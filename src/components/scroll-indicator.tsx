@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react';
 
 export default function ScrollIndicator() {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // Check initial scroll position on mount
+    setVisible(window.scrollY < 100);
+
     const handleScroll = () => {
       // Hide when scrolled more than 100px from top
       setVisible(window.scrollY < 100);

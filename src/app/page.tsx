@@ -320,19 +320,6 @@ export default function Home() {
               mediaSrc="/images/placeholder_kitten_3.avif"
               mediaCaption="gameplay with procedural generation"
             />
-
-            {/* <ExperienceItem
-              title="equitable skin cancer diagnosis web app"
-              subtitle="openCV, keras, python, javascript • 2023"
-              bullets={[
-                "trained CNN for skin cancer diagnosis achieving 0.89 AUC, surpassing human diagnosis",
-                "deployed models to web app using TensorFlow.js for real-time classification",
-                "improved performance on underrepresented skin tones by 18% through data augmentation"
-              ]}
-              mediaType="image"
-              mediaSrc="/images/skin-cancer-app.png"
-              mediaCaption="web app interface with diagnosis results"
-            /> */}
           </div>
         </div>
 
@@ -381,6 +368,13 @@ export default function Home() {
           </div>
         </div>
       </div>
+      
+      {/* Footer */}
+      <footer className="w-full text-center" style={{ marginTop: '64px', paddingBottom: '16px' }}>
+        <p className="text-sm font-helvetica text-gray-600">
+          © 2025 andrew zhou
+        </p>
+      </footer>
     </div>
   );
 }
