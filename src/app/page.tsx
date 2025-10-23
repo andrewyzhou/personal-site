@@ -1,21 +1,49 @@
+'use client';
+
 import Image from "next/image";
+import { useState } from "react";
 import ExperienceItem from "@/components/experience-item";
 import Navbar from "@/components/navbar";
 import ScrollIndicator from "@/components/scroll-indicator";
 
 export default function Home() {
+  const [showNotice, setShowNotice] = useState(true);
+
   return (
     <div className="min-h-screen">
       <Navbar />
       <ScrollIndicator />
       
       {/* Construction Notice */}
-      <div className="fixed bottom-4 left-4 z-50 bg-[#f4f2ee] border-4 border-[#c19c9c] rounded-2xl" style={{ padding: '16px 24px', maxWidth: '370px' }}>
+      <div 
+        className={`fixed bottom-4 left-4 z-50 bg-[#f4f2ee] border-4 border-[#c19c9c] rounded-2xl transition-all duration-300 ease-in-out ${
+          showNotice ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+        style={{ padding: '16px 48px 16px 24px', maxWidth: '240px' }}
+      >
         <div className="text-sm font-helvetica text-gray-800 leading-relaxed">
           <div>
-          <span className="font-bold text-[#c19c9c]">notice:</span> website is best viewed on mobile as site design (and contents) are still under construction<span className="animate-dots"></span>
+            <span className="font-bold text-[#c19c9c]">notice:</span> website is best viewed on mobile as site design (and contents) are still under construction<span className="animate-dots"></span>
           </div>
         </div>
+        
+        {/* Close button */}
+        <button
+          onClick={() => setShowNotice(false)}
+          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center text-[#c19c9c] hover:text-[#a07c7c] transition-all duration-200 hover:scale-110 hover:rotate-90 group"
+          aria-label="Close notice"
+        >
+          <svg
+            className="w-5 h-5 transition-transform duration-200"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          >
+            <path d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
       
       {/* Desktop: positioned layout | Mobile: stacked flow layout */}
