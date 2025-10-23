@@ -1,103 +1,346 @@
 import Image from "next/image";
+import ExperienceItem from "@/components/experience-item";
+import Navbar from "@/components/navbar";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen">
+      <Navbar />
+      {/* Desktop: positioned layout | Mobile: stacked flow layout */}
+      <div className="md:relative scroll-mt-20" id="home">
+        
+        {/* Header Section - stacks naturally on mobile, positioned on desktop */}
+        <div className="flex flex-col items-center pt-8 px-8 md:p-0">
+          
+          {/* Intro text */}
+          <p className="text-xl font-helvetica text-center md:text-left md:absolute md:left-[15vw] md:top-[14vh] text-gray-800">
+            hi, i'm...
+          </p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          {/* Name */}
+          <h1 
+            id="main-name"
+            className="text-7xl md:text-8xl font-helvetica text-center md:text-left md:absolute md:left-[15vw] md:top-[20vh]"
+          >
+            <span 
+              className="text-[#303030]"
+              style={{
+                textShadow: '3px 3px 0px rgba(0, 0, 0, 0.4)'
+              }}
+            >
+              andrew
+            </span>{' '}
+            <span 
+              className="text-[#9c9fc1]"
+              style={{
+                textShadow: '3px 3px 0px rgba(0, 0, 0, 0.4)'
+              }}
+            >
+              zhou
+            </span>
+          </h1>
+
+          {/* Headshot */}
+          <div 
+            className="relative w-48 h-48 mt-8 md:w-[20vw] md:h-[20vw] md:mt-0 md:absolute md:right-[15vw] md:top-[8vw] rounded-full border-4 border-[#9c9fc1]"
           >
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+              src="/images/headshot.png"
+              alt="Andrew Zhou headshot"
+              fill
+              className="object-cover rounded-full"
+              priority
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
+
+          {/* Contact and Links - centered below headshot */}
+          <div className="mt-8 flex flex-col items-center md:absolute md:right-[15vw] md:top-[calc(8vw+20vw+1.5vw)] md:w-[20vw]">
+            {/* Email */}
+            <p className="text-lg font-helvetica text-gray-800 text-center mb-3">
+              andrewzhou [at] berkeley [dot] edu
+            </p>
+            
+            {/* Academic Links */}
+            <div className="flex justify-center gap-x-2 font-helvetica text-lg mb-1">
+              <a 
+                href="https://github.com/andrewyzhou" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#9c9fc1] hover:underline"
+              >
+                github
+              </a>
+              <span className="text-gray-800">/</span>
+              <a 
+                href="/docs/cv.pdf" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#9c9fc1] hover:underline"
+              >
+                CV
+              </a>
+              <span className="text-gray-800">/</span>
+              <a 
+                href="https://scholar.google.com/citations?user=CNboCcMAAAAJ" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#9c9fc1] hover:underline"
+              >
+                google scholar
+              </a>
+            </div>
+
+            {/* Professional Links */}
+            <div className="flex justify-center gap-x-2 font-helvetica text-lg">
+              <a 
+                href="/docs/resume.pdf" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#9c9fc1] hover:underline"
+              >
+                resume
+              </a>
+              <span className="text-gray-800">/</span>
+              <a 
+                href="https://www.linkedin.com/in/andrewyzhou/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#9c9fc1] hover:underline"
+              >
+                linkedin
+              </a>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Bio Section - flows after header on mobile, positioned on desktop */}
+        <div className="mt-12 px-8 relative md:absolute md:left-[17vw] md:right-[5vw] md:top-[35vh] md:max-w-[45vw] md:right-auto">
+          {/* Vertical line and content wrapper */}
+          <div className="relative flex gap-6">
+            {/* Vertical line */}
+            <div className="w-1 bg-[#9c9fc1] flex-shrink-0 absolute left-[-2vw] md:left-[-2vw] top-0 bottom-0 rounded-full"></div>
+            
+            {/* Bio content */}
+            <div className="text-xl text-gray-800 font-helvetica">
+              <p style={{ marginBottom: '12px' }}>
+                i'm an undergraduate at berkeley studying electrical engineering and computer science. my interests include machine learning, computer vision, AI-driven biology, and teaching.
+              </p>
+
+              <div style={{ marginBottom: '12px' }}>
+                <p className="mb-2">currently, i'm:</p>
+                <ul className="list-disc list-outside space-y-1 pl-1" style={{ marginLeft: '1.5rem' }}>
+                  <li>teaching berkeley bears as a part of <a href="https://cs61a.org/staff/" target="_blank" rel="noopener noreferrer" className="text-[#9c9fc1] hover:underline">cs61a staff</a></li>
+                  <li>training to run the berkeley half marathon!</li>
+                  <li>working on this website {'>:)'}</li>
+                </ul>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <p className="mb-2">previously, i was:</p>
+                <ul className="list-disc list-outside space-y-1 pl-1" style={{ marginLeft: '1.5rem' }}>
+                  <li>conducting machine learning research at the <a href="https://med.stanford.edu/guolanlulab.html" target="_blank" rel="noopener noreferrer" className="text-[#9c9fc1] hover:underline">guolan lu lab</a></li>
+                </ul>
+              </div>
+
+              <p>
+              in my free time, I make electronic music, lift weights, play guitar, go to concerts, run, hike, backpack, and play soccer and tennis.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Spacer for absolute positioned header/bio */}
+        <div className="hidden md:block md:h-[100vh] md:w-0"></div>
+
+        {/* Research Section */}
+        <div id="research" className="mt-16 px-8 relative md:mt-0 pb-32 scroll-mt-16 md:scroll-mt-20" style={{ paddingLeft: '15vw', paddingRight: '15vw' }}>
+          <h2 className="text-5xl md:text-[80px] font-helvetica text-[#303030] text-center md:text-left">
+            research
+          </h2>
+
+          {/* Research Items */}
+          <div className="md:ml-[2vw]" style={{ paddingTop: '20px' }}>
+            <ExperienceItem
+              title="machine learning research intern"
+              subtitle="stanford university • may 2025 - aug 2025"
+              bullets={[
+                "built modular 3D analysis pipeline adopted as lab's primary workflow for imaging datasets",
+                "trained 4D diffusion-transformer model for multi-channel super-resolution and 3D reconstruction",
+                "proposed swin-4D hybrid attention transformer for 5× faster training vs. baseline ViT"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/stanford_medicine_logo.png"
+              mediaCaption=""
+            />
+          </div>
+        </div>
+
+        {/* Experience Section */}
+        <div id="experience" className="px-8 relative pb-32 scroll-mt-16 md:scroll-mt-20" style={{ paddingLeft: '15vw', paddingRight: '15vw', marginTop: '4rem' }}>
+          <h2 className="text-5xl md:text-[80px] font-helvetica text-[#303030] text-center md:text-left">
+            experience
+          </h2>
+
+          {/* Experience Items */}
+          <div className="md:ml-[2vw]" style={{ paddingTop: '20px' }}>
+            <ExperienceItem
+              title="software engineer"
+              subtitle="iPick.ai • sept 2024 - present"
+              bullets={[
+                "built full-stack portfolio analysis dashboard with multi-RAG agent stock-screening ensemble",
+                "implemented agents using LangChain + GPT-4o + FinBERT embeddings with FAISS vector database",
+                "accelerated response times by 10× through Redis caching and request optimization"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/ipick_logo.png"
+              mediaCaption=""
+            />
+
+            <ExperienceItem
+              title="game development intern"
+              subtitle="claythis • june 2025 - aug 2025"
+              bullets={[
+                "led integration of 3-intern team's systems and established modular project architecture",
+                "engineered modular NPC systems: AI navigation, behavior FSMs, health, and combat controllers",
+                "delivered full video game in 7 weeks for fundraising showcase"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/claythis_logo.png"
+              mediaCaption=""
+            />
+          </div>
+        </div>
+
+        {/* Teaching Section */}
+        <div id="teaching" className="px-8 relative pb-32 scroll-mt-16 md:scroll-mt-20" style={{ paddingLeft: '15vw', paddingRight: '15vw', marginTop: '4rem' }}>
+          <h2 className="text-5xl md:text-[80px] font-helvetica text-[#303030] text-center md:text-left">
+            teaching
+          </h2>
+
+          {/* Teaching Items */}
+          <div className="md:ml-[2vw]" style={{ paddingTop: '20px' }}>
+            <ExperienceItem
+              title="cs61a: tutor (cs scholars)"
+              subtitle="uc berkeley • aug 2025 - present"
+              bullets={[
+                "co-teaching the <a href='https://eecs.berkeley.edu/cs-scholars/' target='_blank' rel='noopener noreferrer' class='text-[#9c9fc1] hover:underline'>cs scholars</a> discussion and lab",
+                "leading 2 weekly small group tutoring sections for 5-8 students each",
+                "supporting cs scholars students through weekly personal tutoring sections"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/cs61a_shirt.png"
+              mediaCaption=""
+            />
+          </div>
+        </div>
+
+        {/* Projects Section */}
+        <div id="projects" className="px-8 relative pb-32 scroll-mt-16 md:scroll-mt-20" style={{ paddingLeft: '15vw', paddingRight: '15vw', marginTop: '4rem' }}>
+          <h2 className="text-5xl md:text-[80px] font-helvetica text-[#303030] text-center md:text-left">
+            projects
+          </h2>
+
+          {/* Projects Items */}
+          <div style={{ paddingTop: '20px' }}>
+            <ExperienceItem
+              title="waveposer: real-time pose-to-audio synthesis"
+              subtitle="react, next.js, node.js, tailwind, web audio API • 2025"
+              bullets={[
+                "built real-time CV app converting human pose into waveforms using MediaPipe",
+                "developed Tone.js effects pipeline with gain, distortion, EQ, and reverb controls",
+                "architected modular React+Zustand system with reusable hooks"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/placeholder_kitten_1.jpg"
+              mediaCaption="live demo of pose-to-audio synthesis"
+            />
+
+            <ExperienceItem
+              title="secure distributed file system"
+              subtitle="golang, C • 2025"
+              bullets={[
+                "built secure file-sharing backend with user authentication and access revocation",
+                "designed stateless, concurrency-safe API for multi-device sessions",
+                "authored 40+ test suites covering tampering and edge cases"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/placeholder_kitten_2.webp"
+              mediaCaption="system architecture diagram"
+            />
+
+            <ExperienceItem
+              title="procedurally generated adventure game"
+              subtitle="java, data structures & algorithms • 2024"
+              bullets={[
+                "used disjoint-set data structure for procedural level generation with reproducible seeds",
+                "designed graph search algorithms for NPC pathfinding and item spawning",
+                "implemented ray casting for 3D first-person view"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/placeholder_kitten_3.avif"
+              mediaCaption="gameplay with procedural generation"
+            />
+
+            {/* <ExperienceItem
+              title="equitable skin cancer diagnosis web app"
+              subtitle="openCV, keras, python, javascript • 2023"
+              bullets={[
+                "trained CNN for skin cancer diagnosis achieving 0.89 AUC, surpassing human diagnosis",
+                "deployed models to web app using TensorFlow.js for real-time classification",
+                "improved performance on underrepresented skin tones by 18% through data augmentation"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/skin-cancer-app.png"
+              mediaCaption="web app interface with diagnosis results"
+            /> */}
+          </div>
+        </div>
+
+        {/* Other Section */}
+        <div id="other" className="px-8 relative scroll-mt-16 md:scroll-mt-20" style={{ paddingLeft: '15vw', paddingRight: '15vw', marginTop: '4rem' }}>
+          <h2 className="text-5xl md:text-[80px] font-helvetica text-[#303030] text-center md:text-left">
+            other
+          </h2>
+
+          {/* Other Items */}
+          <div className="md:ml-[2vw]" style={{ paddingTop: '20px' }}>
+            <ExperienceItem
+              title="coursework"
+              subtitle="uc berkeley & hs concurrent enrollment"
+              bullets={[
+                "cs 170: efficient algorithms & intractable problems",
+                "cs 161: computer security",
+                "eecs 127: optimization models in engineering",
+                "cs 61a: structure & interpretation of computer programs",
+                "cs 61b: data structures",
+                "cs 61c: computer architecture",
+                "eecs 16a: signals & systems",
+                "eecs 16b: circuits & devices",
+                "cs 70: discrete math & probability",
+                "multivariable calculus",
+                "linear algebra"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/eecs_logo.png"
+              mediaCaption=""
+            />
+
+            <ExperienceItem
+              title="side quests"
+              subtitle="high school adventures"
+              bullets={[
+                "science olympiad: captained the 2024 (go <a href='https://mvso.club/' target='_blank' rel='noopener noreferrer' class='text-[#9c9fc1] hover:underline'>MVSO</a>!), 2020, and 2019 science olympiad national championship teams",
+                "research: 1st place at 2023 <a href='https://science-fair.org/' target='_blank' rel='noopener noreferrer' class='text-[#9c9fc1] hover:underline'>synopsys championship</a>",
+                "olympiads: usajmo qualifier, usaco gold",
+                "clubs: artificial intellgence (president), data science club (president), science olympiad (president), chess, research"
+              ]}
+              mediaType="image"
+              mediaSrc="/images/scioly.jpeg"
+              mediaCaption="2024 science olympiad nationals"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
