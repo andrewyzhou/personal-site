@@ -14,3 +14,24 @@ body {
   font-family: Helvetica, Arial, sans-serif;
 }
 
+/* Cycling dots animation: . -> .. -> ... */
+@keyframes cycle-dots {
+  0%, 20% {
+    content: '';
+  }
+  20%, 40% {
+    content: '.';
+  }
+  40%, 60% {
+    content: '..';
+  }
+  60%, 100% {
+    content: '...';
+  }
+}
+
+.animate-dots::after {
+  content: '.';
+  animation: cycle-dots 2s steps(1) infinite;
+}
+

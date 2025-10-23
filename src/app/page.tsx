@@ -6,6 +6,16 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <Navbar />
+      
+      {/* Construction Notice */}
+      <div className="fixed bottom-4 left-4 z-50 bg-[#f4f2ee] border-4 border-[#c19c9c] rounded-2xl" style={{ padding: '16px 24px', maxWidth: '370px' }}>
+        <div className="text-sm font-helvetica text-gray-800 leading-relaxed">
+          <div>
+          <span className="font-bold text-[#c19c9c]">notice:</span> website is best viewed on mobile as site design (and contents) are still under construction<span className="animate-dots"></span>
+          </div>
+        </div>
+      </div>
+      
       {/* Desktop: positioned layout | Mobile: stacked flow layout */}
       <div className="md:relative scroll-mt-20" id="home">
         
@@ -143,7 +153,7 @@ export default function Home() {
               </div>
 
               <p>
-              in my free time, I make electronic music, lift weights, play guitar, go to concerts, run, hike, backpack, and play soccer and tennis.
+              in my free time, i make electronic music, lift weights, play guitar, go to concerts, run, hike, backpack, and play soccer and tennis.
               </p>
             </div>
           </div>
