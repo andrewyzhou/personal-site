@@ -1,11 +1,13 @@
 import Image from "next/image";
 import ExperienceItem from "@/components/experience-item";
 import Navbar from "@/components/navbar";
+import ScrollIndicator from "@/components/scroll-indicator";
 
 export default function Home() {
   return (
     <div className="min-h-screen">
       <Navbar />
+      <ScrollIndicator />
       
       {/* Construction Notice */}
       <div className="fixed bottom-4 left-4 z-50 bg-[#f4f2ee] border-4 border-[#c19c9c] rounded-2xl" style={{ padding: '16px 24px', maxWidth: '370px' }}>
