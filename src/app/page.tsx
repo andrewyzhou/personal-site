@@ -292,7 +292,7 @@ export default function Home() {
               ]}
               mediaType="image"
               mediaSrc="/images/placeholder_kitten_1.jpg"
-              mediaCaption="live demo of pose-to-audio synthesis"
+              mediaCaption="<s>live demo of pose-to-audio synthesis</s> placeholder_kitten_1"
             />
 
             <ExperienceItem
@@ -305,7 +305,7 @@ export default function Home() {
               ]}
               mediaType="image"
               mediaSrc="/images/placeholder_kitten_2.webp"
-              mediaCaption="system architecture diagram"
+              mediaCaption="<s>distributed file system architecture diagram</s> placeholder_kitten_2"
             />
 
             <ExperienceItem
@@ -318,7 +318,7 @@ export default function Home() {
               ]}
               mediaType="image"
               mediaSrc="/images/placeholder_kitten_3.avif"
-              mediaCaption="gameplay with procedural generation"
+              mediaCaption="<s>gameplay with procedural generation</s> placeholder_kitten_3"
             />
           </div>
         </div>

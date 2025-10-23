@@ -66,9 +66,7 @@ export default function ExperienceItem({
             
             {/* Caption */}
             {mediaCaption && (
-              <p className="text-sm font-helvetica text-gray-600 text-center mt-2">
-                {mediaCaption}
-              </p>
+              <p className="text-sm font-helvetica text-gray-600 text-center mt-2" dangerouslySetInnerHTML={{ __html: mediaCaption }}></p>
             )}
           </div>
         </div>
