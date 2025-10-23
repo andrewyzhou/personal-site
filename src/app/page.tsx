@@ -24,7 +24,7 @@ export default function Home() {
           
           {/* Intro text */}
           <p className="text-xl font-helvetica text-center md:text-left md:absolute md:left-[15vw] md:top-[14vh] text-gray-800">
-            hi, i'm...
+            hi, i&apos;m...
           </p>
 
           {/* Name */}
@@ -133,11 +133,11 @@ export default function Home() {
             {/* Bio content */}
             <div className="text-xl text-gray-800 font-helvetica">
               <p style={{ marginBottom: '12px' }}>
-                i'm an undergraduate at berkeley studying electrical engineering and computer science. my interests include machine learning, computer vision, AI-driven biology, and teaching.
+                i&apos;m an undergraduate at berkeley studying electrical engineering and computer science. my interests include machine learning, computer vision, AI-driven biology, and teaching.
               </p>
 
               <div style={{ marginBottom: '12px' }}>
-                <p className="mb-2">currently, i'm:</p>
+                <p className="mb-2">currently, i&apos;m:</p>
                 <ul className="list-disc list-outside space-y-1 pl-1" style={{ marginLeft: '1.5rem' }}>
                   <li>teaching berkeley bears as a part of <a href="https://cs61a.org/staff/" target="_blank" rel="noopener noreferrer" className="text-[#9c9fc1] hover:underline">cs61a staff</a></li>
                   <li>training to run the berkeley half marathon!</li>

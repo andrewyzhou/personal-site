@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 export default function Navbar() {
   const [activeSection, setActiveSection] = useState('home');
   const [showNameInNav, setShowNameInNav] = useState(false);
 
-  const sections = [
+  const sections = useMemo(() => [
     { id: 'home', label: 'home' },
     { id: 'research', label: 'research' },
     { id: 'experience', label: 'experience' },
     { id: 'teaching', label: 'teaching' },
     { id: 'projects', label: 'projects' },
     { id: 'other', label: 'other' },
-  ];
+  ], []);
 
   // Smooth scroll to section
   const scrollToSection = (sectionId: string) => {
