@@ -23,7 +23,7 @@ export default function Home() {
       >
         <div className="text-sm font-helvetica text-gray-800 leading-relaxed">
           <div>
-            <span className="font-bold text-[#c19c9c]">notice:</span> website is best viewed on mobile as site design (and contents) are still under construction<span className="animate-dots"></span>
+            <span className="font-bold text-[#c19c9c]">notice:</span> website is best viewed on desktop as site design (and contents) are still under construction<span className="animate-dots"></span>
           </div>
         </div>
         
