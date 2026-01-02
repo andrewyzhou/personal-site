@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+@theme {
+  --color-off-black: #101010;
+  --color-off-white: #EEEEEE;
+  --color-secondary: #CCCCCC;
+  --color-gray: #AAAAAA;
+  --color-divider: #303030;
+
+  --font-sans: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  font-optical-sizing: auto;
+}
+
+/* ============================================
+   THEME SYSTEM - CSS Custom Properties
+   ============================================
+   Dark mode: light content on dark background
+   Light mode: dark content on light background
+   ============================================ */
+
+:root {
+  /* semantic colors - dark mode defaults */
+  --theme-bg: #101010;
+  --theme-text: #CCCCCC;
+  --theme-text-primary: #EEEEEE;
+  --theme-text-muted: #AAAAAA;
+  --theme-divider: #303030;
+  --theme-highlight-bg: rgba(238, 238, 238, 0.08);
+  --theme-highlight-bg-hover: rgba(238, 238, 238, 0.15);
+  --theme-highlight-bg-active: rgba(238, 238, 238, 0.18);
+  --theme-card-bg: rgba(238, 238, 238, 0.10);
+  --theme-card-bg-hover: rgba(238, 238, 238, 0.05);
+  --theme-headshot-bg: #DCDCDC;
+  --theme-scrollbar-track: #101010;
+  --theme-scrollbar-thumb: #AAAAAA;
+  --theme-scrollbar-thumb-hover: #EEEEEE;
+  /* github contribution colors */
+  --contrib-0: #1a1a1a;
+  --contrib-1: #444444;
+  --contrib-2: #666666;
+  --contrib-3: #999999;
+  --contrib-4: #EEEEEE;
+}
+
+.theme-light {
+  --theme-bg: #EEEEEE;
+  --theme-text: #333333;
+  --theme-text-primary: #101010;
+  --theme-text-muted: #555555;
+  --theme-divider: #CFCFCF;
+  --theme-highlight-bg: rgba(16, 16, 16, 0.08);
+  --theme-highlight-bg-hover: rgba(16, 16, 16, 0.15);
+  --theme-highlight-bg-active: rgba(16, 16, 16, 0.18);
+  --theme-card-bg: rgba(16, 16, 16, 0.08);
+  --theme-card-bg-hover: rgba(16, 16, 16, 0.05);
+  --theme-scrollbar-track: #EEEEEE;
+  --theme-scrollbar-thumb: #555555;
+  --theme-scrollbar-thumb-hover: #101010;
+  /* github contribution colors */
+  --contrib-0: #e0e0e0;
+  --contrib-1: #b0b0b0;
+  --contrib-2: #808080;
+  --contrib-3: #505050;
+  --contrib-4: #101010;
+}
+
+body {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+/* ============================================
+   LINK HIGHLIGHT STYLES
+   ============================================ */
+
+.link-highlight {
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  background-color: var(--theme-highlight-bg);
+  padding: 0px 2px 1px 2px;
+  margin-left: 1px;
+  margin-right: 1px;
+  border-radius: 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.link-highlight:hover {
+  color: var(--theme-text-primary);
+  background-color: var(--theme-highlight-bg-hover);
+}
+
+.link-highlight-active {
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  background-color: var(--theme-highlight-bg-active);
+  padding: 0px 4px 1px 4px;
+  margin-left: 1px;
+  margin-right: 1px;
+  border-radius: 4px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* ============================================
+   SECTION DIVIDER
+   ============================================ */
+
+.section-divider {
+  height: 2px;
+  background-color: var(--theme-divider);
+  width: 100%;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* ============================================
+   GITHUB CONTRIBUTION COLORS
+   ============================================ */
+
+.contrib-0 { background-color: var(--contrib-0); }
+.contrib-1 { background-color: var(--contrib-1); }
+.contrib-2 { background-color: var(--contrib-2); }
+.contrib-3 { background-color: var(--contrib-3); }
+.contrib-4 { background-color: var(--contrib-4); }
+
+/* ============================================
+   CURSOR BLINK ANIMATION
+   ============================================ */
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-cursor-blink {
+  animation: cursor-blink 1s ease-in-out infinite;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--theme-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--theme-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-scrollbar-thumb-hover);
+}
+
+/* ============================================
+   TAILWIND COLOR OVERRIDES
+   These map Tailwind's color classes to our
+   semantic theme variables
+   ============================================ */
+
+/* text colors */
+.text-off-white {
+  color: var(--theme-text-primary);
+}
+
+.text-gray {
+  color: var(--theme-text-muted);
+}
+
+.text-secondary {
+  color: var(--theme-text);
+}
+
+/* background colors */
+.bg-off-white {
+  background-color: var(--theme-text-primary);
+}
+
+/* card backgrounds using theme variables */
+.card-bg {
+  background-color: var(--theme-card-bg);
+}
+
+.card-bg-hover:hover {
+  background-color: var(--theme-card-bg-hover);
+}
+
+/* headshot border */
+.headshot-border {
+  background-color: var(--theme-headshot-bg);
+}
+
+/* invert icons for light mode */
+.theme-light img[src*="/icons/"] {
+  filter: invert(1);
+}
