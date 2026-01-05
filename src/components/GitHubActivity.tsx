@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+
+const MOBILE_WEEKS = 24; 
 
 interface ContributionDay {
   date: string;
@@ -29,6 +31,15 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 export default function GitHubActivity() {
   const [data, setData] = useState<GitHubData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -46,6 +57,15 @@ export default function GitHubActivity() {
     }
     fetchData();
   }, []);
+
+  // limit weeks on mobile - must be before early returns
+  const displayWeeks = useMemo(() => {
+    if (!data) return [];
+    if (isMobile) {
+      return data.weeks.slice(-MOBILE_WEEKS);
+    }
+    return data.weeks;
+  }, [data, isMobile]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -106,7 +126,7 @@ export default function GitHubActivity() {
     );
   }
 
-  const monthLabels = getMonthLabels(data.weeks);
+  const monthLabels = getMonthLabels(displayWeeks);
 
   return (
     <section className="py-16">
@@ -142,7 +162,7 @@ export default function GitHubActivity() {
 
           {/* graph grid */}
           <div className="flex gap-[2px]">
-            {data.weeks.map((week, weekIndex) => (
+            {displayWeeks.map((week, weekIndex) => (
               <div key={weekIndex} className="flex flex-col gap-[2px]">
                 {week.days.map((day, dayIndex) => (
                   <div
