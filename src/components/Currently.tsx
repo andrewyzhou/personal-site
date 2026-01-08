@@ -353,8 +353,12 @@ export default function Currently() {
     if (strava) {
       const timeAgo = formatStravaTime(strava.startDate);
       const useDuration = ["WeightTraining", "Workout", "Yoga", "Crossfit"].includes(strava.type);
+      const needsSession = ["Yoga", "Crossfit"].includes(strava.type);
       const activityMetric = useDuration ? strava.formattedDuration : strava.formattedDistance;
-      const workoutText = `${activityMetric} ${getActivityType(strava.type)}`;
+      const activityType = getActivityType(strava.type);
+      const workoutText = needsSession
+        ? `${activityMetric} ${activityType} session`
+        : `${activityMetric} ${activityType}`;
 
       text += " my last workout was a ";
       const linkStart = text.length;
