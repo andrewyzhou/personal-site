@@ -457,11 +457,11 @@ export default function Currently() {
     }, LINE_TRANSITION_DELAY);
   }, [isTypingComplete, footerAnimationPhase, cachedFetchedAt, prevApiCalls, apiCalls, wasRefetched, displayedFetchTime, animateDeleteType]);
 
-  // update "data last fetched" every minute with typing animation
+  // update "data last fetched" - on interval and when tab becomes visible
   useEffect(() => {
     if (footerAnimationPhase !== "done" || cachedFetchedAt === null) return;
 
-    const interval = setInterval(() => {
+    const updateFetchTime = () => {
       const oldTime = displayedFetchTime;
       const newTime = formatFetchedTime(cachedFetchedAt);
 
@@ -474,9 +474,22 @@ export default function Currently() {
           });
         }, PRE_TYPE_DELAY);
       }
-    }, 60000); // every minute
+    };
 
-    return () => clearInterval(interval);
+    // update when tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        updateFetchTime();
+      }
+    };
+
+    const interval = setInterval(updateFetchTime, 60000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [footerAnimationPhase, cachedFetchedAt, displayedFetchTime, animateDeleteType]);
 
   // render text with links (apply links as soon as we start typing them)
