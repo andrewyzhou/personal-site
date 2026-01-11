@@ -33,6 +33,72 @@ export interface StravaActivity {
   elapsedTime: number;
 }
 
+// simplified activity for calendar display
+export interface CalendarActivity {
+  id: number;
+  type: string;
+  date: string; // YYYY-MM-DD format (local date)
+}
+
+// fetch all activities with pagination, optionally after a timestamp
+export async function getAllActivities(after?: number): Promise<CalendarActivity[]> {
+  if (!REFRESH_TOKEN) {
+    return [];
+  }
+
+  try {
+    const accessToken = await getAccessToken();
+    const allActivities: CalendarActivity[] = [];
+    let page = 1;
+    const perPage = 200;
+
+    while (true) {
+      const params = new URLSearchParams({
+        per_page: perPage.toString(),
+        page: page.toString(),
+      });
+      if (after) {
+        params.set("after", after.toString());
+      }
+
+      const response = await fetch(`${ACTIVITIES_ENDPOINT}?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch Strava activities");
+      }
+
+      const activities = await response.json();
+      if (activities.length === 0) {
+        break;
+      }
+
+      for (const activity of activities) {
+        // convert to local date string (YYYY-MM-DD)
+        const localDate = activity.start_date_local.split("T")[0];
+        allActivities.push({
+          id: activity.id,
+          type: activity.type,
+          date: localDate,
+        });
+      }
+
+      if (activities.length < perPage) {
+        break;
+      }
+      page++;
+    }
+
+    return allActivities;
+  } catch (error) {
+    console.error("Strava API error fetching all activities:", error);
+    return [];
+  }
+}
+
 export async function getLatestActivity(): Promise<StravaActivity | null> {
   if (!REFRESH_TOKEN) {
     return null;
