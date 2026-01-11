@@ -3,6 +3,7 @@ import Experience from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
+import StravaCalendar from "@/components/StravaCalendar";
 
 export default function Home() {
   return (
@@ -31,8 +32,20 @@ export default function Home() {
       </section>
       <div className="section-divider" />
 
-      {/* section 4: github */}
-      <GitHubActivity />
+      {/* section 4: github activity + strava calendar */}
+      <section className="py-16">
+        <div className="flex flex-col md:flex-row justify-between gap-12">
+          {/* left side - github activity */}
+          <div className="w-full md:w-2/3">
+            <GitHubActivity />
+          </div>
+
+          {/* right side - strava calendar */}
+          <div className="w-full md:w-1/3 flex justify-center">
+            <StravaCalendar />
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

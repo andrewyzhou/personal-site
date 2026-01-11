@@ -13,7 +13,10 @@ export const metadata: Metadata = {
   title: "andrew zhou",
   description: "electrical engineering & computer science @ uc berkeley",
   icons: {
-    icon: "/images/logo.svg",
+    icon: [
+      { url: "/images/favicon.png", sizes: "48x48", type: "image/png" },
+      { url: "/images/logo.svg", type: "image/svg+xml" },
+    ],
   },
 };
 
