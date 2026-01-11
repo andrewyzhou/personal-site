@@ -7,7 +7,7 @@ import StravaCalendar from "@/components/StravaCalendar";
 
 export default function Home() {
   return (
-    <main style={{ maxWidth: '1344px', margin: '0 auto', paddingTop: '10%', paddingBottom: '10%', paddingLeft: '5%', paddingRight: '5%' }}>
+    <main style={{ maxWidth: '1344px', margin: '0 auto', paddingTop: '2.5%', paddingBottom: '10%', paddingLeft: '5%', paddingRight: '5%' }}>
       {/* section 1: hero */}
       <Hero />
       <div className="section-divider" />
