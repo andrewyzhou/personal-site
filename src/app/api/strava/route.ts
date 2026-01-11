@@ -14,7 +14,7 @@ async function fetchStravaData() {
   return {
     ...activity,
     formattedDistance: formatDistance(activity.distance),
-    formattedDuration: formatDuration(activity.movingTime),
+    formattedDuration: formatDuration(activity.elapsedTime),
     formattedTimeAgo: formatTimeAgo(activity.startDate),
   };
 }
