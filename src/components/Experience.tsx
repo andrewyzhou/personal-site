@@ -214,7 +214,7 @@ export default function Experience() {
           </>
         ) : (
           /* other categories use the two-column list/detail layout */
-          <div className="flex flex-col md:flex-row gap-12 h-full">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-12 h-full">
             {/* left side - item list */}
             <div className="w-full md:w-1/2" style={{ marginLeft: '0rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {items.map((item) => (
