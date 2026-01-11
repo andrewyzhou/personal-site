@@ -69,15 +69,14 @@ export default function GitHubActivity() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
+    const month = MONTHS[date.getMonth()];
+    const day = date.getDate();
     const year = date.getFullYear();
-    const hours = date.getHours().toString().padStart(2, "0");
+    let hours = date.getHours();
     const minutes = date.getMinutes().toString().padStart(2, "0");
-    const seconds = date.getSeconds().toString().padStart(2, "0");
-    // get timezone abbreviation
-    const tzAbbr = date.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
-    return `${month}/${day}/${year}, ${hours}:${minutes}:${seconds} ${tzAbbr}`;
+    const ampm = hours >= 12 ? "pm" : "am";
+    hours = hours % 12 || 12;
+    return `${month} ${day}, ${year} at ${hours}:${minutes} ${ampm}`;
   };
 
   // get month labels for the graph - use the first day of each week that starts a new month
@@ -109,80 +108,81 @@ export default function GitHubActivity() {
 
   if (loading) {
     return (
-      <section className="py-16">
+      <div>
         <div className="h-[100px] card-bg animate-pulse rounded" />
         <div className="h-4 w-64 card-bg animate-pulse rounded mt-4" />
-      </section>
+      </div>
     );
   }
 
   if (!data) {
     return (
-      <section className="py-16">
+      <div>
         <div className="text-gray text-lg font-serif">
           failed to load github activity
         </div>
-      </section>
+      </div>
     );
   }
 
   const monthLabels = getMonthLabels(displayWeeks);
 
   return (
-    <section className="py-16">
+    <div>
       <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
         activity
       </h3>
+
       {/* contribution graph */}
       <div className="mb-4">
         {/* month labels */}
         <div className="relative mb-1 h-4" style={{ marginLeft: '1.75rem' }}>
-          {monthLabels.map((label, i) => (
-            <div
-              key={i}
-              className="text-gray text-xs font-sans absolute"
-              style={{
-                left: `${label.weekIndex * 12}px`, // 10px square + 2px gap = 12px per week, +36px offset (3 blocks)
-              }}
-            >
-              {label.month}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex">
-          {/* day labels */}
-          <div className="flex flex-col justify-between text-xs text-gray font-sans py-[2px]" style={{ marginRight: '0.2rem' }}>
-            {DAYS.map((day, i) => (
-              <div key={i} className="h-[10px] leading-[10px]">
-                {day}
+            {monthLabels.map((label, i) => (
+              <div
+                key={i}
+                className="text-gray text-xs font-sans absolute"
+                style={{
+                  left: `${label.weekIndex * 12}px`,
+                }}
+              >
+                {label.month}
               </div>
             ))}
           </div>
 
-          {/* graph grid */}
-          <div className="flex gap-[2px]">
-            {displayWeeks.map((week, weekIndex) => (
-              <div key={weekIndex} className="flex flex-col gap-[2px]">
-                {week.days.map((day, dayIndex) => (
-                  <div
-                    key={dayIndex}
-                    className={`w-[10px] h-[10px] rounded-[2px] contrib-${day.level}`}
-                    title={`${day.date}: ${day.count} contributions`}
-                  />
-                ))}
-              </div>
-            ))}
+          <div className="flex">
+            {/* day labels */}
+            <div className="flex flex-col justify-between text-xs text-gray font-sans py-[2px]" style={{ marginRight: '0.2rem' }}>
+              {DAYS.map((day, i) => (
+                <div key={i} className="h-[10px] leading-[10px]">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* graph grid */}
+            <div className="flex gap-[2px]">
+              {displayWeeks.map((week, weekIndex) => (
+                <div key={weekIndex} className="flex flex-col gap-[2px]">
+                  {week.days.map((day, dayIndex) => (
+                    <div
+                      key={dayIndex}
+                      className={`w-[10px] h-[10px] rounded-[2px] contrib-${day.level}`}
+                      title={`${day.date}: ${day.count} contributions`}
+                    />
+                  ))}
+                </div>
+              ))}
           </div>
         </div>
       </div>
 
-      {/* latest commit info - below the graph */}
+      {/* latest commit info */}
       {data.latestCommit && (
         <p className="font-sans text-gray text-lg" style={{ marginTop: '0.5rem' }}>
-          this site was last deployed on {formatDate(data.latestCommit.date)} for commit {data.latestCommit.sha}
+          this site was last deployed on {formatDate(data.latestCommit.date)} for commit <a href={`https://github.com/andrewyzhou/personal-site/commit/${data.latestCommit.sha}`} target="_blank" rel="noopener noreferrer" className="link-highlight">{data.latestCommit.sha}</a>
         </p>
       )}
-    </section>
+    </div>
   );
 }
