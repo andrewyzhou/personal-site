@@ -1,4 +1,4 @@
-# andrewzhou.me
+# andrewzhou.org
 
 my personal website built with next.js, tailwind, and typescript. inspired by the cool sites of carolyn wang and charlie kubal! 'currently' section uses literal, spotify, and strava APIs. responses + strava calendar are cached with upstash for redis.
 
