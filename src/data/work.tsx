@@ -13,23 +13,38 @@ export const workData: ExperienceItem[] = [
     title: "ml research & software",
     company: "afterquery",
     companyUrl: "https://afterquery.com",
-    description: (<>built <a href="https://appbench.ai" target="_blank" rel="noopener noreferrer" className="link-highlight">appbench.ai</a>, a comprehensive benchmarking platform for code generation tools.</>),
+    description: (
+      <ul className="list-disc list-inside">
+        <li>built <a href="https://appbench.ai" target="_blank" rel="noopener noreferrer" className="link-highlight">appbench.ai</a>, a comprehensive benchmarking platform for code generation tools</li>
+      </ul>
+    ),
     year: "2025",
   },
   {
     id: "lgnova",
-    title: "backend software & agents",
+    title: "backend & llms",
     company: "lg nova",
     companyUrl: "https://www.lgnova.com/",
-    description: "document storage and analysis dashboard to manage lg nova's startups. built restful api and rag pipeline on centralized postgresql db.",
+    description: (
+      <ul className="list-disc list-inside">
+        <li>built document storage + analysis dashboard for lg nova startups</li>
+        <li>designed rest api + rag pipeline on centralized postgresql db</li>
+      </ul>
+    ),
     year: "2025",
   },
   {
     id: "ipick",
-    title: "ai systems",
+    title: "ai agents & systems",
     company: "ipick.ai",
     companyUrl: "https://ipick.ai",
-    description: "financial agents and backend engineering. built multi-rag agent stock-screening ensemble. designed backend systems to support speedy agents.",
+    description: (
+      <ul className="list-disc list-inside">
+        <li>built multi rag agent stock-screening + portfolio analysis ensemble</li>
+        <li>designed backend systems to support speedy agents</li>
+        <li>contributed to 48% growth in 2025 for multi-million AUM</li>
+      </ul>
+    ),
     year: "2025",
   },
   {
@@ -37,7 +52,12 @@ export const workData: ExperienceItem[] = [
     title: "ai 3d models",
     company: "claythis",
     companyUrl: "https://claythis.com",
-    description: "iterating on ai 3d model generation, from animations to textures. built demo for pitch decks.",
+    description: (
+      <ul className="list-disc list-inside">
+        <li>iterated on ai 3d model generation, from animations to textures</li>
+        <li>built demo used in successful investor pitches</li>
+      </ul>
+    ),
     year: "2025",
   },
 ];
