@@ -30,9 +30,10 @@ const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 
 interface GitHubActivityProps {
   showHeading?: boolean;
+  mobileHeading?: boolean;
 }
 
-export default function GitHubActivity({ showHeading = true }: GitHubActivityProps) {
+export default function GitHubActivity({ showHeading = true, mobileHeading = true }: GitHubActivityProps) {
   const [data, setData] = useState<GitHubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -134,7 +135,7 @@ export default function GitHubActivity({ showHeading = true }: GitHubActivityPro
   return (
     <div>
       {showHeading && (
-        <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
+        <h3 className={`font-sans font-bold text-off-white text-3xl${!mobileHeading ? ' hidden md:block' : ''}`} style={{ marginBottom: '0.5rem' }}>
           activity
         </h3>
       )}
