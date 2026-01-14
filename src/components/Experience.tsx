@@ -273,9 +273,9 @@ export default function Experience() {
                       {selectedItem.company}
                     </p>
                   )}
-                  <p className="font-serif text-gray text-lg leading-[1.35]">
+                  <div className="font-serif text-gray text-lg leading-[1.35]">
                     {selectedItem.description}
-                  </p>
+                  </div>
                 </div>
               )}
             </div>
