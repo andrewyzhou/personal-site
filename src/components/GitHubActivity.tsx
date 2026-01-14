@@ -28,7 +28,11 @@ interface GitHubData {
 const DAYS = ["", "mon", "", "wed", "", "fri", ""];
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-export default function GitHubActivity() {
+interface GitHubActivityProps {
+  showHeading?: boolean;
+}
+
+export default function GitHubActivity({ showHeading = true }: GitHubActivityProps) {
   const [data, setData] = useState<GitHubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -129,9 +133,11 @@ export default function GitHubActivity() {
 
   return (
     <div>
-      <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
-        activity
-      </h3>
+      {showHeading && (
+        <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
+          activity
+        </h3>
+      )}
 
       {/* contribution graph */}
       <div className="mb-4">
