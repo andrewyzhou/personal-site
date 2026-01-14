@@ -6,7 +6,11 @@ export const teachingData: ExperienceItem[] = [
     title: "cs 61a tutor",
     company: "uc berkeley eecs department",
     companyUrl: "https://cs61a.org",
-    description: (<>teaching <a href="https://cs61a.org" target="_blank" rel="noopener noreferrer" className="link-highlight">cs 61a</a>&apos;s <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="link-highlight">cs scholars</a> discussion and lab sections!</>),
+    description: (
+      <ul className="list-disc list-inside">
+        <li>teaching <a href="https://cs61a.org" target="_blank" rel="noopener noreferrer" className="link-highlight">cs 61a</a>&apos;s <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="link-highlight">cs scholars</a> discussion and lab sections!</li>
+      </ul>
+    ),
     year: "spring 2026",
   },
   {
@@ -14,7 +18,11 @@ export const teachingData: ExperienceItem[] = [
     title: "cs 61a tutor",
     company: "uc berkeley eecs department",
     companyUrl: "https://cs61a.org",
-    description: (<>taught <a href="https://cs61a.org" target="_blank" rel="noopener noreferrer" className="link-highlight">cs 61a</a>&apos;s <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="link-highlight">cs scholars</a> discussion and lab sections!</>),
+    description: (
+      <ul className="list-disc list-inside">
+        <li>taught <a href="https://cs61a.org" target="_blank" rel="noopener noreferrer" className="link-highlight">cs 61a</a>&apos;s <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="link-highlight">cs scholars</a> discussion and lab sections!</li>
+      </ul>
+    ),
     year: "fall 2025",
   },
 ];
