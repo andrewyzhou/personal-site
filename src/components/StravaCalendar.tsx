@@ -7,6 +7,8 @@ interface CalendarActivity {
   id: number;
   type: string;
   date: string; // YYYY-MM-DD
+  distance: number; // in meters
+  duration: number; // in seconds
 }
 
 interface StoredActivities {
@@ -77,6 +79,55 @@ export default function StravaCalendar() {
       }
     }
     return map;
+  }, [data]);
+
+  // calculate yearly mileage (runs only)
+  const yearlyMileage = useMemo(() => {
+    if (!data?.activities) return 0;
+    const currentYear = new Date().getFullYear();
+    const runTypes = ["Run", "VirtualRun", "TrailRun"];
+
+    const totalMeters = data.activities
+      .filter(a => a.date.startsWith(String(currentYear)) && runTypes.includes(a.type))
+      .reduce((sum, a) => sum + (a.distance || 0), 0);
+
+    return totalMeters / 1609.344; // convert to miles
+  }, [data]);
+
+  // calculate current streak (consecutive days with activity ending today or yesterday)
+  const currentStreak = useMemo(() => {
+    if (!data?.activities || data.activities.length === 0) return 0;
+
+    // get unique dates with activities, sorted descending
+    const activityDates = [...new Set(data.activities.map(a => a.date))].sort().reverse();
+
+    if (activityDates.length === 0) return 0;
+
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    // streak must start from today or yesterday
+    const mostRecent = activityDates[0];
+    if (mostRecent !== todayStr && mostRecent !== yesterdayStr) return 0;
+
+    let streak = 0;
+    let checkDate = new Date(mostRecent);
+
+    for (const dateStr of activityDates) {
+      const expectedStr = checkDate.toISOString().split("T")[0];
+      if (dateStr === expectedStr) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else if (dateStr < expectedStr) {
+        // gap in dates, streak broken
+        break;
+      }
+    }
+
+    return streak;
   }, [data]);
 
   // generate calendar days for current month
@@ -207,6 +258,32 @@ export default function StravaCalendar() {
             </div>
           );
         })}
+      </div>
+
+      {/* stats row */}
+      <div className="flex items-center justify-between" style={{ paddingTop: '12px' }}>
+        <span className="font-sans text-gray text-sm flex items-center gap-1">
+          <Image
+            src="/icons/activities/run.svg"
+            alt="Running"
+            width={14}
+            height={14}
+            className="opacity-70"
+          />
+          {yearlyMileage.toFixed(1)} mi in {new Date().getFullYear()}
+        </span>
+        {currentStreak > 0 && (
+          <span className="font-sans text-gray text-sm flex items-center gap-1">
+            <Image
+              src="/icons/fire.svg"
+              alt="Streak"
+              width={14}
+              height={14}
+              className="opacity-70"
+            />
+            {currentStreak}
+          </span>
+        )}
       </div>
     </div>
   );
