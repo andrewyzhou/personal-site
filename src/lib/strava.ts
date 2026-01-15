@@ -33,11 +33,13 @@ export interface StravaActivity {
   elapsedTime: number;
 }
 
-// simplified activity for calendar display
+// activity for calendar display and stats
 export interface CalendarActivity {
   id: number;
   type: string;
   date: string; // YYYY-MM-DD format (local date)
+  distance: number; // in meters
+  duration: number; // in seconds (moving time)
 }
 
 // fetch all activities with pagination, optionally after a timestamp
@@ -83,6 +85,8 @@ export async function getAllActivities(after?: number): Promise<CalendarActivity
           id: activity.id,
           type: activity.type,
           date: localDate,
+          distance: activity.distance || 0,
+          duration: activity.moving_time || 0,
         });
       }
 
