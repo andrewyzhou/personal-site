@@ -114,6 +114,20 @@ export default function Experience() {
   const [activeCategory, setActiveCategory] = useState<Category>("work");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
 
+  // read hash on mount and set category
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) as Category;
+    if (categories.some(c => c.id === hash)) {
+      setActiveCategory(hash);
+    }
+  }, []);
+
+  // update hash when category changes
+  const handleCategoryChange = (category: Category) => {
+    setActiveCategory(category);
+    window.history.replaceState(null, "", `#${category}`);
+  };
+
   const getItemsData = (): ExperienceItem[] => {
     switch (activeCategory) {
       case "work":
@@ -146,7 +160,7 @@ export default function Experience() {
         {categories.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
+            onClick={() => handleCategoryChange(cat.id)}
             className={`font-sans text-3xl transition-colors ${
               activeCategory === cat.id
                 ? "text-off-white font-medium link-highlight-active"

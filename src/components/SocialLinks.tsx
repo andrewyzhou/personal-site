@@ -50,10 +50,15 @@ export default function SocialLinks() {
       ))}
       <button
         onClick={cycleTheme}
-        className="font-sans text-gray text-lg link-highlight"
         title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
       >
-        {theme}
+        <Image
+          src={theme === "dark" ? "/icons/moon.svg" : "/icons/sun.svg"}
+          alt={`${theme} mode`}
+          width={24}
+          height={24}
+          className="opacity-60 hover:opacity-100 transition-opacity"
+        />
       </button>
     </div>
   );
