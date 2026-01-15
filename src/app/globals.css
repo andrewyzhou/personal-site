@@ -260,3 +260,12 @@ body {
   background-color: var(--theme-highlight-bg-hover);
 }
 
+/* ============================================
+   LIST STYLING - control bullet-text gap
+   ============================================ */
+
+ul.list-disc.list-inside li::marker {
+  content: " • ";
+}
+
+
