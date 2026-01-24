@@ -2,7 +2,65 @@
 
 import { useEffect, useState, useMemo } from "react";
 
-const MOBILE_WEEKS = 24; 
+const MOBILE_WEEKS = 28;
+const STACK_BREAKPOINT = 768;
+
+// gradual week reduction breakpoints (widest to narrowest)
+// reduces by 1 week every ~12.5px as screen gets narrower
+const DESKTOP_BREAKPOINTS = [
+  { minWidth: 1152, weeks: 52 },
+  { minWidth: 1140, weeks: 51 },
+  { minWidth: 1127, weeks: 50 },
+  { minWidth: 1114, weeks: 49 },
+  { minWidth: 1101, weeks: 48 },
+  { minWidth: 1088, weeks: 47 },
+  { minWidth: 1075, weeks: 46 },
+  { minWidth: 1062, weeks: 45 },
+  { minWidth: 1049, weeks: 44 },
+  { minWidth: 1036, weeks: 43 },
+  { minWidth: 1023, weeks: 42 },
+  { minWidth: 1010, weeks: 41 },
+  { minWidth: 997, weeks: 40 },
+  { minWidth: 984, weeks: 39 },
+  { minWidth: 971, weeks: 38 },
+  { minWidth: 958, weeks: 37 },
+  { minWidth: 945, weeks: 36 },
+  { minWidth: 932, weeks: 35 },
+  { minWidth: 919, weeks: 34 },
+  { minWidth: 906, weeks: 33 },
+  { minWidth: 893, weeks: 32 },
+  { minWidth: 880, weeks: 31 },
+  { minWidth: 867, weeks: 30 },
+  { minWidth: 854, weeks: 29 },
+  { minWidth: STACK_BREAKPOINT, weeks: MOBILE_WEEKS },  // 768-854 stays at 28
+];
+
+const MOBILE_BREAKPOINTS = [
+  { minWidth: 755, weeks: 51 },
+  { minWidth: 742, weeks: 50 },
+  { minWidth: 729, weeks: 49 },
+  { minWidth: 716, weeks: 48 },
+  { minWidth: 703, weeks: 47 },
+  { minWidth: 690, weeks: 46 },
+  { minWidth: 677, weeks: 45 },
+  { minWidth: 664, weeks: 44 },
+  { minWidth: 651, weeks: 43 },
+  { minWidth: 638, weeks: 42 },
+  { minWidth: 625, weeks: 41 },
+  { minWidth: 612, weeks: 40 },
+  { minWidth: 599, weeks: 39 },
+  { minWidth: 586, weeks: 38 },
+  { minWidth: 573, weeks: 37 },
+  { minWidth: 560, weeks: 36 },
+  { minWidth: 547, weeks: 35 },
+  { minWidth: 534, weeks: 34 },
+  { minWidth: 521, weeks: 33 },
+  { minWidth: 508, weeks: 32 },
+  { minWidth: 495, weeks: 31 },
+  { minWidth: 482, weeks: 30 },
+  { minWidth: 469, weeks: 29 },
+  { minWidth: 456, weeks: MOBILE_WEEKS },
+];
 
 interface ContributionDay {
   date: string;
@@ -36,14 +94,44 @@ interface GitHubActivityProps {
 export default function GitHubActivity({ showHeading = true, mobileHeading = true }: GitHubActivityProps) {
   const [data, setData] = useState<GitHubData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const [weeksToShow, setWeeksToShow] = useState(52);
 
-  // detect mobile screen size
+  // detect how many weeks to show based on viewport width
+  // gradually reduces weeks as screen narrows (both desktop and mobile)
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    const updateWeeks = () => {
+      const width = window.innerWidth;
+
+      // desktop/side-by-side mode (768px and above)
+      if (width >= STACK_BREAKPOINT) {
+        for (const breakpoint of DESKTOP_BREAKPOINTS) {
+          if (width >= breakpoint.minWidth) {
+            setWeeksToShow(breakpoint.weeks);
+            return;
+          }
+        }
+        setWeeksToShow(MOBILE_WEEKS);
+        return;
+      }
+
+      // mobile/stacked mode (below 768px) - starts at 52 weeks
+      if (width >= 718) {
+        setWeeksToShow(52);
+        return;
+      }
+      for (const breakpoint of MOBILE_BREAKPOINTS) {
+        if (width >= breakpoint.minWidth) {
+          setWeeksToShow(breakpoint.weeks);
+          return;
+        }
+      }
+
+      // fallback to mobile weeks if narrower than all breakpoints
+      setWeeksToShow(MOBILE_WEEKS);
+    };
+    updateWeeks();
+    window.addEventListener("resize", updateWeeks);
+    return () => window.removeEventListener("resize", updateWeeks);
   }, []);
 
   useEffect(() => {
@@ -63,14 +151,14 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
     fetchData();
   }, []);
 
-  // limit weeks on mobile - must be before early returns
+  // limit weeks based on viewport - must be before early returns
   const displayWeeks = useMemo(() => {
     if (!data) return [];
-    if (isMobile) {
-      return data.weeks.slice(-MOBILE_WEEKS);
+    if (weeksToShow < 52) {
+      return data.weeks.slice(-weeksToShow);
     }
     return data.weeks;
-  }, [data, isMobile]);
+  }, [data, weeksToShow]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -135,7 +223,7 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
   return (
     <div>
       {showHeading && (
-        <h3 className={`font-sans font-bold text-off-white text-3xl${!mobileHeading ? ' hidden md:block' : ''}`} style={{ marginBottom: '0.5rem' }}>
+        <h3 className={`font-sans font-bold text-off-white text-3xl${!mobileHeading ? ' hidden activity-stack:block' : ''}`} style={{ marginBottom: '0.5rem' }}>
           activity
         </h3>
       )}

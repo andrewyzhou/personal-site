@@ -25,8 +25,14 @@ async function syncCalendarActivities() {
     let activities: CalendarActivity[];
 
     if (stored && stored.activities.length > 0) {
-      // Incremental update: only fetch activities after last fetch
-      const afterTimestamp = Math.floor(stored.lastFetchedAt / 1000);
+      // Incremental update: find the most recent activity's date and fetch after that
+      // Use the date of the most recent activity (already sorted descending)
+      const mostRecentDate = stored.activities[0].date; // YYYY-MM-DD format
+      // Convert to Unix timestamp (start of that day in UTC, minus 1 day for safety)
+      const afterDate = new Date(mostRecentDate + "T00:00:00Z");
+      afterDate.setDate(afterDate.getDate() - 1); // go back 1 day to catch any we missed
+      const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+
       const newActivities = await getAllActivities(afterTimestamp);
 
       // Merge new activities with existing, avoiding duplicates
