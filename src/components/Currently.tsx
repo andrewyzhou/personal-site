@@ -67,12 +67,12 @@ export default function Currently() {
   // ellipsis animation while loading
   useEffect(() => {
     if (loading && displayedText === INITIAL_TEXT) {
-      const ellipsisStates = ["...", "..", ".", "..", "...", "..", "."];
+      const ellipsisStates = ["...", "..", ".", ".."];
       let index = 0;
       const interval = setInterval(() => {
         index = (index + 1) % ellipsisStates.length;
         setEllipsis(ellipsisStates[index]);
-      }, 300);
+      }, 350);
       return () => clearInterval(interval);
     }
   }, [loading, displayedText]);
@@ -199,6 +199,10 @@ export default function Currently() {
       Hike: "hike",
       WeightTraining: "lift",
       Workout: "workout",
+      Tennis: "tennis",
+      Soccer: "soccer",
+      TrailRun: "trail run",
+      RockClimbing: "climbing",
     };
     return types[type] || type.toLowerCase();
   }, []);
@@ -310,7 +314,8 @@ export default function Currently() {
       const songText = `${songTitle} by ${artistName}`;
 
       if (spotify.isPlaying) {
-        text += " right now, i'm listening to ";
+        // only add leading space if there's text before this
+        text += text.length > 0 ? " right now, i'm listening to " : "right now, i'm listening to ";
         const linkStart = text.length;
         text += songText;
         if (spotify.songUrl) {
@@ -323,7 +328,7 @@ export default function Currently() {
         text += ".";
       } else if (spotify.playedAt) {
         const timeAgo = formatSpotifyTime(spotify.playedAt);
-        text += " my last played song was ";
+        text += text.length > 0 ? " my last played song was " : "my last played song was ";
         const linkStart = text.length;
         text += songText;
         if (spotify.songUrl) {
@@ -335,7 +340,7 @@ export default function Currently() {
         }
         text += ", " + timeAgo + ".";
       } else {
-        text += " my last played song was ";
+        text += text.length > 0 ? " my last played song was " : "my last played song was ";
         const linkStart = text.length;
         text += songText;
         if (spotify.songUrl) {
@@ -352,15 +357,15 @@ export default function Currently() {
     // strava part
     if (strava) {
       const timeAgo = formatStravaTime(strava.startDate);
-      const useDuration = ["WeightTraining", "Workout", "Yoga", "Crossfit"].includes(strava.type);
-      const needsSession = ["Yoga", "Crossfit"].includes(strava.type);
+      const useDuration = ["WeightTraining", "Workout", "Yoga", "Crossfit", "Tennis", "Soccer", "RockClimbing"].includes(strava.type);
+      const needsSession = ["Yoga", "Crossfit", "Tennis", "Soccer", "RockClimbing"].includes(strava.type);
       const activityMetric = useDuration ? strava.formattedDuration : strava.formattedDistance;
       const activityType = getActivityType(strava.type);
       const workoutText = needsSession
         ? `${activityMetric} ${activityType} session`
         : `${activityMetric} ${activityType}`;
 
-      text += " my last workout was a ";
+      text += text.length > 0 ? " my last workout was a " : "my last workout was a ";
       const linkStart = text.length;
       text += workoutText;
       links.push({
@@ -373,16 +378,6 @@ export default function Currently() {
 
     return { text, links };
   }, [book, spotify, strava, formatSpotifyTime, formatStravaTime, getActivityType]);
-
-  // trigger continue typing when data loads
-  useEffect(() => {
-    if (!loading && displayedText === INITIAL_TEXT && (book || spotify || strava)) {
-      const { text } = buildPlainTextAndLinks();
-      // get the remaining text after "i'm currently reading"
-      const remainingText = text.slice(INITIAL_TEXT.length);
-      continueTyping(remainingText);
-    }
-  }, [loading, displayedText, book, spotify, strava, buildPlainTextAndLinks, continueTyping]);
 
   // reusable delete/type animation function
   const animateDeleteType = useCallback((
@@ -420,6 +415,24 @@ export default function Currently() {
     };
     deleteChar();
   }, []);
+
+  // trigger continue typing when data loads
+  useEffect(() => {
+    if (!loading && displayedText === INITIAL_TEXT && (book || spotify || strava)) {
+      const { text } = buildPlainTextAndLinks();
+
+      if (text.startsWith(INITIAL_TEXT)) {
+        // book exists - just continue typing the rest
+        const remainingText = text.slice(INITIAL_TEXT.length);
+        continueTyping(remainingText);
+      } else {
+        // no book - need to delete "i'm currently reading " and type the correct text
+        animateDeleteType(INITIAL_TEXT, text, setDisplayedText, () => {
+          setIsTypingComplete(true);
+        });
+      }
+    }
+  }, [loading, displayedText, book, spotify, strava, buildPlainTextAndLinks, continueTyping, animateDeleteType]);
 
   // footer animation: after body typing completes, animate fetch time (if refetched), then api calls
   useEffect(() => {
@@ -578,7 +591,7 @@ export default function Currently() {
       </p>
       <p className="font-sans text-off-white text-sm italic" style={{ marginTop: '0.5rem' }}>
         {loading ? (
-          <>data last fetched ...</>
+          <>data last fetched...</>
         ) : cachedFetchedAt !== null ? (
           <>data last fetched {displayedFetchTime}<Cursor visible={cursorLine === "fetch_time"} /></>
         ) : null}

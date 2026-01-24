@@ -45,15 +45,22 @@ export async function getCachedData<T>(
     // cache is stale or missing, fetch fresh data
     const previousFetchedAt = cached?.fetchedAt ?? null;
     const data = await fetchFn();
-    const cacheEntry: CachedData<T> = {
-      data,
-      fetchedAt: Date.now(),
-    };
 
-    // store in redis (set TTL to 24 hours as a safety - we control freshness via timestamp)
-    await redis.set(key, cacheEntry, { ex: 86400 });
+    // only cache non-null values to avoid caching failed fetches
+    if (data !== null) {
+      const cacheEntry: CachedData<T> = {
+        data,
+        fetchedAt: Date.now(),
+      };
 
-    return { ...cacheEntry, previousFetchedAt };
+      // store in redis (set TTL to 24 hours as a safety - we control freshness via timestamp)
+      await redis.set(key, cacheEntry, { ex: 86400 });
+
+      return { ...cacheEntry, previousFetchedAt };
+    }
+
+    // if fetch returned null, return it without caching so next request will retry
+    return { data, fetchedAt: Date.now(), previousFetchedAt };
   } catch (error) {
     // if redis fails, fall back to direct fetch
     console.error(`Cache error for ${key}:`, error);

@@ -33,13 +33,27 @@ export interface StravaActivity {
   elapsedTime: number;
 }
 
-// activity for calendar display and stats
+// activity for calendar display and detail views
 export interface CalendarActivity {
   id: number;
+  name: string;
   type: string;
   date: string; // YYYY-MM-DD format (local date)
+  startTime: string; // HH:MM format (local time)
   distance: number; // in meters
   duration: number; // in seconds (moving time)
+  elapsedTime: number; // in seconds (total elapsed time)
+  totalElevationGain: number; // in meters
+  averageSpeed: number; // in meters per second
+  maxSpeed: number; // in meters per second
+  averageHeartrate: number | null;
+  maxHeartrate: number | null;
+  averageCadence: number | null;
+  averageWatts: number | null;
+  maxWatts: number | null;
+  kilojoules: number | null;
+  description: string | null;
+  sufferScore: number | null;
 }
 
 // fetch all activities with pagination, optionally after a timestamp
@@ -79,14 +93,30 @@ export async function getAllActivities(after?: number): Promise<CalendarActivity
       }
 
       for (const activity of activities) {
-        // convert to local date string (YYYY-MM-DD)
-        const localDate = activity.start_date_local.split("T")[0];
+        // convert to local date string (YYYY-MM-DD) and time (HH:MM)
+        const [localDate, localTimeRaw] = activity.start_date_local.split("T");
+        const localTime = localTimeRaw ? localTimeRaw.slice(0, 5) : "00:00";
+
         allActivities.push({
           id: activity.id,
+          name: activity.name || "",
           type: activity.type,
           date: localDate,
+          startTime: localTime,
           distance: activity.distance || 0,
           duration: activity.moving_time || 0,
+          elapsedTime: activity.elapsed_time || 0,
+          totalElevationGain: activity.total_elevation_gain || 0,
+          averageSpeed: activity.average_speed || 0,
+          maxSpeed: activity.max_speed || 0,
+          averageHeartrate: activity.has_heartrate ? activity.average_heartrate : null,
+          maxHeartrate: activity.has_heartrate ? activity.max_heartrate : null,
+          averageCadence: activity.average_cadence || null,
+          averageWatts: activity.average_watts || null,
+          maxWatts: activity.max_watts || null,
+          kilojoules: activity.kilojoules || null,
+          description: activity.description || null,
+          sufferScore: activity.suffer_score || null,
         });
       }
 
@@ -157,6 +187,41 @@ export function formatDuration(seconds: number): string {
     return `${hours}h ${minutes}min`;
   }
   return `${minutes}min`;
+}
+
+// format pace as min:sec per mile (for running activities)
+export function formatPace(metersPerSecond: number): string {
+  if (metersPerSecond <= 0) return "--:--";
+  const secondsPerMile = 1609.344 / metersPerSecond;
+  const minutes = Math.floor(secondsPerMile / 60);
+  const seconds = Math.round(secondsPerMile % 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}/mi`;
+}
+
+// format speed in mph (for cycling activities)
+export function formatSpeed(metersPerSecond: number): string {
+  if (metersPerSecond <= 0) return "0 mph";
+  const mph = metersPerSecond * 2.23694;
+  return `${mph.toFixed(1)} mph`;
+}
+
+// format elevation in feet
+export function formatElevation(meters: number): string {
+  const feet = meters * 3.28084;
+  return `${Math.round(feet)} ft`;
+}
+
+// format heartrate
+export function formatHeartrate(bpm: number): string {
+  return `${Math.round(bpm)} bpm`;
+}
+
+// format time of day (24h to 12h)
+export function formatTimeOfDay(time24: string): string {
+  const [hours, minutes] = time24.split(":").map(Number);
+  const period = hours >= 12 ? "pm" : "am";
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${minutes.toString().padStart(2, "0")}${period}`;
 }
 
 // format relative time
