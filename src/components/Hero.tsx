@@ -53,7 +53,7 @@ export default function Hero() {
         </div>
 
         {/* right side - info */}
-        <div className="text-right">
+        <div className="text-center md:text-right">
           <p className="font-sans font-semibold text-off-white text-lg leading-[1.35]">
             electrical engineering &amp; computer sciences
           </p>

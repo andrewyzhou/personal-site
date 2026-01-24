@@ -1,14 +1,28 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Image from "next/image";
 
 interface CalendarActivity {
   id: number;
+  name: string;
   type: string;
   date: string; // YYYY-MM-DD
+  startTime: string; // HH:MM format (local time)
   distance: number; // in meters
-  duration: number; // in seconds
+  duration: number; // in seconds (moving time)
+  elapsedTime: number; // in seconds (total elapsed time)
+  totalElevationGain: number; // in meters
+  averageSpeed: number; // in meters per second
+  maxSpeed: number; // in meters per second
+  averageHeartrate: number | null;
+  maxHeartrate: number | null;
+  averageCadence: number | null;
+  averageWatts: number | null;
+  maxWatts: number | null;
+  kilojoules: number | null;
+  description: string | null;
+  sufferScore: number | null;
 }
 
 interface StoredActivities {
@@ -30,17 +44,380 @@ const ACTIVITY_ICONS: Record<string, string> = {
   Workout: "workout",
   Hike: "hike",
   Walk: "walk",
+  Tennis: "tennis",
+  Soccer: "soccer",
+  TrailRun: "trailrun",
+  RockClimbing: "climb",
   // fallbacks
   VirtualRide: "ride",
   VirtualRun: "run",
-  TrailRun: "run",
   MountainBikeRide: "ride",
   GravelRide: "ride",
   Crossfit: "workout",
 };
 
+// activity types that use duration instead of distance
+const DURATION_TYPES = ["WeightTraining", "Workout", "Yoga", "Crossfit", "Tennis", "Soccer", "RockClimbing"];
+
+// activity type display names
+const ACTIVITY_NAMES: Record<string, string> = {
+  Run: "run",
+  Ride: "bike ride",
+  Swim: "swim",
+  Walk: "walk",
+  Hike: "hike",
+  WeightTraining: "lift",
+  Workout: "workout",
+  Tennis: "tennis",
+  Soccer: "soccer",
+  TrailRun: "trail run",
+  RockClimbing: "climb",
+  Yoga: "yoga",
+  Crossfit: "crossfit",
+  VirtualRun: "run",
+  VirtualRide: "bike ride",
+  MountainBikeRide: "bike ride",
+  GravelRide: "bike ride",
+};
+
 function getIconForType(type: string): string {
   return ACTIVITY_ICONS[type] || "workout";
+}
+
+function getActivityName(type: string): string {
+  return ACTIVITY_NAMES[type] || type.toLowerCase();
+}
+
+function formatDistance(meters: number): string {
+  const miles = meters / 1609.344;
+  return `${miles.toFixed(1)}mi`;
+}
+
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}min`;
+  }
+  return `${minutes}min`;
+}
+
+function getActivityDescription(activity: CalendarActivity): string {
+  const useDuration = DURATION_TYPES.includes(activity.type);
+  const metric = useDuration ? formatDuration(activity.duration) : formatDistance(activity.distance);
+  const name = getActivityName(activity.type);
+  return `${metric} ${name}`;
+}
+
+// format pace as min:sec per mile
+function formatPace(metersPerSecond: number): string {
+  if (metersPerSecond <= 0) return "--:--";
+  const secondsPerMile = 1609.344 / metersPerSecond;
+  const minutes = Math.floor(secondsPerMile / 60);
+  const seconds = Math.round(secondsPerMile % 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}/mi`;
+}
+
+// format speed in mph
+function formatSpeed(metersPerSecond: number): string {
+  if (metersPerSecond <= 0) return "0 mph";
+  const mph = metersPerSecond * 2.23694;
+  return `${mph.toFixed(1)} mph`;
+}
+
+// format elevation in feet
+function formatElevation(meters: number): string {
+  const feet = meters * 3.28084;
+  return `${Math.round(feet)} ft`;
+}
+
+// format time of day (24h to 12h)
+function formatTimeOfDay(time24: string): string {
+  const [hours, minutes] = time24.split(":").map(Number);
+  const period = hours >= 12 ? "pm" : "am";
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${minutes.toString().padStart(2, "0")}${period}`;
+}
+
+// activity types that show pace (running activities)
+const PACE_TYPES = ["Run", "VirtualRun", "TrailRun"];
+// activity types that show speed (cycling activities)
+const SPEED_TYPES = ["Ride", "VirtualRide", "MountainBikeRide", "GravelRide"];
+// activity types that show distance
+const DISTANCE_TYPES = ["Run", "VirtualRun", "TrailRun", "Ride", "VirtualRide", "MountainBikeRide", "GravelRide", "Swim", "Walk", "Hike"];
+
+// view state types
+type ViewState =
+  | { type: "calendar" }
+  | { type: "selector"; date: string; activities: CalendarActivity[] }
+  | { type: "detail"; activity: CalendarActivity };
+
+// Component for a single calendar day cell with activities
+function CalendarDayCell({
+  activities,
+  dayNumber,
+  onActivityClick
+}: {
+  activities: CalendarActivity[];
+  dayNumber: number;
+  onActivityClick: (activities: CalendarActivity[], date: string) => void;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // cycle through activities every 2s if multiple
+  useEffect(() => {
+    if (activities.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentIndex(prev => (prev + 1) % activities.length);
+        setIsTransitioning(false);
+      }, 150); // half of transition duration
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [activities.length]);
+
+  if (activities.length === 0) {
+    return <span className="calendar-day-number">{dayNumber}</span>;
+  }
+
+  const currentActivity = activities[currentIndex];
+
+  return (
+    <div className="relative w-full h-full">
+      <button
+        onClick={() => onActivityClick(activities, activities[0].date)}
+        className="calendar-activity"
+        title={`${activities.length} activit${activities.length === 1 ? 'y' : 'ies'}`}
+      >
+        <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+          <Image
+            src={`/icons/activities/${getIconForType(currentActivity.type)}.svg`}
+            alt={currentActivity.type}
+            width={16}
+            height={16}
+            className="activity-icon"
+          />
+        </div>
+        {activities.length > 1 && (
+          <span className="absolute -top-1 -right-1 bg-gray text-off-black text-[10px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
+            {activities.length}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// Component for selecting which activity to view (when multiple on same day)
+function ActivitySelector({
+  activities,
+  date,
+  onSelect,
+  onBack
+}: {
+  activities: CalendarActivity[];
+  date: string;
+  onSelect: (activity: CalendarActivity) => void;
+  onBack: () => void;
+}) {
+  // parse date for display
+  const dateObj = new Date(date + "T12:00:00");
+  const dateDisplay = dateObj.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric"
+  }).toLowerCase();
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* header */}
+      <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+        <button
+          onClick={onBack}
+          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
+        >
+          &lt; back
+        </button>
+        <span className="font-sans text-off-white text-sm">{dateDisplay}</span>
+        <div className="w-12" /> {/* spacer for alignment */}
+      </div>
+
+      {/* activity list */}
+      <div className="flex flex-col gap-2">
+        {activities.map((activity) => {
+          const isDurationBased = DURATION_TYPES.includes(activity.type);
+          const time = isDurationBased ? formatDuration(activity.elapsedTime) : formatDuration(activity.duration);
+          const metric = isDurationBased ? time : formatDistance(activity.distance);
+
+          return (
+            <button
+              key={activity.id}
+              onClick={() => onSelect(activity)}
+              className="link-highlight rounded-lg text-left flex items-center gap-3"
+              style={{ padding: '8px 12px' }}
+            >
+              <Image
+                src={`/icons/activities/${getIconForType(activity.type)}.svg`}
+                alt={activity.type}
+                width={18}
+                height={18}
+                className="activity-icon"
+              />
+              <div className="flex flex-col">
+                <span className="font-sans text-off-white text-sm">
+                  {getActivityName(activity.type)}
+                </span>
+                <span className="font-sans text-gray text-xs">
+                  {metric} • {formatTimeOfDay(activity.startTime)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Component for displaying activity details
+function ActivityDetail({
+  activity,
+  onBack
+}: {
+  activity: CalendarActivity;
+  onBack: () => void;
+}) {
+  const showDistance = DISTANCE_TYPES.includes(activity.type);
+  const showPace = PACE_TYPES.includes(activity.type);
+  const showSpeed = SPEED_TYPES.includes(activity.type);
+  const showElevation = activity.totalElevationGain > 0;
+  const showHeartrate = activity.averageHeartrate !== null;
+  const showMaxHeartrate = activity.maxHeartrate !== null;
+  const showCadence = activity.averageCadence !== null && !DURATION_TYPES.includes(activity.type);
+  const showPower = activity.averageWatts !== null;
+  const isDurationBased = DURATION_TYPES.includes(activity.type);
+
+  // parse date for display
+  const dateObj = new Date(activity.date + "T12:00:00");
+  const dateDisplay = dateObj.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric"
+  }).toLowerCase();
+
+  // build stats array dynamically based on activity type
+  const stats: { label: string; value: string }[] = [];
+
+  // time: use elapsed time for duration-based activities, moving time for others
+  if (isDurationBased) {
+    stats.push({ label: "time", value: formatDuration(activity.elapsedTime) });
+  } else {
+    stats.push({ label: "time", value: formatDuration(activity.duration) });
+  }
+
+  if (showDistance) {
+    stats.push({ label: "distance", value: formatDistance(activity.distance) });
+  }
+
+  if (showPace && activity.averageSpeed > 0) {
+    stats.push({ label: "avg pace", value: formatPace(activity.averageSpeed) });
+  }
+
+  if (showSpeed && activity.averageSpeed > 0) {
+    stats.push({ label: "avg speed", value: formatSpeed(activity.averageSpeed) });
+  }
+
+  if (showElevation) {
+    stats.push({ label: "elevation", value: formatElevation(activity.totalElevationGain) });
+  }
+
+  if (showHeartrate) {
+    stats.push({ label: "avg hr", value: `${Math.round(activity.averageHeartrate!)} bpm` });
+  }
+
+  if (showMaxHeartrate) {
+    stats.push({ label: "max hr", value: `${Math.round(activity.maxHeartrate!)} bpm` });
+  }
+
+  if (showCadence) {
+    stats.push({ label: "cadence", value: `${Math.round(activity.averageCadence!)} spm` });
+  }
+
+  if (showPower) {
+    stats.push({ label: "power", value: `${Math.round(activity.averageWatts!)}W` });
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* header */}
+      <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+        <button
+          onClick={onBack}
+          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
+        >
+          &lt; back
+        </button>
+        <span className="font-sans text-off-white text-sm">{dateDisplay}</span>
+        <div className="w-12" /> {/* spacer for alignment */}
+      </div>
+
+      {/* activity header */}
+      <div className="flex items-center gap-3" style={{ marginBottom: '12px' }}>
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ border: '1px solid var(--theme-highlight-bg)' }}>
+          <Image
+            src={`/icons/activities/${getIconForType(activity.type)}.svg`}
+            alt={activity.type}
+            width={24}
+            height={24}
+            className="activity-icon"
+          />
+        </div>
+        <div>
+          <h4 className="font-sans font-medium text-off-white text-base leading-tight">
+            {activity.name || getActivityName(activity.type)}
+          </h4>
+          <span className="font-sans text-gray text-xs">
+            {formatTimeOfDay(activity.startTime)}
+          </span>
+        </div>
+      </div>
+
+      {/* description if present */}
+      {activity.description && (
+        <p className="font-sans text-gray text-sm mb-4 leading-relaxed">
+          {activity.description}
+        </p>
+      )}
+
+      {/* stats grid */}
+      <div className="grid grid-cols-3 gap-3" style={{ marginBottom: '24px' }}>
+        {stats.map((stat) => (
+          <div key={stat.label} className="text-center">
+            <div className="font-sans text-off-white text-sm font-medium">
+              {stat.value}
+            </div>
+            <div className="font-sans text-gray text-xs">
+              {stat.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* strava link */}
+      <a
+        href={`https://www.strava.com/activities/${activity.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors text-center mt-auto"
+      >
+        view on strava &rarr;
+      </a>
+    </div>
+  );
 }
 
 export default function StravaCalendar() {
@@ -50,6 +427,52 @@ export default function StravaCalendar() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
+  const [viewState, setViewState] = useState<ViewState>({ type: "calendar" });
+  const [lockedHeight, setLockedHeight] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // handler for when an activity day is clicked
+  const handleActivityClick = useCallback((activities: CalendarActivity[], date: string) => {
+    // lock height before transitioning
+    if (containerRef.current) {
+      setLockedHeight(containerRef.current.offsetHeight);
+    }
+    if (activities.length === 1) {
+      // single activity - go directly to detail view
+      setViewState({ type: "detail", activity: activities[0] });
+    } else {
+      // multiple activities - show selector
+      setViewState({ type: "selector", date, activities });
+    }
+  }, []);
+
+  // handler for going back to calendar
+  const handleBackToCalendar = useCallback(() => {
+    setLockedHeight(null); // unlock height when returning to calendar
+    setViewState({ type: "calendar" });
+  }, []);
+
+  // handler for selecting an activity from selector
+  const handleSelectActivity = useCallback((activity: CalendarActivity) => {
+    setViewState({ type: "detail", activity });
+  }, []);
+
+  // handler for going back from detail to selector (if came from selector)
+  const handleBackFromDetail = useCallback(() => {
+    // check if we should go back to selector or calendar
+    if (viewState.type === "detail") {
+      const activity = viewState.activity;
+      // find all activities on the same date
+      const sameDay = data?.activities.filter(a => a.date === activity.date) || [];
+      if (sameDay.length > 1) {
+        setViewState({ type: "selector", date: activity.date, activities: sameDay });
+      } else {
+        setViewState({ type: "calendar" });
+      }
+    } else {
+      setViewState({ type: "calendar" });
+    }
+  }, [viewState, data]);
 
   useEffect(() => {
     async function fetchActivities() {
@@ -68,16 +491,22 @@ export default function StravaCalendar() {
     fetchActivities();
   }, []);
 
-  // group activities by date for quick lookup
+  // group activities by date - now returns array of activities per date
   const activitiesByDate = useMemo(() => {
-    if (!data?.activities) return new Map<string, CalendarActivity>();
-    const map = new Map<string, CalendarActivity>();
-    // store first activity of each day (most activities will be one per day)
+    if (!data?.activities) return new Map<string, CalendarActivity[]>();
+    const map = new Map<string, CalendarActivity[]>();
+
     for (const activity of data.activities) {
-      if (!map.has(activity.date)) {
-        map.set(activity.date, activity);
-      }
+      const existing = map.get(activity.date) || [];
+      existing.push(activity);
+      map.set(activity.date, existing);
     }
+
+    // sort each day's activities chronologically (by id as proxy, lower id = earlier)
+    for (const acts of map.values()) {
+      acts.sort((a, b) => a.id - b.id);
+    }
+
     return map;
   }, [data]);
 
@@ -153,35 +582,35 @@ export default function StravaCalendar() {
     return days;
   }, [currentMonth]);
 
-  const goToPrevMonth = () => {
+  const goToPrevMonth = useCallback(() => {
     setCurrentMonth(prev => {
       if (prev.month === 0) {
         return { year: prev.year - 1, month: 11 };
       }
       return { year: prev.year, month: prev.month - 1 };
     });
-  };
+  }, []);
 
-  const goToNextMonth = () => {
+  const goToNextMonth = useCallback(() => {
     setCurrentMonth(prev => {
       if (prev.month === 11) {
         return { year: prev.year + 1, month: 0 };
       }
       return { year: prev.year, month: prev.month + 1 };
     });
-  };
+  }, []);
 
-  const formatDateKey = (day: number) => {
+  const formatDateKey = useCallback((day: number) => {
     const { year, month } = currentMonth;
     const m = (month + 1).toString().padStart(2, "0");
     const d = day.toString().padStart(2, "0");
     return `${year}-${m}-${d}`;
-  };
+  }, [currentMonth]);
 
   if (loading) {
     return (
       <div className="strava-calendar">
-        <div className="h-[200px] card-bg animate-pulse rounded" />
+        <div className="h-[300px] card-bg animate-pulse rounded-lg" />
       </div>
     );
   }
@@ -190,13 +619,14 @@ export default function StravaCalendar() {
     return null;
   }
 
-  return (
-    <div className="strava-calendar">
+  // calendar content component
+  const CalendarView = () => (
+    <>
       {/* month navigation */}
       <div className="flex items-center justify-between">
         <button
           onClick={goToPrevMonth}
-          className="font-sans text-gray text-sm hover:text-off-white transition-colors px-2"
+          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
           aria-label="Previous month"
         >
           &lt;
@@ -206,7 +636,7 @@ export default function StravaCalendar() {
         </span>
         <button
           onClick={goToNextMonth}
-          className="font-sans text-gray text-sm hover:text-off-white transition-colors px-2"
+          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
           aria-label="Next month"
         >
           &gt;
@@ -214,11 +644,11 @@ export default function StravaCalendar() {
       </div>
 
       {/* day headers */}
-      <div style={{ paddingTop: '12px', paddingBottom: '6px' }}>
+      <div style={{ paddingTop: '16px', paddingBottom: '8px' }}>
         <div className="grid grid-cols-7 gap-1">
           {DAYS.map((day, i) => (
             <div key={i} className="flex items-center justify-center">
-              <span className="font-sans font-medium text-gray text-xs">{day}</span>
+              <span className="font-sans font-bold text-gray text-xs">{day}</span>
             </div>
           ))}
         </div>
@@ -232,36 +662,22 @@ export default function StravaCalendar() {
           }
 
           const dateKey = formatDateKey(day);
-          const activity = activitiesByDate.get(dateKey);
+          const activities = activitiesByDate.get(dateKey) || [];
 
           return (
             <div key={i} className="calendar-day">
-              {activity ? (
-                <a
-                  href={`https://www.strava.com/activities/${activity.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="calendar-activity"
-                  title={`${activity.type} on ${dateKey}`}
-                >
-                  <Image
-                    src={`/icons/activities/${getIconForType(activity.type)}.svg`}
-                    alt={activity.type}
-                    width={16}
-                    height={16}
-                    className="activity-icon"
-                  />
-                </a>
-              ) : (
-                <span className="calendar-day-number">{day}</span>
-              )}
+              <CalendarDayCell
+                activities={activities}
+                dayNumber={day}
+                onActivityClick={handleActivityClick}
+              />
             </div>
           );
         })}
       </div>
 
       {/* stats row */}
-      <div className="flex items-center justify-between" style={{ paddingTop: '12px' }}>
+      <div className="flex items-center justify-between" style={{ marginTop: '12px' }}>
         <span className="font-sans text-gray text-sm flex items-center gap-1">
           <Image
             src="/icons/activities/run.svg"
@@ -270,7 +686,7 @@ export default function StravaCalendar() {
             height={14}
             className="opacity-70"
           />
-          {yearlyMileage.toFixed(1)} mi in {new Date().getFullYear()}
+          <span className="font-bold">{yearlyMileage.toFixed(1)} mi</span> in {new Date().getFullYear()}
         </span>
         {currentStreak > 0 && (
           <span className="font-sans text-gray text-sm flex items-center gap-1">
@@ -284,6 +700,43 @@ export default function StravaCalendar() {
             {currentStreak}
           </span>
         )}
+      </div>
+    </>
+  );
+
+  // render content based on view state
+  const renderContent = () => {
+    if (viewState.type === "selector") {
+      return (
+        <ActivitySelector
+          activities={viewState.activities}
+          date={viewState.date}
+          onSelect={handleSelectActivity}
+          onBack={handleBackToCalendar}
+        />
+      );
+    }
+
+    if (viewState.type === "detail") {
+      return (
+        <ActivityDetail
+          activity={viewState.activity}
+          onBack={handleBackFromDetail}
+        />
+      );
+    }
+
+    return <CalendarView />;
+  };
+
+  return (
+    <div className="strava-calendar">
+      <div
+        ref={containerRef}
+        className="card-bg rounded-lg overflow-hidden flex flex-col !p-5"
+        style={lockedHeight ? { height: lockedHeight } : undefined}
+      >
+        {renderContent()}
       </div>
     </div>
   );

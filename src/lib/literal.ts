@@ -1,4 +1,4 @@
-const LITERAL_API = "https://literal.club/graphql/";
+const LITERAL_API = "https://api.literal.club/graphql/";
 
 interface LiteralBook {
   id: string;

@@ -18,14 +18,14 @@ export default function Home() {
 
       {/* section 3: currently + contact */}
       <section className="py-16">
-        <div className="flex flex-col md:flex-row justify-between gap-12">
+        <div className="flex flex-col sm:flex-row justify-between gap-12">
           {/* left side - currently */}
-          <div className="w-full md:w-1/2">
+          <div className="w-full sm:w-1/2">
             <Currently />
           </div>
 
           {/* right side - contact */}
-          <div className="w-full md:w-1/2">
+          <div className="w-full sm:w-1/2">
             <Contact />
           </div>
         </div>
@@ -35,18 +35,18 @@ export default function Home() {
       {/* section 4: github activity + strava calendar */}
       <section className="py-16">
         {/* heading - visible on mobile only, above everything */}
-        <h3 className="font-sans font-bold text-off-white text-3xl md:hidden" style={{ marginBottom: '1rem' }}>
+        <h3 className="font-sans font-bold text-off-white text-3xl activity-stack:hidden" style={{ marginBottom: '1rem' }}>
           activity
         </h3>
 
-        <div className="flex flex-col md:flex-row justify-between gap-8 md:gap-12">
+        <div className="flex flex-col activity-stack:flex-row justify-between gap-8 activity-stack:gap-12">
           {/* strava calendar - shows first on mobile, right on desktop */}
-          <div className="w-full md:w-2/5 flex justify-center md:items-center order-first md:order-last">
+          <div className="w-full activity-stack:w-2/5 flex justify-center activity-stack:justify-end activity-stack:items-center order-first activity-stack:order-last">
             <StravaCalendar />
           </div>
 
           {/* github activity - shows second on mobile, left on desktop */}
-          <div className="w-full md:w-3/5 order-last md:order-first">
+          <div className="w-full activity-stack:w-3/5 order-last activity-stack:order-first">
             <GitHubActivity showHeading={true} mobileHeading={false} />
           </div>
         </div>

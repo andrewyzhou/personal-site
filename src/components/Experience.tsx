@@ -103,9 +103,8 @@ const semesters: Semester[] = [
   {
     name: "high school concurrent enrollment",
     courses: [
-      { code: "math 54", title: "linear algebra*" },
+      { code: "math 54", title: "linear algebra & differential equations*" },
       { code: "math 53", title: "multivariable calculus*" },
-      { code: "math 55", title: "differential equations*" },
     ],
   },
 ];
