@@ -130,35 +130,41 @@ export default function Currently() {
 
         if (spotifyRes.ok) {
           const data = await spotifyRes.json();
-          setSpotify(data);
-          if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
-            maxFetchedAt = data.fetchedAt;
-          }
-          // track the most recent previousFetchedAt (indicates a refetch happened)
-          if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
-            maxPreviousFetchedAt = data.previousFetchedAt;
+          if (data) {
+            setSpotify(data);
+            if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
+              maxFetchedAt = data.fetchedAt;
+            }
+            // track the most recent previousFetchedAt (indicates a refetch happened)
+            if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
+              maxPreviousFetchedAt = data.previousFetchedAt;
+            }
           }
         }
 
         if (stravaRes.ok) {
           const data = await stravaRes.json();
-          setStrava(data);
-          if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
-            maxFetchedAt = data.fetchedAt;
-          }
-          if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
-            maxPreviousFetchedAt = data.previousFetchedAt;
+          if (data) {
+            setStrava(data);
+            if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
+              maxFetchedAt = data.fetchedAt;
+            }
+            if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
+              maxPreviousFetchedAt = data.previousFetchedAt;
+            }
           }
         }
 
         if (literalRes.ok) {
           const data = await literalRes.json();
-          setBook(data);
-          if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
-            maxFetchedAt = data.fetchedAt;
-          }
-          if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
-            maxPreviousFetchedAt = data.previousFetchedAt;
+          if (data) {
+            setBook(data);
+            if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
+              maxFetchedAt = data.fetchedAt;
+            }
+            if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
+              maxPreviousFetchedAt = data.previousFetchedAt;
+            }
           }
         }
 
