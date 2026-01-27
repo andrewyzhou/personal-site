@@ -177,7 +177,7 @@ export default function Experience() {
 
       {/* category content */}
       <div style={{ marginTop: '0.5rem' }}>
-        <p className="font-serif text-gray text-lg leading-[1.35] mb-8">
+        <p className="font-sans text-gray text-lg leading-[1.35] mb-8">
           {categoryDescriptions[activeCategory]}
         </p>
         <br />
@@ -196,7 +196,7 @@ export default function Experience() {
                   </h3>
                   <ul className="space-y-2">
                     {semester.courses.map((course) => (
-                      <li key={course.code} className="font-serif text-gray text-lg">
+                      <li key={course.code} className="font-sans text-gray text-lg">
                         <span className="text-off-white">{course.code}</span>: {course.title}
                         {course.cheatsheets && course.cheatsheets.length > 0 && (
                           <span>
@@ -221,7 +221,7 @@ export default function Experience() {
                 </div>
               ))}
             </div>
-            <p className="font-serif text-gray text-lg" style={{ marginTop: '2rem' }}>
+            <p className="font-sans text-gray text-lg" style={{ marginTop: '2rem' }}>
               * accredited courses taken outside of uc berkeley
             </p>
           </>
@@ -245,13 +245,20 @@ export default function Experience() {
                     <span className="font-sans text-off-white text-lg">
                       {item.title}
                     </span>
-                    <span className="font-serif font-semibold text-gray text-lg">
+                    <span className="font-sans font-semibold text-gray text-lg">
                       {item.year}
                     </span>
                   </div>
-                  <span className="font-sans text-gray text-sm" style={{ marginTop: '-0.25rem', display: 'block' }}>
-                    {item.company}
-                  </span>
+                  <div className="flex items-center justify-between" style={{ marginTop: '-0.25rem' }}>
+                    <span className="font-sans text-gray text-sm">
+                      {item.company}
+                    </span>
+                    {item.location && (
+                      <span className="font-sans text-gray text-sm">
+                        {item.location}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -260,33 +267,40 @@ export default function Experience() {
             <div className="w-full md:w-1/2">
               {selectedItem && (
                 <div className="card-bg rounded-lg" style={{ padding: '1rem', paddingLeft: '1.25rem' }}>
-                  <div className="flex items-center justify-between" style={{ marginBottom: 0 }}>
-                    <p className="font-sans text-off-white text-lg font-bold">
-                      {selectedItem.title}
-                    </p>
-                    <span className="font-serif font-semibold text-gray text-lg">
-                      {selectedItem.year}
-                    </span>
+                  <div className="flex justify-between" style={{ marginBottom: '0.5rem' }}>
+                    <div>
+                      <p className="font-sans text-off-white text-lg font-bold">
+                        {selectedItem.title}
+                      </p>
+                      {selectedItem.companyUrl ? (
+                        <a
+                          href={selectedItem.companyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-sans text-secondary text-lg link-highlight inline-block"
+                        >
+                          {selectedItem.company}
+                        </a>
+                      ) : (
+                        <p
+                          className={`font-sans text-secondary text-lg${activeCategory === "projects" ? " italic" : ""}`}
+                        >
+                          {selectedItem.company}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0" style={{ marginLeft: '1rem' }}>
+                      <span className="font-sans font-semibold text-gray text-lg">
+                        {selectedItem.period || selectedItem.year}
+                      </span>
+                      {selectedItem.location && (
+                        <span className="font-sans text-gray text-lg block">
+                          {selectedItem.location}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {selectedItem.companyUrl ? (
-                    <a
-                      href={selectedItem.companyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-serif text-secondary text-lg link-highlight inline-block"
-                      style={{ marginBottom: '0.5rem' }}
-                    >
-                      {selectedItem.company}
-                    </a>
-                  ) : (
-                    <p
-                      className={`font-serif text-secondary text-lg${activeCategory === "projects" ? " italic" : ""}`}
-                      style={{ marginBottom: '0.5rem' }}
-                    >
-                      {selectedItem.company}
-                    </p>
-                  )}
-                  <div className="font-serif text-gray text-lg leading-[1.35]">
+                  <div className="font-sans text-gray text-lg leading-[1.35]">
                     {selectedItem.description}
                   </div>
                 </div>
