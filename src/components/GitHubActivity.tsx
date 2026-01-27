@@ -211,7 +211,7 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
   if (!data) {
     return (
       <div>
-        <div className="text-gray text-lg font-serif">
+        <div className="text-gray text-lg font-sans">
           failed to load github activity
         </div>
       </div>
