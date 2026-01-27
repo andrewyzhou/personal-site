@@ -23,6 +23,7 @@ async function graphqlRequest(query: string, variables: Record<string, unknown> 
       "Authorization": `Bearer ${token}`,
     },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(2000),
   });
 
   const data = await response.json();
