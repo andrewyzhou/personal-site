@@ -90,16 +90,16 @@ function getActivityName(type: string): string {
 
 function formatDistance(meters: number): string {
   const miles = meters / 1609.344;
-  return `${miles.toFixed(1)}mi`;
+  return `${miles.toFixed(1)} mi`;
 }
 
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   if (hours > 0) {
-    return `${hours}h ${minutes}min`;
+    return `${hours} hr ${minutes} min`;
   }
-  return `${minutes}min`;
+  return `${minutes} min`;
 }
 
 function getActivityDescription(activity: CalendarActivity): string {
@@ -136,7 +136,7 @@ function formatTimeOfDay(time24: string): string {
   const [hours, minutes] = time24.split(":").map(Number);
   const period = hours >= 12 ? "pm" : "am";
   const hours12 = hours % 12 || 12;
-  return `${hours12}:${minutes.toString().padStart(2, "0")}${period}`;
+  return `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`;
 }
 
 // activity types that show pace (running activities)
