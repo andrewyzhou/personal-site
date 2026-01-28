@@ -1,11 +1,106 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import SocialLinks from "./SocialLinks";
 
+const QUOTES = [
+  `"there's a lot of beauty in ordinary things.\nisn't that kind of the point?" - pam halpert`,
+  `"you miss 100% of the shots you \ndon't take. - wayne gretzky"\n- michael scott`,
+  `"how would i describe myself? three words.\nhard-working, alpha male. jackhammer. merciless.\ninsatiable." - dwight schrute`,
+];
+
+const TYPING_SPEED = 45;
+
+// random initial quote index
+const INITIAL_INDEX = Math.floor(Math.random() * QUOTES.length);
+
+function getNextQuoteIndex(current: number): number {
+  return (current + 1) % QUOTES.length;
+}
+
 export default function Hero() {
   const [showLogo, setShowLogo] = useState(false);
+  const [displayedQuote, setDisplayedQuote] = useState(QUOTES[INITIAL_INDEX]);
+  const [isTypingActive, setIsTypingActive] = useState(false);
+  const [showCursor, setShowCursor] = useState(false);
+  const quoteIndexRef = useRef(INITIAL_INDEX);
+  const animatingRef = useRef(false);
+  const displayedQuoteRef = useRef(QUOTES[INITIAL_INDEX]);
+  const cursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // keep ref in sync with state
+  useEffect(() => {
+    displayedQuoteRef.current = displayedQuote;
+  }, [displayedQuote]);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    let interval: ReturnType<typeof setInterval>;
+
+    const animateQuoteChange = () => {
+      if (animatingRef.current) return;
+      animatingRef.current = true;
+
+      const nextIndex = getNextQuoteIndex(quoteIndexRef.current);
+      quoteIndexRef.current = nextIndex;
+      const newText = QUOTES[nextIndex];
+      const oldText = displayedQuoteRef.current;
+
+      if (cursorTimeoutRef.current) clearTimeout(cursorTimeoutRef.current);
+      setShowCursor(true);
+      setIsTypingActive(true);
+      let deleteIndex = oldText.length;
+
+      const deleteChar = () => {
+        if (deleteIndex > 0) {
+          deleteIndex--;
+          const sliced = oldText.slice(0, deleteIndex);
+          displayedQuoteRef.current = sliced;
+          setDisplayedQuote(sliced);
+          setTimeout(deleteChar, TYPING_SPEED);
+        } else {
+          setTimeout(() => {
+            let typeIndex = 0;
+            const typeChar = () => {
+              if (typeIndex < newText.length) {
+                typeIndex++;
+                const sliced = newText.slice(0, typeIndex);
+                displayedQuoteRef.current = sliced;
+                setDisplayedQuote(sliced);
+                setTimeout(typeChar, TYPING_SPEED);
+              } else {
+                setIsTypingActive(false);
+                animatingRef.current = false;
+                cursorTimeoutRef.current = setTimeout(() => setShowCursor(false), 2000);
+              }
+            };
+            typeChar();
+          }, 500);
+        }
+      };
+      deleteChar();
+    };
+
+    const handleTypingComplete = () => {
+      // first switch 30s after Currently typing finishes
+      timeout = setTimeout(() => {
+        animateQuoteChange();
+
+        // then every 60s after that
+        interval = setInterval(() => {
+          animateQuoteChange();
+        }, 60000);
+      }, 30000);
+    };
+
+    window.addEventListener("currently-typing-complete", handleTypingComplete);
+    return () => {
+      window.removeEventListener("currently-typing-complete", handleTypingComplete);
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <section className="py-16">
@@ -60,10 +155,13 @@ export default function Hero() {
           <p className="font-sans font-semibold text-off-white text-lg leading-[1.35]" style={{ marginBottom: '0.5rem' }}>
             @ uc berkeley
           </p>
-          <p className="font-sans italic text-gray text-lg leading-[1.35] max-w-md">
-            &ldquo;there&apos;s a lot of beauty in ordinary things.
-            <br />
-            isn&apos;t that kind of the point?&rdquo; - pam halpert
+          <p className="font-sans italic text-gray text-lg leading-[1.35] max-w-md whitespace-pre-line">
+            {displayedQuote}
+            {showCursor && (
+              <span
+                className={`inline-block w-[2px] h-[1.1em] bg-gray align-middle ml-[1px] ${isTypingActive ? '' : 'animate-cursor-blink'}`}
+              />
+            )}
           </p>
         </div>
       </div>
