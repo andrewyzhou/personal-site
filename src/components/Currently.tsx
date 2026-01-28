@@ -110,6 +110,7 @@ export default function Currently() {
       } else {
         setIsTypingActive(false);
         setIsTypingComplete(true);
+        window.dispatchEvent(new CustomEvent("currently-typing-complete"));
       }
     };
     typeNext();
@@ -435,6 +436,7 @@ export default function Currently() {
         // no book - need to delete "i'm currently reading " and type the correct text
         animateDeleteType(INITIAL_TEXT, text, setDisplayedText, () => {
           setIsTypingComplete(true);
+          window.dispatchEvent(new CustomEvent("currently-typing-complete"));
         });
       }
     }
