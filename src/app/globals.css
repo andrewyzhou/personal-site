@@ -156,6 +156,21 @@ body {
   animation: cursor-blink 1s ease-in-out infinite;
 }
 
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-enter {
+  animation: content-enter 0.3s ease-out;
+}
+
 /* ============================================
    SCROLLBAR STYLING
    ============================================ */
@@ -236,6 +251,7 @@ body {
 .strava-calendar {
   min-width: 300px;
   max-width: 400px;
+  overflow: hidden;
 }
 
 @media (min-width: 768px) {
