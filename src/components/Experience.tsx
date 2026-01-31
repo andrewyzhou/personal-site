@@ -6,9 +6,10 @@ import { researchData } from "@/data/research";
 import { teachingData } from "@/data/teaching";
 import { projectsData } from "@/data/projects";
 
-type Category = "work" | "research" | "teaching" | "projects" | "coursework";
+type Category = "bio" | "work" | "research" | "teaching" | "projects" | "coursework";
 
 const categories: { id: Category; label: string }[] = [
+  { id: "bio", label: "bio" },
   { id: "work", label: "work" },
   { id: "research", label: "research" },
   { id: "teaching", label: "teaching" },
@@ -17,6 +18,7 @@ const categories: { id: Category; label: string }[] = [
 ];
 
 const categoryDescriptions: Record<Category, string> = {
+  bio: "",
   work: "building products and shipping code >:)",
   research: "exploring machine learning with interests in distributed training, computer vision, and computational biology!",
   teaching: "helping berkeley bears learn computer science :p",
@@ -110,8 +112,9 @@ const semesters: Semester[] = [
 ];
 
 export default function Experience() {
-  const [activeCategory, setActiveCategory] = useState<Category>("work");
+  const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
+  const [contentKey, setContentKey] = useState(0);
 
   // read hash on mount and set category
   useEffect(() => {
@@ -123,8 +126,15 @@ export default function Experience() {
 
   // update hash when category changes
   const handleCategoryChange = (category: Category) => {
+    if (category === activeCategory) return;
+    const wasBio = activeCategory === "bio";
+    const goingToBio = category === "bio";
     setActiveCategory(category);
     window.history.replaceState(null, "", `#${category}`);
+    // trigger enter animation only for bio transitions
+    if (wasBio || goingToBio) {
+      setContentKey(prev => prev + 1);
+    }
   };
 
   const getItemsData = (): ExperienceItem[] => {
@@ -152,28 +162,60 @@ export default function Experience() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory]);
 
+  const categoryTabs = (
+    <div className="flex flex-wrap gap-2">
+      {categories.map((cat) => (
+        <button
+          key={cat.id}
+          onClick={() => handleCategoryChange(cat.id)}
+          className={`font-sans text-3xl transition-colors ${
+            activeCategory === cat.id
+              ? "text-off-white font-medium link-highlight-active"
+              : "text-gray link-highlight"
+          }`}
+          style={{ padding: '0px 4px 1px 4px', margin: '0 2px' }}
+        >
+          <span className="inline-flex flex-col items-center">
+            <span>{cat.label}</span>
+            <span className="font-medium h-0 invisible overflow-hidden">{cat.label}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <section className="py-16">
-      {/* category tabs */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => handleCategoryChange(cat.id)}
-            className={`font-sans text-3xl transition-colors ${
-              activeCategory === cat.id
-                ? "text-off-white font-medium link-highlight-active"
-                : "text-gray link-highlight"
-            }`}
-            style={{ padding: '0px 4px 1px 4px', margin: '0 2px' }}
-          >
-            <span className="inline-flex flex-col items-center">
-              <span>{cat.label}</span>
-              <span className="font-medium h-0 invisible overflow-hidden">{cat.label}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      <div key={contentKey} className="animate-content-enter">
+      {activeCategory === "bio" ? (
+        <div className="flex flex-col md:flex-row gap-8 md:gap-12">
+          {/* left side - bio text */}
+          <div className="w-full md:w-3/5">
+            <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '1rem' }}>
+              about me
+            </h3>
+            <div className="font-sans text-gray text-lg leading-[1.35] flex flex-col gap-3">
+              <p>
+                i&apos;m an undergraduate @ <a href="https://berkeley.edu" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">uc berkeley</a> studying <a href="https://eecs.berkeley.edu/about/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">electrical engineering &amp; computer sciences</a>. my research interests lie in machine learning architecture and infrastructure. i'm also passionate about teaching, fitness, and electronic music!
+              </p>
+              <p>
+                currently, i serve as course staff for <a href="https://cs61a.org/staff/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">cs 61a</a>, with a focus on supporting the <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">cs scholars</a> program. this summer, i&apos;ll be joining <a href="https://www.amazon.jobs/content/en/teams/amazon-web-services/annapurna-labs" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">annapurna labs</a> as an ml engineer intern on the distributed training team. previously, i conducted machine learning research under professor <a href="https://med.stanford.edu/guolanlulab.html" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">guolan lu</a> at the stanford school of medicine.
+              </p>
+              <p>
+                you can learn more by clicking around the sections on the right. or just poke around the rest of the site! thanks for stopping by :3
+              </p>
+            </div>
+          </div>
+
+          {/* right side - category tabs */}
+          <div className="w-full md:w-2/5 flex flex-col items-start md:items-end">
+            {categoryTabs}
+          </div>
+        </div>
+      ) : (
+        <>
+        {/* category tabs */}
+        {categoryTabs}
 
       {/* category content */}
       <div style={{ marginTop: '0.5rem' }}>
@@ -309,6 +351,9 @@ export default function Experience() {
           </div>
         )}
         </div>
+        </>
+      )}
+      </div>
     </section>
   );
 }

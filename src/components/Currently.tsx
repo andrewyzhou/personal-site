@@ -153,6 +153,13 @@ export default function Currently() {
             if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
               maxPreviousFetchedAt = data.previousFetchedAt;
             }
+            if (data.latestActivityId) {
+              window.dispatchEvent(
+                new CustomEvent("strava-latest-activity", {
+                  detail: { latestActivityId: data.latestActivityId },
+                })
+              );
+            }
           }
         }
 

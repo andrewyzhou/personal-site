@@ -17,11 +17,8 @@ interface StoredActivities {
   lastFetchedAt: number;
 }
 
-// Sync calendar activities in the background (fire and forget)
-async function syncCalendarActivities() {
+async function syncCalendarActivities(stored: StoredActivities | null) {
   try {
-    const stored = await redis.get<StoredActivities>(CALENDAR_CACHE_KEY);
-
     let activities: CalendarActivity[];
 
     if (stored && stored.activities.length > 0) {
@@ -61,15 +58,21 @@ async function syncCalendarActivities() {
 async function fetchStravaData() {
   const activity = await getLatestActivity();
 
-  // Also sync calendar activities when we fetch fresh data
-  syncCalendarActivities(); // fire and forget (no await)
-
   if (!activity) {
     return null;
   }
 
+  // Check if calendar cache needs updating
+  const stored = await redis.get<StoredActivities>(CALENDAR_CACHE_KEY);
+  const cachedLatestId = stored?.activities?.[0]?.id ?? null;
+
+  if (activity.id !== cachedLatestId) {
+    await syncCalendarActivities(stored);
+  }
+
   return {
     ...activity,
+    latestActivityId: activity.id,
     formattedDistance: formatDistance(activity.distance),
     formattedDuration: formatDuration(activity.elapsedTime),
     formattedTimeAgo: formatTimeAgo(activity.startDate),

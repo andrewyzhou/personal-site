@@ -12,22 +12,27 @@ const QUOTES = [
 
 const TYPING_SPEED = 45;
 
-// random initial quote index
-const INITIAL_INDEX = Math.floor(Math.random() * QUOTES.length);
-
 function getNextQuoteIndex(current: number): number {
   return (current + 1) % QUOTES.length;
 }
 
 export default function Hero() {
   const [showLogo, setShowLogo] = useState(false);
-  const [displayedQuote, setDisplayedQuote] = useState(QUOTES[INITIAL_INDEX]);
+  const [initialIndex] = useState(() => Math.floor(Math.random() * QUOTES.length));
+  const [displayedQuote, setDisplayedQuote] = useState("");
   const [isTypingActive, setIsTypingActive] = useState(false);
   const [showCursor, setShowCursor] = useState(false);
-  const quoteIndexRef = useRef(INITIAL_INDEX);
+  const quoteIndexRef = useRef(0);
   const animatingRef = useRef(false);
-  const displayedQuoteRef = useRef(QUOTES[INITIAL_INDEX]);
+  const displayedQuoteRef = useRef("");
   const cursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Set random quote on client mount to avoid hydration mismatch
+  useEffect(() => {
+    quoteIndexRef.current = initialIndex;
+    displayedQuoteRef.current = QUOTES[initialIndex];
+    setDisplayedQuote(QUOTES[initialIndex]);
+  }, [initialIndex]);
 
   // keep ref in sync with state
   useEffect(() => {

@@ -297,7 +297,6 @@ function ActivityDetail({
   const showElevation = activity.totalElevationGain > 0;
   const showHeartrate = activity.averageHeartrate !== null;
   const showMaxHeartrate = activity.maxHeartrate !== null;
-  const showCadence = activity.averageCadence !== null && !DURATION_TYPES.includes(activity.type);
   const showPower = activity.averageWatts !== null;
   const isDurationBased = DURATION_TYPES.includes(activity.type);
 
@@ -343,10 +342,6 @@ function ActivityDetail({
     stats.push({ label: "max hr", value: `${Math.round(activity.maxHeartrate!)} bpm` });
   }
 
-  if (showCadence) {
-    stats.push({ label: "cadence", value: `${Math.round(activity.averageCadence!)} spm` });
-  }
-
   if (showPower) {
     stats.push({ label: "power", value: `${Math.round(activity.averageWatts!)}W` });
   }
@@ -367,7 +362,7 @@ function ActivityDetail({
 
       {/* activity header */}
       <div className="flex items-center gap-3" style={{ marginBottom: '12px' }}>
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ border: '1px solid var(--theme-highlight-bg)' }}>
+        <div className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center" style={{ border: '1px solid var(--theme-highlight-bg)' }}>
           <Image
             src={`/icons/activities/${getIconForType(activity.type)}.svg`}
             alt={activity.type}
@@ -376,8 +371,8 @@ function ActivityDetail({
             className="activity-icon"
           />
         </div>
-        <div>
-          <h4 className="font-sans font-medium text-off-white text-base leading-tight">
+        <div className="min-w-0">
+          <h4 className="font-sans font-medium text-off-white text-base leading-tight break-words line-clamp-3">
             {activity.name || getActivityName(activity.type)}
           </h4>
           <span className="font-sans text-gray text-xs">
@@ -429,13 +424,15 @@ export default function StravaCalendar() {
   });
   const [viewState, setViewState] = useState<ViewState>({ type: "calendar" });
   const [lockedHeight, setLockedHeight] = useState<number | null>(null);
+  const [lockedWidth, setLockedWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // handler for when an activity day is clicked
   const handleActivityClick = useCallback((activities: CalendarActivity[], date: string) => {
-    // lock height before transitioning
+    // lock dimensions before transitioning
     if (containerRef.current) {
       setLockedHeight(containerRef.current.offsetHeight);
+      setLockedWidth(containerRef.current.offsetWidth);
     }
     if (activities.length === 1) {
       // single activity - go directly to detail view
@@ -448,7 +445,8 @@ export default function StravaCalendar() {
 
   // handler for going back to calendar
   const handleBackToCalendar = useCallback(() => {
-    setLockedHeight(null); // unlock height when returning to calendar
+    setLockedHeight(null);
+    setLockedWidth(null);
     setViewState({ type: "calendar" });
   }, []);
 
@@ -490,6 +488,25 @@ export default function StravaCalendar() {
     }
     fetchActivities();
   }, []);
+
+  // Listen for new activity events from the Currently section
+  useEffect(() => {
+    function handleLatestActivity(e: Event) {
+      const { latestActivityId } = (e as CustomEvent).detail;
+      const cachedLatestId = data?.activities?.[0]?.id;
+      if (latestActivityId && latestActivityId !== cachedLatestId) {
+        fetch("/api/strava/activities")
+          .then(res => res.ok ? res.json() : null)
+          .then(result => {
+            if (result) setData(result);
+          })
+          .catch(err => console.error("Failed to refresh strava activities:", err));
+      }
+    }
+
+    window.addEventListener("strava-latest-activity", handleLatestActivity);
+    return () => window.removeEventListener("strava-latest-activity", handleLatestActivity);
+  }, [data]);
 
   // group activities by date - now returns array of activities per date
   const activitiesByDate = useMemo(() => {
@@ -734,7 +751,10 @@ export default function StravaCalendar() {
       <div
         ref={containerRef}
         className="card-bg rounded-lg overflow-hidden flex flex-col !p-5"
-        style={lockedHeight ? { height: lockedHeight } : undefined}
+        style={{
+          ...(lockedHeight ? { height: lockedHeight } : {}),
+          ...(lockedWidth ? { width: lockedWidth } : {}),
+        }}
       >
         {renderContent()}
       </div>
