@@ -155,7 +155,7 @@ export default function Hero() {
         {/* right side - info */}
         <div className="text-center md:text-right">
           <p className="font-sans font-semibold text-off-white text-lg leading-[1.35]">
-            electrical engineering &amp; computer sciences
+            electrical engineering &amp; computer science
           </p>
           <p className="font-sans font-semibold text-off-white text-lg leading-[1.35]" style={{ marginBottom: '0.5rem' }}>
             @ uc berkeley
