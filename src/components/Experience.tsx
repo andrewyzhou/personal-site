@@ -202,7 +202,7 @@ export default function Experience() {
                 currently, i serve as course staff for <a href="https://cs61a.org/staff/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">cs 61a</a>, with a focus on supporting the <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">cs scholars</a> program. this summer, i&apos;ll be joining <a href="https://www.amazon.jobs/content/en/teams/amazon-web-services/annapurna-labs" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">annapurna labs</a> as an ml engineer intern on the distributed training team. previously, i conducted machine learning research under professor <a href="https://med.stanford.edu/guolanlulab.html" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">guolan lu</a> at the stanford school of medicine.
               </p>
               <p>
-                you can learn more by clicking around the sections <span className="hidden md:inline">on the right</span><span className="md:hidden">below</span>. or just poke around the rest of the site! thanks for stopping by :3
+                you can learn more by clicking around the sections <span className="hidden md:inline">on the right</span><span className="md:hidden">below</span>—or just poke around the rest of the site! thanks for stopping by :3
               </p>
             </div>
           </div>

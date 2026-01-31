@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 
-const MOBILE_WEEKS = 28;
+const MOBILE_WEEKS = 24;
 const STACK_BREAKPOINT = 768;
 
 // gradual week reduction breakpoints (widest to narrowest)
@@ -32,7 +32,7 @@ const DESKTOP_BREAKPOINTS = [
   { minWidth: 880, weeks: 31 },
   { minWidth: 867, weeks: 30 },
   { minWidth: 854, weeks: 29 },
-  { minWidth: STACK_BREAKPOINT, weeks: MOBILE_WEEKS },  // 768-854 stays at 28
+  { minWidth: STACK_BREAKPOINT, weeks: 28 },  // 768-854 stays at 28
 ];
 
 const MOBILE_BREAKPOINTS = [
@@ -59,7 +59,11 @@ const MOBILE_BREAKPOINTS = [
   { minWidth: 495, weeks: 31 },
   { minWidth: 482, weeks: 30 },
   { minWidth: 469, weeks: 29 },
-  { minWidth: 456, weeks: MOBILE_WEEKS },
+  { minWidth: 456, weeks: 28 },
+  { minWidth: 443, weeks: 27 },
+  { minWidth: 430, weeks: 26 },
+  { minWidth: 417, weeks: 25 },
+  { minWidth: 404, weeks: MOBILE_WEEKS },
 ];
 
 interface ContributionDay {
