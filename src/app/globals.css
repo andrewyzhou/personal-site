@@ -304,4 +304,20 @@ ul.list-disc.list-inside li::marker {
   content: " • ";
 }
 
+/* ============================================
+   SITE CONTAINER
+   ============================================ */
+
+.site-container {
+  max-width: 1344px;
+  margin: 0 auto;
+  padding: 48px 20px;
+}
+
+@media (min-width: 768px) {
+  .site-container {
+    padding: 64px 64px;
+  }
+}
+
 
