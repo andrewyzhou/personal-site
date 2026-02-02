@@ -130,7 +130,7 @@ export default function Experience() {
     const wasBio = activeCategory === "bio";
     const goingToBio = category === "bio";
     setActiveCategory(category);
-    window.history.replaceState(null, "", `#${category}`);
+    window.history.replaceState(null, "", category === "bio" ? window.location.pathname : `#${category}`);
     // trigger enter animation only for bio transitions
     if (wasBio || goingToBio) {
       setContentKey(prev => prev + 1);
