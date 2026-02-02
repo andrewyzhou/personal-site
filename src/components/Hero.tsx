@@ -10,7 +10,7 @@ const QUOTES = [
   `"how would i describe myself? three words.\nhard-working, alpha male. jackhammer. merciless.\ninsatiable." - dwight schrute`,
 ];
 
-const TYPING_SPEED = 45;
+const TYPING_SPEED = 35;
 
 function getNextQuoteIndex(current: number): number {
   return (current + 1) % QUOTES.length;
@@ -92,10 +92,10 @@ export default function Hero() {
       timeout = setTimeout(() => {
         animateQuoteChange();
 
-        // then every 60s after that
+        // then every 30s after that
         interval = setInterval(() => {
           animateQuoteChange();
-        }, 60000);
+        }, 30000);
       }, 30000);
     };
 
