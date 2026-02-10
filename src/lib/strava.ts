@@ -100,7 +100,7 @@ export async function getAllActivities(after?: number): Promise<CalendarActivity
         allActivities.push({
           id: activity.id,
           name: activity.name || "",
-          type: activity.type,
+          type: activity.sport_type || activity.type,
           date: localDate,
           startTime: localTime,
           distance: activity.distance || 0,
