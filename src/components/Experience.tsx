@@ -46,11 +46,19 @@ const semesters: Semester[] = [
   {
     name: "spring 2026",
     courses: [
-      { code: "cs 162", title: "operating systems and system programming" },
-      { code: "cs 186", title: "introduction to database systems" },
-      { code: "cs 189", title: "introduction to machine learning" },
+      { code: "cs 162", title: "operating systems and system programming", cheatsheets: [
+        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/cs162/pdf/cs162_notes.pdf" },
+      ]},
+      { code: "cs 186", title: "introduction to database systems", cheatsheets: [
+        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/cs186/pdf/cs186_notes.pdf" },
+      ]},
+      { code: "cs 189", title: "introduction to machine learning", cheatsheets: [
+        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/cs189/pdf/cs189_notes.pdf" },
+      ]},
       { code: "cs 197", title: "field study (cs 61a tutor)" },
-      { code: "eecs 126", title: "probability and random processes" },
+      { code: "eecs 126", title: "probability and random processes", cheatsheets: [
+        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/eecs126/pdf/eecs126_notes.pdf" },
+      ]},
     ],
   },
   {

@@ -3,7 +3,7 @@ import Experience from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
-import StravaCalendar from "@/components/StravaCalendar";
+import ActivityCalendar from "@/components/ActivityCalendar";
 
 export default function Home() {
   return (
@@ -42,7 +42,7 @@ export default function Home() {
         <div className="flex flex-col activity-stack:flex-row justify-between gap-8 activity-stack:gap-12">
           {/* strava calendar - shows first on mobile, right on desktop */}
           <div className="w-full activity-stack:w-2/5 flex justify-center activity-stack:justify-end activity-stack:items-center order-first activity-stack:order-last">
-            <StravaCalendar />
+            <ActivityCalendar />
           </div>
 
           {/* github activity - shows second on mobile, left on desktop */}

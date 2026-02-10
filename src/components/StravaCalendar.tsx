@@ -238,12 +238,13 @@ function ActivitySelector({
       <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
         <button
           onClick={onBack}
-          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
+          className="flex items-center justify-center"
+          aria-label="Back"
         >
-          &lt; back
+          <Image src="/icons/arrow-left.svg" alt="" width={16} height={16} className="opacity-70 hover:opacity-100 transition-opacity" />
         </button>
         <span className="font-sans text-off-white text-sm">{dateDisplay}</span>
-        <div className="w-12" /> {/* spacer for alignment */}
+        <div className="w-4" /> {/* spacer for alignment */}
       </div>
 
       {/* activity list */}
@@ -352,12 +353,13 @@ function ActivityDetail({
       <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
         <button
           onClick={onBack}
-          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
+          className="flex items-center justify-center"
+          aria-label="Back"
         >
-          &lt; back
+          <Image src="/icons/arrow-left.svg" alt="" width={16} height={16} className="opacity-70 hover:opacity-100 transition-opacity" />
         </button>
         <span className="font-sans text-off-white text-sm">{dateDisplay}</span>
-        <div className="w-12" /> {/* spacer for alignment */}
+        <div className="w-4" /> {/* spacer for alignment */}
       </div>
 
       {/* activity header */}
@@ -643,20 +645,20 @@ export default function StravaCalendar() {
       <div className="flex items-center justify-between">
         <button
           onClick={goToPrevMonth}
-          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
+          className="flex items-center justify-center hover:opacity-100 transition-opacity"
           aria-label="Previous month"
         >
-          &lt;
+          <Image src="/icons/arrow-left.svg" alt="" width={16} height={16} className="opacity-70 hover:opacity-100 transition-opacity" />
         </button>
         <span className="font-sans font-medium text-off-white text-sm">
           {MONTHS[currentMonth.month]} {currentMonth.year}
         </span>
         <button
           onClick={goToNextMonth}
-          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors"
+          className="flex items-center justify-center hover:opacity-100 transition-opacity"
           aria-label="Next month"
         >
-          &gt;
+          <Image src="/icons/arrow-right.svg" alt="" width={16} height={16} className="opacity-70 hover:opacity-100 transition-opacity" />
         </button>
       </div>
 
