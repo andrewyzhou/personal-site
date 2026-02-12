@@ -19,7 +19,7 @@ export const workData: ExperienceItem[] = [
     description: (
       <ul className="list-disc list-inside">
         <li>incoming summer 2026</li>
-        <li>distributed ml training team</li>
+        <li>distributed training team: machine learning training optimization on AWS Trainium</li>
       </ul>
     ),
     year: "2026",
@@ -34,6 +34,7 @@ export const workData: ExperienceItem[] = [
     description: (
       <ul className="list-disc list-inside">
         <li>built <a href="https://appbench.ai" target="_blank" rel="noopener noreferrer" className="link-highlight">appbench.ai</a>, a comprehensive benchmarking platform for code generation tools</li>
+        <li>engineered an agent harness system running parallelized evaluations across 14 frontier models with trajectory logging, cost analysis, and automated grading</li>
       </ul>
     ),
     year: "2025",

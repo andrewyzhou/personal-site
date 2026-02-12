@@ -6,7 +6,11 @@ export const teachingData: ExperienceItem[] = [
     title: "cs 61a tutor",
     company: "uc berkeley eecs",
     companyUrl: "https://eecs.berkeley.edu/",
-    description: null,
+    description: (
+      <ul className="list-disc list-inside">
+        <li>leading exam prep and specialized sections for <a href="https://cs61a.org" target="_blank" rel="noopener noreferrer" className="link-highlight">cs 61a</a>&apos;s <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="link-highlight">cs scholars</a> students!</li>
+      </ul>
+    ),
     year: "spring 2026",
   },
   {
