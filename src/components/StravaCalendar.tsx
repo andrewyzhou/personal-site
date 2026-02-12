@@ -298,7 +298,6 @@ function ActivityDetail({
   const showElevation = activity.totalElevationGain > 0;
   const showHeartrate = activity.averageHeartrate !== null;
   const showMaxHeartrate = activity.maxHeartrate !== null;
-  const showPower = activity.averageWatts !== null;
   const isDurationBased = DURATION_TYPES.includes(activity.type);
 
   // parse date for display
@@ -343,9 +342,6 @@ function ActivityDetail({
     stats.push({ label: "max hr", value: `${Math.round(activity.maxHeartrate!)} bpm` });
   }
 
-  if (showPower) {
-    stats.push({ label: "power", value: `${Math.round(activity.averageWatts!)}W` });
-  }
 
   return (
     <div className="flex flex-col h-full">
