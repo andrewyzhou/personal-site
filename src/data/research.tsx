@@ -10,7 +10,8 @@ export const researchData: ExperienceItem[] = [
     period: "nov 2025 – present",
     description: (
       <ul className="list-disc list-inside">
-        <li>in the works...</li>
+        <li>built <a href="https://appbench.ai" target="_blank" rel="noopener noreferrer" className="link-highlight">appbench.ai</a>, a comprehensive benchmarking platform for code generation tools</li>
+        <li>engineered an agent harness system running parallelized evaluations across 14 frontier models with trajectory logging, cost analysis, and automated grading</li>
       </ul>
     ),
     year: "2025",
