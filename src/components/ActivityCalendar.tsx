@@ -257,7 +257,6 @@ function StravaActivityDetail({
   const showElevation = activity.totalElevationGain > 0;
   const showHeartrate = activity.averageHeartrate !== null;
   const showMaxHeartrate = activity.maxHeartrate !== null;
-  const showPower = activity.averageWatts !== null;
   const isDurationBased = DURATION_TYPES.includes(activity.type);
 
   const dateObj = new Date(activity.date + "T12:00:00");
@@ -273,7 +272,6 @@ function StravaActivityDetail({
   if (showElevation) stats.push({ label: "elevation", value: formatElevation(activity.totalElevationGain) });
   if (showHeartrate) stats.push({ label: "avg hr", value: `${Math.round(activity.averageHeartrate!)} bpm` });
   if (showMaxHeartrate) stats.push({ label: "max hr", value: `${Math.round(activity.maxHeartrate!)} bpm` });
-  if (showPower) stats.push({ label: "power", value: `${Math.round(activity.averageWatts!)}W` });
 
   return (
     <div className="flex flex-col h-full">
