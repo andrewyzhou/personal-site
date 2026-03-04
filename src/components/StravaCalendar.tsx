@@ -594,6 +594,9 @@ export default function StravaCalendar() {
       days.push(day);
     }
 
+    // pad to 6 full weeks for consistent height
+    while (days.length < 42) days.push(null);
+
     return days;
   }, [currentMonth]);
 
