@@ -677,6 +677,7 @@ export default function ActivityCalendar() {
     const days: (number | null)[] = [];
     for (let i = 0; i < startDayOfWeek; i++) days.push(null);
     for (let day = 1; day <= daysInMonth; day++) days.push(day);
+    while (days.length < 42) days.push(null);
     return days;
   }, [currentMonth]);
 
