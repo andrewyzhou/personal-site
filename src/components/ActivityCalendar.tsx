@@ -719,7 +719,7 @@ export default function ActivityCalendar() {
   const handleStravaBackFromDetail = useCallback(() => {
     if (stravaViewState.type === "detail") {
       const activity = stravaViewState.activity;
-      const sameDay = stravaData?.activities.filter(a => a.date === activity.date) || [];
+      const sameDay = (stravaData?.activities.filter(a => a.date === activity.date) || []).slice().sort((a, b) => a.id - b.id);
       if (sameDay.length > 1) {
         setStravaViewState({ type: "selector", date: activity.date, activities: sameDay });
       } else {
