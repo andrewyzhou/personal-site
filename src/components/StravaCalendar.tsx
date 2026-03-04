@@ -459,7 +459,7 @@ export default function StravaCalendar() {
     if (viewState.type === "detail") {
       const activity = viewState.activity;
       // find all activities on the same date
-      const sameDay = data?.activities.filter(a => a.date === activity.date) || [];
+      const sameDay = (data?.activities.filter(a => a.date === activity.date) || []).slice().sort((a, b) => a.id - b.id);
       if (sameDay.length > 1) {
         setViewState({ type: "selector", date: activity.date, activities: sameDay });
       } else {
