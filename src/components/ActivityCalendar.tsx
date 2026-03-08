@@ -582,7 +582,7 @@ export default function ActivityCalendar() {
       map.set(activity.date, existing);
     }
     for (const acts of map.values()) {
-      acts.sort((a, b) => a.id - b.id);
+      acts.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
     return map;
   }, [stravaData]);
@@ -720,7 +720,7 @@ export default function ActivityCalendar() {
   const handleStravaBackFromDetail = useCallback(() => {
     if (stravaViewState.type === "detail") {
       const activity = stravaViewState.activity;
-      const sameDay = (stravaData?.activities.filter(a => a.date === activity.date) || []).slice().sort((a, b) => a.id - b.id);
+      const sameDay = (stravaData?.activities.filter(a => a.date === activity.date) || []).slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
       if (sameDay.length > 1) {
         setStravaViewState({ type: "selector", date: activity.date, activities: sameDay });
       } else {
