@@ -43,7 +43,7 @@ export async function getContributions(username: string): Promise<GitHubContribu
       query,
       variables: { username },
     }),
-    next: { revalidate: 3600 }, // cache for 1 hour
+    next: { revalidate: 300 }, // cache for 5 minutes
   });
 
   if (!response.ok) {
