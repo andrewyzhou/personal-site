@@ -193,7 +193,7 @@ function CalendarDayCell({
         className="calendar-activity"
         title={`${activities.length} activit${activities.length === 1 ? 'y' : 'ies'}`}
       >
-        <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+        <div style={{ opacity: isTransitioning ? 0 : 1, transition: 'opacity 0.3s ease' }}>
           <Image
             src={`/icons/activities/${getIconForType(currentActivity.type)}.svg`}
             alt={currentActivity.type}
@@ -525,18 +525,84 @@ export default function StravaCalendar() {
     return map;
   }, [data]);
 
-  // calculate yearly mileage (runs only)
-  const yearlyMileage = useMemo(() => {
-    if (!data?.activities) return 0;
+  // calculate yearly stats by activity type
+  const yearlyStats = useMemo(() => {
+    if (!data?.activities) return [];
     const currentYear = new Date().getFullYear();
-    const runTypes = ["Run", "VirtualRun", "TrailRun"];
+    const yearActivities = data.activities.filter(a => a.date.startsWith(String(currentYear)));
 
-    const totalMeters = data.activities
-      .filter(a => a.date.startsWith(String(currentYear)) && runTypes.includes(a.type))
-      .reduce((sum, a) => sum + (a.distance || 0), 0);
+    const statDefs: { types: string[]; icon: string; format: (activities: CalendarActivity[]) => string }[] = [
+      {
+        types: ["Run", "VirtualRun", "TrailRun"],
+        icon: "run",
+        format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi`,
+      },
+      {
+        types: ["Ride", "VirtualRide", "MountainBikeRide", "GravelRide"],
+        icon: "ride",
+        format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi`,
+      },
+      {
+        types: ["Walk", "Hike"],
+        icon: "walk",
+        format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi`,
+      },
+      {
+        types: ["WeightTraining", "Workout", "Crossfit"],
+        icon: "weight",
+        format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min`,
+      },
+      {
+        types: ["Soccer"],
+        icon: "soccer",
+        format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min`,
+      },
+      {
+        types: ["Yoga"],
+        icon: "yoga",
+        format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min`,
+      },
+      {
+        types: ["Tennis"],
+        icon: "tennis",
+        format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min`,
+      },
+      {
+        types: ["RockClimbing"],
+        icon: "climb",
+        format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min`,
+      },
+      {
+        types: ["Swim"],
+        icon: "swim",
+        format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi`,
+      },
+    ];
 
-    return totalMeters / 1609.344; // convert to miles
+    return statDefs
+      .map(def => {
+        const acts = yearActivities.filter(a => def.types.includes(a.type));
+        if (acts.length === 0) return null;
+        return { icon: def.icon, value: def.format(acts) };
+      })
+      .filter((s): s is { icon: string; value: string } => s !== null);
   }, [data]);
+
+  // cycle through yearly stats
+  const [statIndex, setStatIndex] = useState(0);
+  const [statTransitioning, setStatTransitioning] = useState(false);
+
+  useEffect(() => {
+    if (yearlyStats.length <= 1) return;
+    const interval = setInterval(() => {
+      setStatTransitioning(true);
+      setTimeout(() => {
+        setStatIndex(prev => (prev + 1) % yearlyStats.length);
+        setStatTransitioning(false);
+      }, 150);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [yearlyStats.length]);
 
   // calculate current streak (consecutive days with activity ending today or yesterday)
   const currentStreak = useMemo(() => {
@@ -638,7 +704,7 @@ export default function StravaCalendar() {
   }
 
   // calendar content component
-  const CalendarView = () => (
+  const calendarView = (
     <>
       {/* month navigation */}
       <div className="flex items-center justify-between">
@@ -696,16 +762,21 @@ export default function StravaCalendar() {
 
       {/* stats row */}
       <div className="flex items-center justify-between" style={{ marginTop: '12px' }}>
-        <span className="font-sans text-gray text-sm flex items-center gap-1">
-          <Image
-            src="/icons/activities/run.svg"
-            alt="Running"
-            width={14}
-            height={14}
-            className="opacity-70"
-          />
-          <span className="font-bold">{yearlyMileage.toFixed(1)} mi</span> in {new Date().getFullYear()}
-        </span>
+        {yearlyStats.length > 0 && (
+          <span className="font-sans text-gray text-sm flex items-center gap-1">
+            <div className="flex items-center gap-1" style={{ opacity: statTransitioning ? 0 : 1, transition: 'opacity 0.3s ease' }}>
+              <Image
+                src={`/icons/activities/${yearlyStats[statIndex % yearlyStats.length].icon}.svg`}
+                alt=""
+                width={14}
+                height={14}
+                className="opacity-70"
+              />
+              <span className="font-bold">{yearlyStats[statIndex % yearlyStats.length].value}</span>
+            </div>
+             in {new Date().getFullYear()}
+          </span>
+        )}
         {currentStreak > 0 && (
           <span className="font-sans text-gray text-sm flex items-center gap-1">
             <Image
@@ -744,7 +815,7 @@ export default function StravaCalendar() {
       );
     }
 
-    return <CalendarView />;
+    return calendarView;
   };
 
   return (
