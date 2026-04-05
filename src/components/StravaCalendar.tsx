@@ -184,7 +184,7 @@ function CalendarDayCell({
     return <span className="calendar-day-number">{dayNumber}</span>;
   }
 
-  const currentActivity = activities[currentIndex];
+  const currentActivity = activities[currentIndex % activities.length];
 
   return (
     <div className="relative w-full h-full">
