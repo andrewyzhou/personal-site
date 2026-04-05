@@ -161,7 +161,7 @@ function StravaDayCell({
     return <span className="calendar-day-number">{dayNumber}</span>;
   }
 
-  const currentActivity = activities[currentIndex];
+  const currentActivity = activities[currentIndex % activities.length];
 
   return (
     <div className="relative w-full h-full">
@@ -348,7 +348,7 @@ function LeetCodeDayCell({
     return <span className="calendar-day-number">{dayNumber}</span>;
   }
 
-  const currentSubmission = submissions[currentIndex];
+  const currentSubmission = submissions[currentIndex % submissions.length];
 
   return (
     <div className="relative w-full h-full">
