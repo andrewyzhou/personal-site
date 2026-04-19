@@ -4,6 +4,6 @@ my personal website built with next.js, tailwind, and typescript. inspired by th
 
 ## note on usage
 
-this repo is public so you can see how it's built, but please don't copy or redistribute the code without asking first. if you'd like to use this site as a template or reference for your own project, please feel free to reach out to me - i'm happy to chat!
+this repo is public so you can see how it's built, but please don't copy or redistribute the code. i've gotten requests for a generic template for my site that i'm currently working on and will be released publically for free!
 
 you can contact me at andrewzhou [at] berkeley [dot] edu
