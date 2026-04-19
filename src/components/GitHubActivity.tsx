@@ -279,7 +279,7 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
       {/* latest commit info */}
       {data.latestCommit && (
         <p className="font-sans text-gray text-lg" style={{ marginTop: '0.5rem' }}>
-          this site was last deployed on {formatDate(data.latestCommit.date)} for commit <a href={`https://github.com/andrewyzhou/personal-site/commit/${data.latestCommit.sha}`} target="_blank" rel="noopener noreferrer" className="link-highlight">{data.latestCommit.sha}</a>
+          this site was last deployed on {formatDate(data.latestCommit.date)} for commit {data.latestCommit.sha}
         </p>
       )}
     </div>
