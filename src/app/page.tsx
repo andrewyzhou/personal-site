@@ -1,19 +1,46 @@
 import Hero from "@/components/Hero";
-import Experience from "@/components/Experience";
+import Experience, { LearningPreviewItem } from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
+import { getAllEntries } from "@/lib/learning";
+
+function formatDateLabel(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  const month = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
+  return `${month} ${d.getDate()}, ${d.getFullYear()}`;
+}
 
 export default function Home() {
+  const learningPreview: LearningPreviewItem[] = getAllEntries().slice(0, 5).map((e) => {
+    const dateLabel = e.dateCompleted
+      ? `completed ${formatDateLabel(e.dateCompleted)}`
+      : e.dateStarted
+      ? `started ${formatDateLabel(e.dateStarted)}`
+      : "in progress";
+    const year =
+      (e.dateCompleted ?? e.dateStarted ?? "").slice(0, 4) || "";
+    return {
+      slug: e.slug,
+      title: e.title,
+      creator: e.creator,
+      type: e.type,
+      summary: e.summary,
+      dateLabel,
+      year,
+    };
+  });
+
   return (
     <main className="site-container">
       {/* section 1: hero */}
       <Hero />
       <div className="section-divider" />
 
-      {/* section 2: experience/work/research/teaching/projects */}
-      <Experience />
+      {/* section 2: experience/work/research/teaching/projects/learning */}
+      <Experience learningPreview={learningPreview} />
       <div className="section-divider" />
 
       {/* section 3: currently + contact */}
