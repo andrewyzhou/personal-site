@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { workData, ExperienceItem } from "@/data/work";
 import { researchData } from "@/data/research";
 import { teachingData } from "@/data/teaching";
 import { projectsData } from "@/data/projects";
 
-type Category = "bio" | "work" | "research" | "teaching" | "projects" | "coursework";
+type Category = "bio" | "work" | "research" | "teaching" | "projects" | "learning" | "coursework";
 
 const categories: { id: Category; label: string }[] = [
   { id: "bio", label: "bio" },
@@ -14,6 +15,7 @@ const categories: { id: Category; label: string }[] = [
   { id: "research", label: "research" },
   { id: "teaching", label: "teaching" },
   { id: "projects", label: "projects" },
+  { id: "learning", label: "learning" },
   { id: "coursework", label: "coursework" },
 ];
 
@@ -23,8 +25,19 @@ const categoryDescriptions: Record<Category, string> = {
   research: "exploring machine learning with interests in distributed training, computer vision, and computational biology!",
   teaching: "helping berkeley bears learn computer science :p",
   projects: "things i've built for fun and learning :D",
+  learning: "books, videos, podcasts, and courses i've been learning from — with my notes :3",
   coursework: "classes i've taken at berkeley with links to my notes & cheatsheets :)",
 };
+
+export interface LearningPreviewItem {
+  slug: string;
+  title: string;
+  creator: string;
+  type: string;
+  summary: string;
+  dateLabel: string;
+  year: string;
+}
 
 interface Cheatsheet {
   label: string;
@@ -119,10 +132,33 @@ const semesters: Semester[] = [
   },
 ];
 
-export default function Experience() {
+interface ExperienceProps {
+  learningPreview?: LearningPreviewItem[];
+}
+
+export default function Experience({ learningPreview = [] }: ExperienceProps) {
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
+
+  const learningItems: ExperienceItem[] = learningPreview.map((e) => ({
+    id: e.slug,
+    title: e.title,
+    company: e.creator,
+    year: e.year,
+    period: e.dateLabel,
+    description: (
+      <div className="flex flex-col gap-2">
+        <p>{e.summary}</p>
+        <Link
+          href={`/learning/${e.slug}`}
+          className="font-sans text-off-white link-highlight inline-block w-fit"
+        >
+          read full notes →
+        </Link>
+      </div>
+    ),
+  }));
 
   // read hash on mount and set category
   useEffect(() => {
@@ -155,6 +191,8 @@ export default function Experience() {
         return teachingData;
       case "projects":
         return projectsData;
+      case "learning":
+        return learningItems;
       default:
         return [];
     }
@@ -356,6 +394,16 @@ export default function Experience() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {activeCategory === "learning" && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <Link
+              href="/learning"
+              className="font-sans text-off-white text-lg link-highlight"
+            >
+              see all learning →
+            </Link>
           </div>
         )}
         </div>
