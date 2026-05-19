@@ -1,7 +1,7 @@
-import { MDXRemote } from "next-mdx-remote/rsc";
 import type { ComponentProps } from "react";
+import type { MDXComponents } from "mdx/types";
 
-const components = {
+const components: MDXComponents = {
   h1: (props: ComponentProps<"h1">) => (
     <h1
       className="font-sans font-bold text-off-white text-3xl"
@@ -30,14 +30,16 @@ const components = {
       {...props}
     />
   ),
-  a: (props: ComponentProps<"a">) => (
-    <a
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-off-white link-highlight"
-      {...props}
-    />
-  ),
+  a: (props: ComponentProps<"a">) => {
+    const isExternal = props.href?.startsWith("http");
+    return (
+      <a
+        {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        className="text-off-white link-highlight"
+        {...props}
+      />
+    );
+  },
   ul: (props: ComponentProps<"ul">) => (
     <ul
       className="font-sans text-gray text-lg leading-[1.55] list-disc list-inside"
@@ -100,6 +102,12 @@ const components = {
   ),
 };
 
-export default function MDXContent({ source }: { source: string }) {
-  return <MDXRemote source={source} components={components} />;
+interface MDXModule {
+  default: (props: { components?: MDXComponents }) => React.JSX.Element;
+}
+
+export default async function MDXContent({ slug }: { slug: string }) {
+  const mod = (await import(`@/content/learning/${slug}.mdx`)) as MDXModule;
+  const Content = mod.default;
+  return <Content components={components} />;
 }
