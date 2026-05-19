@@ -316,7 +316,7 @@ export default function Currently() {
       links.push({
         start: linkStart,
         end: text.length,
-        url: `https://literal.club/book/${book.slug}`,
+        url: `/learning`,
       });
       text += ".";
     }
@@ -552,12 +552,12 @@ export default function Currently() {
 
       // add the link (partial or complete depending on how far we've typed)
       const linkEnd = Math.min(link.end, displayedText.length);
+      const isInternal = link.url.startsWith("/");
       result.push(
         <a
           key={`link-${i}`}
           href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
+          {...(isInternal ? {} : { target: "_blank", rel: "noopener noreferrer" })}
           className="link-highlight"
         >
           {displayedText.slice(link.start, linkEnd)}
