@@ -116,7 +116,7 @@ export default async function LearningEntryPage({ params }: PageProps) {
           </p>
         )}
 
-        <MDXContent source={entry.content} />
+        <MDXContent slug={entry.slug} />
       </article>
 
       {(prev || next) && (
