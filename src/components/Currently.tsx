@@ -316,7 +316,7 @@ export default function Currently() {
       links.push({
         start: linkStart,
         end: text.length,
-        url: `/learning`,
+        url: `/library`,
       });
       text += ".";
     }

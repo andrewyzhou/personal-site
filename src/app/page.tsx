@@ -1,12 +1,12 @@
 import Hero from "@/components/Hero";
-import Experience, { LearningPreviewItem } from "@/components/Experience";
+import Experience, { LibraryPreviewItem } from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
 import Bio from "@/components/mdx/Bio";
 import ItemContent from "@/components/mdx/ItemContent";
-import { getAllEntries } from "@/lib/learning";
+import { getAllEntries } from "@/lib/library";
 import { getItems, type ItemCategory } from "@/lib/items";
 import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
 
@@ -36,7 +36,7 @@ export default function Home() {
   const teachingItems = loadCategory("teaching");
   const projectsItems = loadCategory("projects");
 
-  const learningPreview: LearningPreviewItem[] = getAllEntries().slice(0, 5).map((e) => {
+  const libraryPreview: LibraryPreviewItem[] = getAllEntries().slice(0, 5).map((e) => {
     const dateLabel = e.dateCompleted
       ? `completed ${formatDateLabel(e.dateCompleted)}`
       : e.dateStarted
@@ -61,9 +61,9 @@ export default function Home() {
       <Hero quotes={getHeroQuotes()} />
       <div className="section-divider" />
 
-      {/* section 2: experience/work/research/teaching/projects/learning */}
+      {/* section 2: experience/work/research/teaching/projects/library */}
       <Experience
-        learningPreview={learningPreview}
+        libraryPreview={libraryPreview}
         sectionDescriptions={getSectionDescriptions()}
         semesters={getCoursework()}
         bio={<Bio />}

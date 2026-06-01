@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getAllEntries, getEntryBySlug, getAdjacentEntries } from "@/lib/learning";
-import SourceIcon from "@/components/learning/SourceIcon";
-import Rating from "@/components/learning/Rating";
-import MDXContent from "@/components/learning/MDXContent";
+import { getAllEntries, getEntryBySlug, getAdjacentEntries } from "@/lib/library";
+import SourceIcon from "@/components/library/SourceIcon";
+import Rating from "@/components/library/Rating";
+import MDXContent from "@/components/library/MDXContent";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const entry = getEntryBySlug(slug);
   if (!entry) return { title: "not found · andrew zhou" };
   return {
-    title: `${entry.title} · learning · andrew zhou`,
+    title: `${entry.title} · library · andrew zhou`,
     description: entry.summary,
   };
 }
@@ -31,7 +31,7 @@ function formatDate(iso?: string): string {
   return `${month} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-export default async function LearningEntryPage({ params }: PageProps) {
+export default async function LibraryEntryPage({ params }: PageProps) {
   const { slug } = await params;
   const entry = getEntryBySlug(slug);
   if (!entry) notFound();
@@ -46,8 +46,8 @@ export default async function LearningEntryPage({ params }: PageProps) {
   return (
     <main className="site-container">
       <section className="py-8">
-        <Link href="/learning" className="font-sans text-gray text-base link-highlight">
-          ← learning
+        <Link href="/library" className="font-sans text-gray text-base link-highlight">
+          ← library
         </Link>
       </section>
 
@@ -89,7 +89,7 @@ export default async function LearningEntryPage({ params }: PageProps) {
             {entry.tags.map((tag) => (
               <Link
                 key={tag}
-                href={`/learning?tags=${encodeURIComponent(tag)}`}
+                href={`/library?tags=${encodeURIComponent(tag)}`}
                 className="font-sans text-gray text-sm link-highlight"
               >
                 {tag}
@@ -126,7 +126,7 @@ export default async function LearningEntryPage({ params }: PageProps) {
             <div className="flex justify-between gap-6" style={{ maxWidth: "720px" }}>
               <div className="flex-1">
                 {prev && (
-                  <Link href={`/learning/${prev.slug}`} className="block group">
+                  <Link href={`/library/${prev.slug}`} className="block group">
                     <p className="font-sans text-gray text-sm" style={{ marginBottom: "0.25rem" }}>
                       ← previous
                     </p>
@@ -138,7 +138,7 @@ export default async function LearningEntryPage({ params }: PageProps) {
               </div>
               <div className="flex-1 text-right">
                 {next && (
-                  <Link href={`/learning/${next.slug}`} className="block group">
+                  <Link href={`/library/${next.slug}`} className="block group">
                     <p className="font-sans text-gray text-sm" style={{ marginBottom: "0.25rem" }}>
                       next →
                     </p>

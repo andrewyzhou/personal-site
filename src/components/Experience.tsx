@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
 import type { Semester } from "@/lib/content";
 
-type Category = "bio" | "work" | "research" | "teaching" | "projects" | "learning" | "coursework";
+type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "coursework";
 
 const categories: { id: Category; label: string }[] = [
   { id: "bio", label: "bio" },
@@ -13,12 +13,12 @@ const categories: { id: Category; label: string }[] = [
   { id: "research", label: "research" },
   { id: "teaching", label: "teaching" },
   { id: "projects", label: "projects" },
-  { id: "learning", label: "learning" },
+  { id: "library", label: "library" },
   { id: "coursework", label: "coursework" },
 ];
 
 
-export interface LearningPreviewItem {
+export interface LibraryPreviewItem {
   slug: string;
   title: string;
   creator: string;
@@ -29,7 +29,7 @@ export interface LearningPreviewItem {
 }
 
 interface ExperienceProps {
-  learningPreview?: LearningPreviewItem[];
+  libraryPreview?: LibraryPreviewItem[];
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
   semesters: Semester[];
   bio: React.ReactNode;
@@ -40,7 +40,7 @@ interface ExperienceProps {
 }
 
 export default function Experience({
-  learningPreview = [],
+  libraryPreview = [],
   sectionDescriptions,
   semesters,
   bio,
@@ -53,7 +53,7 @@ export default function Experience({
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
 
-  const learningItems: ExperienceItem[] = learningPreview.map((e) => ({
+  const libraryItems: ExperienceItem[] = libraryPreview.map((e) => ({
     id: e.slug,
     title: e.title,
     company: e.creator,
@@ -63,7 +63,7 @@ export default function Experience({
       <div className="flex flex-col gap-2">
         <p>{e.summary}</p>
         <Link
-          href={`/learning/${e.slug}`}
+          href={`/library/${e.slug}`}
           className="font-sans text-off-white link-highlight inline-block w-fit"
         >
           read full notes →
@@ -103,8 +103,8 @@ export default function Experience({
         return teachingItems;
       case "projects":
         return projectsItems;
-      case "learning":
-        return learningItems;
+      case "library":
+        return libraryItems;
       default:
         return [];
     }
@@ -298,13 +298,13 @@ export default function Experience({
             </div>
           </div>
         )}
-        {activeCategory === "learning" && (
+        {activeCategory === "library" && (
           <div style={{ marginTop: '1.5rem' }}>
             <Link
-              href="/learning"
+              href="/library"
               className="font-sans text-off-white text-lg link-highlight"
             >
-              see all learning →
+              see all library →
             </Link>
           </div>
         )}
