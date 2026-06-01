@@ -5,7 +5,7 @@ import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
 import { getAllEntries } from "@/lib/learning";
-import { getHeroQuotes } from "@/lib/content";
+import { getHeroQuotes, getSectionDescriptions } from "@/lib/content";
 
 function formatDateLabel(iso?: string): string {
   if (!iso) return "";
@@ -41,7 +41,7 @@ export default function Home() {
       <div className="section-divider" />
 
       {/* section 2: experience/work/research/teaching/projects/learning */}
-      <Experience learningPreview={learningPreview} />
+      <Experience learningPreview={learningPreview} sectionDescriptions={getSectionDescriptions()} />
       <div className="section-divider" />
 
       {/* section 3: currently + contact */}

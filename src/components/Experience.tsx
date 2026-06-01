@@ -19,15 +19,6 @@ const categories: { id: Category; label: string }[] = [
   { id: "coursework", label: "coursework" },
 ];
 
-const categoryDescriptions: Record<Category, string> = {
-  bio: "",
-  work: "building products and shipping code >:)",
-  research: "exploring machine learning with interests in distributed training, computer vision, and computational biology!",
-  teaching: "helping berkeley bears learn computer science :p",
-  projects: "things i've built for fun and learning :D",
-  learning: "books, videos, podcasts, and courses i've been learning from — with my notes :3",
-  coursework: "classes i've taken at berkeley with links to my notes & cheatsheets :)",
-};
 
 export interface LearningPreviewItem {
   slug: string;
@@ -134,9 +125,10 @@ const semesters: Semester[] = [
 
 interface ExperienceProps {
   learningPreview?: LearningPreviewItem[];
+  sectionDescriptions: Record<Exclude<Category, "bio">, string>;
 }
 
-export default function Experience({ learningPreview = [] }: ExperienceProps) {
+export default function Experience({ learningPreview = [], sectionDescriptions }: ExperienceProps) {
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
@@ -266,7 +258,7 @@ export default function Experience({ learningPreview = [] }: ExperienceProps) {
       {/* category content */}
       <div style={{ marginTop: '0.5rem' }}>
         <p className="font-sans text-gray text-lg leading-[1.35] mb-8">
-          {categoryDescriptions[activeCategory]}
+          {sectionDescriptions[activeCategory]}
         </p>
         <br />
         {activeCategory === "coursework" ? (
