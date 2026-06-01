@@ -1,7 +1,7 @@
-import type { LearningType } from "@/lib/learning";
+import type { LibraryType } from "@/lib/library";
 
 interface Props {
-  type: LearningType;
+  type: LibraryType;
   size?: number;
   className?: string;
 }
