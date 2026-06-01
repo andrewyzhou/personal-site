@@ -134,6 +134,26 @@ body {
 }
 
 /* ============================================
+   BLOG IMAGES (Figure / Gallery)
+   ============================================ */
+
+.blog-figure {
+  margin: 2rem 0;
+}
+
+.blog-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 2rem 0;
+}
+
+/* figures inside a gallery sit flush in the grid, no stacked spacing */
+.blog-gallery .blog-figure {
+  margin: 0;
+}
+
+/* ============================================
    GITHUB CONTRIBUTION COLORS
    ============================================ */
 
