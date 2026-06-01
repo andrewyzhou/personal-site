@@ -21,3 +21,23 @@ export type SectionKey =
 export function getSectionDescriptions(): Record<SectionKey, string> {
   return loadYaml<Record<SectionKey, string>>("sections.yaml");
 }
+
+export interface Cheatsheet {
+  label: string;
+  url: string;
+}
+
+export interface Course {
+  code: string;
+  title: string;
+  cheatsheets?: Cheatsheet[];
+}
+
+export interface Semester {
+  name: string;
+  courses: Course[];
+}
+
+export function getCoursework(): Semester[] {
+  return loadYaml<Semester[]>("coursework.yaml");
+}
