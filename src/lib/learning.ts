@@ -22,7 +22,7 @@ export interface LearningEntry extends LearningFrontmatter {
   status: "in-progress" | "completed";
 }
 
-const CONTENT_DIR = path.join(process.cwd(), "src/content/learning");
+const CONTENT_DIR = path.join(process.cwd(), "content/learning");
 
 export function getAllEntries(): LearningEntry[] {
   if (!fs.existsSync(CONTENT_DIR)) return [];
