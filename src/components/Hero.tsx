@@ -4,21 +4,19 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import SocialLinks from "./SocialLinks";
 
-const QUOTES = [
-  `"there's a lot of beauty in ordinary things.\nisn't that kind of the point?" - pam halpert`,
-  `"you miss 100% of the shots you \ndon't take. - wayne gretzky"\n- michael scott`,
-  `"how would i describe myself? three words.\nhard-working, alpha male. jackhammer. merciless.\ninsatiable." - dwight schrute`,
-];
-
 const TYPING_SPEED = 35;
 
-function getNextQuoteIndex(current: number): number {
-  return (current + 1) % QUOTES.length;
+interface HeroProps {
+  quotes: string[];
 }
 
-export default function Hero() {
+function getNextQuoteIndex(current: number, total: number): number {
+  return (current + 1) % total;
+}
+
+export default function Hero({ quotes }: HeroProps) {
   const [showLogo, setShowLogo] = useState(false);
-  const [initialIndex] = useState(() => Math.floor(Math.random() * QUOTES.length));
+  const [initialIndex] = useState(() => Math.floor(Math.random() * quotes.length));
   const [displayedQuote, setDisplayedQuote] = useState("");
   const [isTypingActive, setIsTypingActive] = useState(false);
   const [showCursor, setShowCursor] = useState(false);
@@ -30,9 +28,9 @@ export default function Hero() {
   // Set random quote on client mount to avoid hydration mismatch
   useEffect(() => {
     quoteIndexRef.current = initialIndex;
-    displayedQuoteRef.current = QUOTES[initialIndex];
-    setDisplayedQuote(QUOTES[initialIndex]);
-  }, [initialIndex]);
+    displayedQuoteRef.current = quotes[initialIndex];
+    setDisplayedQuote(quotes[initialIndex]);
+  }, [initialIndex, quotes]);
 
   // keep ref in sync with state
   useEffect(() => {
@@ -47,9 +45,9 @@ export default function Hero() {
       if (animatingRef.current) return;
       animatingRef.current = true;
 
-      const nextIndex = getNextQuoteIndex(quoteIndexRef.current);
+      const nextIndex = getNextQuoteIndex(quoteIndexRef.current, quotes.length);
       quoteIndexRef.current = nextIndex;
-      const newText = QUOTES[nextIndex];
+      const newText = quotes[nextIndex];
       const oldText = displayedQuoteRef.current;
 
       if (cursorTimeoutRef.current) clearTimeout(cursorTimeoutRef.current);
@@ -105,7 +103,7 @@ export default function Hero() {
       clearTimeout(timeout);
       clearInterval(interval);
     };
-  }, []);
+  }, [quotes]);
 
   return (
     <section className="py-16">

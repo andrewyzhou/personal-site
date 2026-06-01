@@ -1,0 +1,19 @@
+# hero quotes - rotate every 30 seconds in the hero section.
+# `text` may include \n for line breaks. `attribution` is appended on its own line as "- name".
+# add, remove, or reorder freely.
+
+- text: |-
+    "there's a lot of beauty in ordinary things.
+    isn't that kind of the point?"
+  attribution: pam halpert
+
+- text: |-
+    "you miss 100% of the shots you
+    don't take. - wayne gretzky"
+  attribution: michael scott
+
+- text: |-
+    "how would i describe myself? three words.
+    hard-working, alpha male. jackhammer. merciless.
+    insatiable."
+  attribution: dwight schrute
