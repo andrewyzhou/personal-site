@@ -5,6 +5,7 @@ import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
 import { getAllEntries } from "@/lib/learning";
+import { getHeroQuotes } from "@/lib/content";
 
 function formatDateLabel(iso?: string): string {
   if (!iso) return "";
@@ -36,7 +37,7 @@ export default function Home() {
   return (
     <main className="site-container">
       {/* section 1: hero */}
-      <Hero />
+      <Hero quotes={getHeroQuotes()} />
       <div className="section-divider" />
 
       {/* section 2: experience/work/research/teaching/projects/learning */}
