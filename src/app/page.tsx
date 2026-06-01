@@ -5,8 +5,23 @@ import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
 import Bio from "@/components/mdx/Bio";
+import ItemContent from "@/components/mdx/ItemContent";
 import { getAllEntries } from "@/lib/learning";
+import { getItems, type ItemCategory } from "@/lib/items";
 import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
+
+function loadCategory(category: ItemCategory) {
+  return getItems(category).map((m) => ({
+    id: m.slug,
+    title: m.title,
+    company: m.company,
+    companyUrl: m.companyUrl,
+    location: m.location,
+    period: m.period,
+    year: m.year,
+    description: <ItemContent category={category} slug={m.slug} />,
+  }));
+}
 
 function formatDateLabel(iso?: string): string {
   if (!iso) return "";
@@ -16,6 +31,11 @@ function formatDateLabel(iso?: string): string {
 }
 
 export default function Home() {
+  const workItems = loadCategory("work");
+  const researchItems = loadCategory("research");
+  const teachingItems = loadCategory("teaching");
+  const projectsItems = loadCategory("projects");
+
   const learningPreview: LearningPreviewItem[] = getAllEntries().slice(0, 5).map((e) => {
     const dateLabel = e.dateCompleted
       ? `completed ${formatDateLabel(e.dateCompleted)}`
@@ -47,6 +67,10 @@ export default function Home() {
         sectionDescriptions={getSectionDescriptions()}
         semesters={getCoursework()}
         bio={<Bio />}
+        workItems={workItems}
+        researchItems={researchItems}
+        teachingItems={teachingItems}
+        projectsItems={projectsItems}
       />
       <div className="section-divider" />
 
