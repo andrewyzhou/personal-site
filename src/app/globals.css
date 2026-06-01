@@ -344,19 +344,7 @@ ul.list-disc.list-inside li::marker {
    GALLERY
    ============================================ */
 
-/* masonry: css columns. each cover keeps its natural aspect ratio. */
-.gallery-masonry {
-  column-count: 1;
-  column-gap: 8px;
-}
-@media (min-width: 640px) {
-  .gallery-masonry { column-count: 2; }
-}
-@media (min-width: 1024px) {
-  .gallery-masonry { column-count: 3; }
-}
-
-/* hover darken + title reveal — shared across all 3 layouts */
+/* hover darken + title reveal on cover images */
 .gallery-cover-link {
   cursor: pointer;
 }
