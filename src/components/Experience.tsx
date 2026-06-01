@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { workData, ExperienceItem } from "@/data/work";
+import { ExperienceItem } from "@/data/work";
 import { researchData } from "@/data/research";
 import { teachingData } from "@/data/teaching";
 import { projectsData } from "@/data/projects";
@@ -36,9 +36,22 @@ interface ExperienceProps {
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
   semesters: Semester[];
   bio: React.ReactNode;
+  workItems: ExperienceItem[];
+  researchItems: ExperienceItem[];
+  teachingItems: ExperienceItem[];
+  projectsItems: ExperienceItem[];
 }
 
-export default function Experience({ learningPreview = [], sectionDescriptions, semesters, bio }: ExperienceProps) {
+export default function Experience({
+  learningPreview = [],
+  sectionDescriptions,
+  semesters,
+  bio,
+  workItems,
+  researchItems,
+  teachingItems,
+  projectsItems,
+}: ExperienceProps) {
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
@@ -86,13 +99,13 @@ export default function Experience({ learningPreview = [], sectionDescriptions, 
   const getItemsData = (): ExperienceItem[] => {
     switch (activeCategory) {
       case "work":
-        return workData;
+        return workItems;
       case "research":
-        return researchData;
+        return researchItems;
       case "teaching":
-        return teachingData;
+        return teachingItems;
       case "projects":
-        return projectsData;
+        return projectsItems;
       case "learning":
         return learningItems;
       default:
