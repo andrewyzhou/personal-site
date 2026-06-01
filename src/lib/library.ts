@@ -24,24 +24,47 @@ export interface LibraryEntry extends LibraryFrontmatter {
 
 const CONTENT_DIR = path.join(process.cwd(), "content/library");
 
+// subdirectories of content/library/ are intentionally not traversed — only
+// direct-child .mdx files are published. drafts live in content/library/wip/
+// and are skipped by this loader (and not statically generated). a wip entry
+// is published by moving its file up one level into content/library/.
+
+// slug = filename minus .mdx. must be lowercase ascii to keep urls portable
+// across case-sensitive (linux prod) and case-insensitive (macos dev) hosts,
+// and to keep `${slug}.mdx` in dynamic imports unambiguous. enforced on both
+// ingest (getAllEntries) and lookup (getEntryBySlug) so the /library index
+// can't list an entry whose detail page would 404.
+function isValidSlug(slug: string): boolean {
+  return /^[a-z0-9][a-z0-9-_]*$/.test(slug);
+}
+
 export function getAllEntries(): LibraryEntry[] {
   if (!fs.existsSync(CONTENT_DIR)) return [];
 
-  const files = fs.readdirSync(CONTENT_DIR).filter((f) => f.endsWith(".mdx"));
+  const dirents = fs
+    .readdirSync(CONTENT_DIR, { withFileTypes: true })
+    .filter((d) => d.isFile() && d.name.endsWith(".mdx"));
 
-  const entries: LibraryEntry[] = files.map((file) => {
-    const slug = file.replace(/\.mdx$/, "");
-    const raw = fs.readFileSync(path.join(CONTENT_DIR, file), "utf8");
+  const entries: LibraryEntry[] = [];
+  for (const d of dirents) {
+    const slug = d.name.replace(/\.mdx$/, "");
+    if (!isValidSlug(slug)) {
+      console.warn(
+        `[library] skipping ${d.name}: filename must match /^[a-z0-9][a-z0-9-_]*$/ (lowercase ascii, no spaces/dots)`
+      );
+      continue;
+    }
+    const raw = fs.readFileSync(path.join(CONTENT_DIR, d.name), "utf8");
     const { data, content } = matter(raw);
     const fm = data as LibraryFrontmatter;
-    return {
+    entries.push({
       ...fm,
       tags: fm.tags ?? [],
       slug,
       content,
       status: fm.dateCompleted ? "completed" : "in-progress",
-    };
-  });
+    });
+  }
 
   // sort: in-progress first (by dateStarted desc), then completed (by dateCompleted desc)
   return entries.sort((a, b) => {
@@ -53,7 +76,12 @@ export function getAllEntries(): LibraryEntry[] {
 }
 
 export function getEntryBySlug(slug: string): LibraryEntry | null {
+  if (!isValidSlug(slug)) return null;
   const file = path.join(CONTENT_DIR, `${slug}.mdx`);
+  // defense in depth: confirm the resolved file lives directly inside
+  // CONTENT_DIR, not in a subfolder like wip/ — should already be guaranteed
+  // by isValidSlug above but cheap to verify.
+  if (path.dirname(file) !== CONTENT_DIR) return null;
   if (!fs.existsSync(file)) return null;
   const raw = fs.readFileSync(file, "utf8");
   const { data, content } = matter(raw);
