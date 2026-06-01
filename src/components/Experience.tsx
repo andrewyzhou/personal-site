@@ -6,6 +6,7 @@ import { workData, ExperienceItem } from "@/data/work";
 import { researchData } from "@/data/research";
 import { teachingData } from "@/data/teaching";
 import { projectsData } from "@/data/projects";
+import type { Semester } from "@/lib/content";
 
 type Category = "bio" | "work" | "research" | "teaching" | "projects" | "learning" | "coursework";
 
@@ -30,105 +31,13 @@ export interface LearningPreviewItem {
   year: string;
 }
 
-interface Cheatsheet {
-  label: string;
-  url: string;
-}
-
-interface Course {
-  code: string;
-  title: string;
-  cheatsheets?: Cheatsheet[];
-}
-
-interface Semester {
-  name: string;
-  courses: Course[];
-}
-
-const semesters: Semester[] = [
-  {
-    name: "spring 2026",
-    courses: [
-      { code: "cs 162", title: "operating systems and system programming", cheatsheets: [
-        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/cs162/pdf/cs162_notes.pdf" },
-      ]},
-      { code: "cs 186", title: "introduction to database systems", cheatsheets: [
-        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/cs186/pdf/cs186_notes.pdf" },
-      ]},
-      { code: "cs 189", title: "introduction to machine learning", cheatsheets: [
-        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/cs189/pdf/cs189_notes.pdf" },
-      ]},
-      { code: "cs 197", title: "field study (cs 61a tutor)" },
-      { code: "eecs 126", title: "probability and random processes", cheatsheets: [
-        { label: "notes", url: "https://github.com/andrewyzhou/notes/blob/main/eecs126/pdf/eecs126_notes.pdf" },
-      ]},
-    ],
-  },
-  {
-    name: "fall 2025",
-    courses: [
-      { code: "cs 161", title: "computer security", cheatsheets: [
-        { label: "mt", url: "/docs/cs161_mt_cheatsheet.pdf" },
-        { label: "final", url: "/docs/cs161_final_cheatsheet.pdf" },
-      ]},
-      { code: "cs 170", title: "efficient algorithms and intractable problems", cheatsheets: [
-        { label: "mt1", url: "/docs/cs170_mt1_cheatsheet.pdf" },
-        { label: "final", url: "/docs/cs170_final_cheatsheet.pdf" },
-      ]},
-      { code: "cs 195", title: "social implications of computer technology" },
-      { code: "cs 197", title: "field study (cs 61a tutor)" },
-      { code: "eecs 127", title: "optimization models in engineering" },
-    ],
-  },
-  {
-    name: "summer 2025",
-    courses: [
-      { code: "physics 7b", title: "physics for scientists and engineers*" },
-      { code: "english r1b", title: "reading and composition*" },
-    ],
-  },
-  {
-    name: "spring 2025",
-    courses: [
-      { code: "cs 61c", title: "great ideas of computer architecture" },
-      { code: "cs 70", title: "discrete mathematics and probability theory", cheatsheets: [
-        { label: "final", url: "/docs/cs70_final_cheatsheet.pdf" },
-      ]},
-      { code: "eecs 16b", title: "designing information devices and systems ii", cheatsheets: [
-        { label: "mt1", url: "/docs/eecs16b_mt1_cheatsheet.pdf" },
-        { label: "mt2", url: "/docs/eecs16b_mt2_cheatsheet.pdf" },
-        { label: "final", url: "/docs/eecs16b_final_cheatsheet.pdf" },
-      ]},
-    ],
-  },
-  {
-    name: "fall 2024",
-    courses: [
-      { code: "cs 61a", title: "structure and interpretation of computer programs" },
-      { code: "cs 61b", title: "data structures" },
-      { code: "eecs 16a", title: "designing information devices and systems i", cheatsheets: [
-        { label: "mt1", url: "/docs/eecs16a_mt1_cheatsheet.pdf" },
-        { label: "mt2", url: "/docs/eecs16a_mt2_cheatsheet.pdf" },
-      ]},
-      { code: "philos 5", title: "science and human understanding" },
-    ],
-  },
-  {
-    name: "high school concurrent enrollment",
-    courses: [
-      { code: "math 54", title: "linear algebra & differential equations*" },
-      { code: "math 53", title: "multivariable calculus*" },
-    ],
-  },
-];
-
 interface ExperienceProps {
   learningPreview?: LearningPreviewItem[];
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
+  semesters: Semester[];
 }
 
-export default function Experience({ learningPreview = [], sectionDescriptions }: ExperienceProps) {
+export default function Experience({ learningPreview = [], sectionDescriptions, semesters }: ExperienceProps) {
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
