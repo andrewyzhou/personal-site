@@ -22,6 +22,14 @@
 .DS_Store
 *.pem
 
+# raw photo originals — keep the raw/ folders for visibility, but never commit
+# heic source files (they don't render in browsers and bloat the repo). run
+# `npm run images` to produce the committed web-ready .jpg versions.
+*.heic
+*.HEIC
+*.heif
+*.HEIF
+
 # debug
 npm-debug.log*
 yarn-debug.log*
