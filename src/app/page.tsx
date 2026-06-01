@@ -1,5 +1,5 @@
 import Hero from "@/components/Hero";
-import Experience, { LibraryPreviewItem } from "@/components/Experience";
+import Experience, { LibraryPreviewItem, BlogPreviewItem } from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
@@ -7,6 +7,7 @@ import ActivityCalendar from "@/components/ActivityCalendar";
 import Bio from "@/components/mdx/Bio";
 import ItemContent from "@/components/mdx/ItemContent";
 import { getAllEntries } from "@/lib/library";
+import { getAllPosts } from "@/lib/blog";
 import { getItems, type ItemCategory } from "@/lib/items";
 import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
 
@@ -55,6 +56,14 @@ export default function Home() {
     };
   });
 
+  const blogPreview: BlogPreviewItem[] = getAllPosts().slice(0, 5).map((p) => ({
+    slug: p.slug,
+    title: p.title,
+    summary: p.summary,
+    dateLabel: formatDateLabel(p.date),
+    year: (p.date ?? "").slice(0, 4) || "",
+  }));
+
   return (
     <main className="site-container">
       {/* section 1: hero */}
@@ -64,6 +73,7 @@ export default function Home() {
       {/* section 2: experience/work/research/teaching/projects/library */}
       <Experience
         libraryPreview={libraryPreview}
+        blogPreview={blogPreview}
         sectionDescriptions={getSectionDescriptions()}
         semesters={getCoursework()}
         bio={<Bio />}

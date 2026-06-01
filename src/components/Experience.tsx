@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
 import type { Semester } from "@/lib/content";
 
-type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "coursework";
+type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "coursework";
 
 const categories: { id: Category; label: string }[] = [
   { id: "bio", label: "bio" },
@@ -14,6 +14,7 @@ const categories: { id: Category; label: string }[] = [
   { id: "teaching", label: "teaching" },
   { id: "projects", label: "projects" },
   { id: "library", label: "library" },
+  { id: "blog", label: "blog" },
   { id: "coursework", label: "coursework" },
 ];
 
@@ -28,8 +29,17 @@ export interface LibraryPreviewItem {
   year: string;
 }
 
+export interface BlogPreviewItem {
+  slug: string;
+  title: string;
+  summary: string;
+  dateLabel: string;
+  year: string;
+}
+
 interface ExperienceProps {
   libraryPreview?: LibraryPreviewItem[];
+  blogPreview?: BlogPreviewItem[];
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
   semesters: Semester[];
   bio: React.ReactNode;
@@ -41,6 +51,7 @@ interface ExperienceProps {
 
 export default function Experience({
   libraryPreview = [],
+  blogPreview = [],
   sectionDescriptions,
   semesters,
   bio,
@@ -67,6 +78,24 @@ export default function Experience({
           className="font-sans text-off-white link-highlight inline-block w-fit"
         >
           read full notes →
+        </Link>
+      </div>
+    ),
+  }));
+
+  const blogItems: ExperienceItem[] = blogPreview.map((e) => ({
+    id: e.slug,
+    title: e.title,
+    company: e.dateLabel,
+    year: e.year,
+    description: (
+      <div className="flex flex-col gap-2">
+        <p>{e.summary}</p>
+        <Link
+          href={`/blog/${e.slug}`}
+          className="font-sans text-off-white link-highlight inline-block w-fit"
+        >
+          read post →
         </Link>
       </div>
     ),
@@ -105,6 +134,8 @@ export default function Experience({
         return projectsItems;
       case "library":
         return libraryItems;
+      case "blog":
+        return blogItems;
       default:
         return [];
     }
@@ -305,6 +336,16 @@ export default function Experience({
               className="font-sans text-off-white text-lg link-highlight"
             >
               see all library →
+            </Link>
+          </div>
+        )}
+        {activeCategory === "blog" && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <Link
+              href="/blog"
+              className="font-sans text-off-white text-lg link-highlight"
+            >
+              see all posts →
             </Link>
           </div>
         )}
