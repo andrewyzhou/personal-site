@@ -340,4 +340,56 @@ ul.list-disc.list-inside li::marker {
   }
 }
 
+/* ============================================
+   GALLERY
+   ============================================ */
 
+/* masonry: css columns. each cover keeps its natural aspect ratio. */
+.gallery-masonry {
+  column-count: 1;
+  column-gap: 8px;
+}
+@media (min-width: 640px) {
+  .gallery-masonry { column-count: 2; }
+}
+@media (min-width: 1024px) {
+  .gallery-masonry { column-count: 3; }
+}
+
+/* hover darken + title reveal — shared across all 3 layouts */
+.gallery-cover-link {
+  cursor: pointer;
+}
+.gallery-cover-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(16, 16, 16, 0);
+  transition: background-color 0.2s ease;
+  pointer-events: none;
+}
+.gallery-cover-link:hover .gallery-cover-overlay {
+  background-color: rgba(16, 16, 16, 0.35);
+}
+.gallery-cover-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(to top, rgba(16, 16, 16, 0.55), rgba(16, 16, 16, 0));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.gallery-cover-link:hover .gallery-cover-caption {
+  opacity: 1;
+}
+.theme-light .gallery-cover-overlay {
+  background-color: rgba(238, 238, 238, 0);
+}
+.theme-light .gallery-cover-link:hover .gallery-cover-overlay {
+  background-color: rgba(238, 238, 238, 0.35);
+}
+.theme-light .gallery-cover-caption {
+  background: linear-gradient(to top, rgba(238, 238, 238, 0.55), rgba(238, 238, 238, 0));
+}
