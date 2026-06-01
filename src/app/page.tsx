@@ -4,6 +4,7 @@ import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
+import Bio from "@/components/mdx/Bio";
 import { getAllEntries } from "@/lib/learning";
 import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
 
@@ -45,6 +46,7 @@ export default function Home() {
         learningPreview={learningPreview}
         sectionDescriptions={getSectionDescriptions()}
         semesters={getCoursework()}
+        bio={<Bio />}
       />
       <div className="section-divider" />
 

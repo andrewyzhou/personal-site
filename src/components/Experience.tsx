@@ -35,9 +35,10 @@ interface ExperienceProps {
   learningPreview?: LearningPreviewItem[];
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
   semesters: Semester[];
+  bio: React.ReactNode;
 }
 
-export default function Experience({ learningPreview = [], sectionDescriptions, semesters }: ExperienceProps) {
+export default function Experience({ learningPreview = [], sectionDescriptions, semesters, bio }: ExperienceProps) {
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
@@ -141,17 +142,7 @@ export default function Experience({ learningPreview = [], sectionDescriptions, 
             <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '1rem' }}>
               about me
             </h3>
-            <div className="font-sans text-gray text-lg leading-[1.35] flex flex-col gap-3">
-              <p>
-                i&apos;m an undergraduate @ <a href="https://berkeley.edu" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">uc berkeley</a> studying <a href="https://eecs.berkeley.edu/about/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">electrical engineering &amp; computer science</a>. my research interests lie in machine learning architecture and infrastructure. i'm also passionate about teaching, fitness, and electronic music!
-              </p>
-              <p>
-                currently, i serve as course staff for <a href="https://cs61a.org/staff/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">cs 61a</a>, with a focus on supporting the <a href="https://eecs.berkeley.edu/cs-scholars/" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">cs scholars</a> program. this summer, i&apos;ll be joining <a href="https://www.amazon.jobs/content/en/teams/amazon-web-services/annapurna-labs" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">annapurna labs</a> as an ml engineer intern on the distributed training team. previously, i conducted machine learning research under professor <a href="https://med.stanford.edu/guolanlulab.html" target="_blank" rel="noopener noreferrer" className="text-off-white link-highlight">guolan lu</a> at the stanford school of medicine.
-              </p>
-              <p>
-                you can learn more by clicking around the sections <span className="hidden md:inline">on the right</span><span className="md:hidden">below</span>—or just poke around the rest of the site! thanks for stopping by :3
-              </p>
-            </div>
+            <div>{bio}</div>
           </div>
 
           {/* right side - category tabs */}
