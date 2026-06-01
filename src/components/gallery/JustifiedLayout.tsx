@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Gallery } from "@/lib/gallery";
-import GalleryCover from "../GalleryCover";
+import GalleryCover from "./GalleryCover";
 
 interface Props {
   galleries: Gallery[];

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getAllGalleries } from "@/lib/gallery";
-import GalleryIndex from "@/components/gallery/GalleryIndex";
+import JustifiedLayout from "@/components/gallery/JustifiedLayout";
 
 export const metadata: Metadata = {
   title: "gallery · andrew zhou",
@@ -31,7 +31,11 @@ export default function GalleryPage() {
       <div className="section-divider" />
 
       <section className="py-8">
-        <GalleryIndex galleries={galleries} />
+        {galleries.length === 0 ? (
+          <p className="font-sans text-gray text-lg italic">no galleries yet.</p>
+        ) : (
+          <JustifiedLayout galleries={galleries} />
+        )}
       </section>
 
       <div className="section-divider" />
