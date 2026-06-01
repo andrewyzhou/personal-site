@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
 import type { Semester } from "@/lib/content";
 
-type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "coursework";
+type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "gallery" | "coursework";
 
 const categories: { id: Category; label: string }[] = [
   { id: "bio", label: "bio" },
@@ -15,6 +15,7 @@ const categories: { id: Category; label: string }[] = [
   { id: "projects", label: "projects" },
   { id: "library", label: "library" },
   { id: "blog", label: "blog" },
+  { id: "gallery", label: "gallery" },
   { id: "coursework", label: "coursework" },
 ];
 
@@ -37,9 +38,19 @@ export interface BlogPreviewItem {
   year: string;
 }
 
+export interface GalleryPreviewItem {
+  slug: string;
+  title: string;
+  caption: string;
+  dateLabel: string;
+  year: string;
+  count: number;
+}
+
 interface ExperienceProps {
   libraryPreview?: LibraryPreviewItem[];
   blogPreview?: BlogPreviewItem[];
+  galleryPreview?: GalleryPreviewItem[];
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
   semesters: Semester[];
   bio: React.ReactNode;
@@ -52,6 +63,7 @@ interface ExperienceProps {
 export default function Experience({
   libraryPreview = [],
   blogPreview = [],
+  galleryPreview = [],
   sectionDescriptions,
   semesters,
   bio,
@@ -101,6 +113,25 @@ export default function Experience({
     ),
   }));
 
+  const galleryItems: ExperienceItem[] = galleryPreview.map((e) => ({
+    id: e.slug,
+    title: e.title,
+    company: e.dateLabel,
+    year: e.year,
+    description: (
+      <div className="flex flex-col gap-2">
+        <p>{e.caption}</p>
+        <p className="font-sans text-gray text-sm italic">{e.count} photo{e.count === 1 ? "" : "s"}</p>
+        <Link
+          href={`/gallery/${e.slug}`}
+          className="font-sans text-off-white link-highlight inline-block w-fit"
+        >
+          view gallery →
+        </Link>
+      </div>
+    ),
+  }));
+
   // read hash on mount and set category
   useEffect(() => {
     const hash = window.location.hash.slice(1) as Category;
@@ -136,6 +167,8 @@ export default function Experience({
         return libraryItems;
       case "blog":
         return blogItems;
+      case "gallery":
+        return galleryItems;
       default:
         return [];
     }
@@ -346,6 +379,16 @@ export default function Experience({
               className="font-sans text-off-white text-lg link-highlight"
             >
               see all posts →
+            </Link>
+          </div>
+        )}
+        {activeCategory === "gallery" && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <Link
+              href="/gallery"
+              className="font-sans text-off-white text-lg link-highlight"
+            >
+              see all galleries →
             </Link>
           </div>
         )}
