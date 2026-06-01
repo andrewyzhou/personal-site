@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ExperienceItem } from "@/data/work";
-import { researchData } from "@/data/research";
-import { teachingData } from "@/data/teaching";
-import { projectsData } from "@/data/projects";
+import type { ExperienceItem } from "@/lib/items";
 import type { Semester } from "@/lib/content";
 
 type Category = "bio" | "work" | "research" | "teaching" | "projects" | "learning" | "coursework";

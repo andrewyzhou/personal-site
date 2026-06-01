@@ -15,6 +15,19 @@ export interface ItemMeta {
   year: string;
 }
 
+// shape consumed by the Experience component (description is a server-rendered
+// react node from the item's mdx body).
+export interface ExperienceItem {
+  id: string;
+  title: string;
+  company: string;
+  companyUrl?: string;
+  description: React.ReactNode;
+  year: string;
+  period?: string;
+  location?: string;
+}
+
 export function getItems(category: ItemCategory): ItemMeta[] {
   const dir = path.join(process.cwd(), "content", category);
   if (!fs.existsSync(dir)) return [];
