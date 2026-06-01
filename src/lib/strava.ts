@@ -189,41 +189,6 @@ export function formatDuration(seconds: number): string {
   return `${minutes} min`;
 }
 
-// format pace as min:sec per mile (for running activities)
-export function formatPace(metersPerSecond: number): string {
-  if (metersPerSecond <= 0) return "--:--";
-  const secondsPerMile = 1609.344 / metersPerSecond;
-  const minutes = Math.floor(secondsPerMile / 60);
-  const seconds = Math.round(secondsPerMile % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}/mi`;
-}
-
-// format speed in mph (for cycling activities)
-export function formatSpeed(metersPerSecond: number): string {
-  if (metersPerSecond <= 0) return "0 mph";
-  const mph = metersPerSecond * 2.23694;
-  return `${mph.toFixed(1)} mph`;
-}
-
-// format elevation in feet
-export function formatElevation(meters: number): string {
-  const feet = meters * 3.28084;
-  return `${Math.round(feet)} ft`;
-}
-
-// format heartrate
-export function formatHeartrate(bpm: number): string {
-  return `${Math.round(bpm)} bpm`;
-}
-
-// format time of day (24h to 12h)
-export function formatTimeOfDay(time24: string): string {
-  const [hours, minutes] = time24.split(":").map(Number);
-  const period = hours >= 12 ? "pm" : "am";
-  const hours12 = hours % 12 || 12;
-  return `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`;
-}
-
 // format relative time
 export function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
