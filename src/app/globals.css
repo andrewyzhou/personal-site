@@ -393,3 +393,34 @@ ul.list-disc.list-inside li::marker {
 .theme-light .gallery-cover-caption {
   background: linear-gradient(to top, rgba(238, 238, 238, 0.55), rgba(238, 238, 238, 0));
 }
+
+/* viewer prev/next nav buttons — float over the image edges */
+.gallery-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--theme-text-primary);
+  background-color: rgba(16, 16, 16, 0.35);
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  opacity: 0.6;
+  z-index: 5;
+  cursor: pointer;
+}
+.gallery-nav-btn:hover {
+  opacity: 1;
+  background-color: rgba(16, 16, 16, 0.6);
+}
+.theme-light .gallery-nav-btn {
+  background-color: rgba(238, 238, 238, 0.5);
+}
+.theme-light .gallery-nav-btn:hover {
+  background-color: rgba(238, 238, 238, 0.8);
+}
