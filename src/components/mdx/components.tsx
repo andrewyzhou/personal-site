@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import type { MDXComponents } from "mdx/types";
 
-// shared component map used wherever mdx content is rendered (learning entries,
+// shared component map used wherever mdx content is rendered (library entries,
 // bio, item descriptions). styles match the site's typography tokens.
 export const mdxComponents: MDXComponents = {
   h1: (props: ComponentProps<"h1">) => (

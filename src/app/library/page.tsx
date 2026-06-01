@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getAllEntries, getAllTags } from "@/lib/learning";
-import LearningIndex from "@/components/learning/LearningIndex";
+import { getAllEntries, getAllTags } from "@/lib/library";
+import LibraryIndex from "@/components/library/LibraryIndex";
 
 export const metadata: Metadata = {
-  title: "learning · andrew zhou",
+  title: "library · andrew zhou",
   description: "books, videos, podcasts, and courses i've been learning from, with my notes.",
 };
 
-export default function LearningPage() {
+export default function LibraryPage() {
   const entries = getAllEntries();
   const allTags = getAllTags();
 
@@ -25,7 +25,7 @@ export default function LearningPage() {
 
       <section className="py-8">
         <h1 className="font-sans font-bold text-off-white text-6xl" style={{ letterSpacing: "-0.02em", marginBottom: "1rem" }}>
-          learning
+          library
         </h1>
         <p className="font-sans text-gray text-lg leading-[1.35] max-w-2xl">
           a running list of books, videos, podcasts, and courses i&apos;ve been learning from — with summaries, commentary, and what stuck. mostly non-technical, occasionally technical, always honest.
@@ -35,7 +35,7 @@ export default function LearningPage() {
       <div className="section-divider" />
 
       <section className="py-8">
-        <LearningIndex entries={entries} allTags={allTags} />
+        <LibraryIndex entries={entries} allTags={allTags} />
       </section>
 
       <div className="section-divider" />

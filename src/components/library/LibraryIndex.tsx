@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import type { LearningEntry } from "@/lib/learning";
+import type { LibraryEntry } from "@/lib/library";
 import SourceIcon from "./SourceIcon";
 import Rating from "./Rating";
 
 interface Props {
-  entries: LearningEntry[];
+  entries: LibraryEntry[];
   allTags: string[];
 }
 
@@ -18,7 +18,7 @@ function formatDate(iso?: string): string {
   return `${month} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-export default function LearningIndex({ entries, allTags }: Props) {
+export default function LibraryIndex({ entries, allTags }: Props) {
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
 
@@ -110,7 +110,7 @@ export default function LearningIndex({ entries, allTags }: Props) {
 
 interface SectionProps {
   title: string;
-  entries: LearningEntry[];
+  entries: LibraryEntry[];
   onTagClick: (t: string) => void;
   activeTags: Set<string>;
 }
@@ -131,7 +131,7 @@ function Section({ title, entries, onTagClick, activeTags }: SectionProps) {
 }
 
 interface RowProps {
-  entry: LearningEntry;
+  entry: LibraryEntry;
   onTagClick: (t: string) => void;
   activeTags: Set<string>;
 }
@@ -153,7 +153,7 @@ function EntryRow({ entry, onTagClick, activeTags }: RowProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <Link
-              href={`/learning/${entry.slug}`}
+              href={`/library/${entry.slug}`}
               className="font-sans text-off-white text-lg font-bold link-highlight"
             >
               {entry.title}

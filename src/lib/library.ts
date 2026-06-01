@@ -2,12 +2,12 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 
-export type LearningType = "book" | "video" | "podcast" | "course" | "article";
+export type LibraryType = "book" | "video" | "podcast" | "course" | "article";
 
-export interface LearningFrontmatter {
+export interface LibraryFrontmatter {
   title: string;
   creator: string;
-  type: LearningType;
+  type: LibraryType;
   sourceUrl?: string;
   dateStarted?: string;
   dateCompleted?: string;
@@ -16,24 +16,24 @@ export interface LearningFrontmatter {
   summary: string;
 }
 
-export interface LearningEntry extends LearningFrontmatter {
+export interface LibraryEntry extends LibraryFrontmatter {
   slug: string;
   content: string;
   status: "in-progress" | "completed";
 }
 
-const CONTENT_DIR = path.join(process.cwd(), "content/learning");
+const CONTENT_DIR = path.join(process.cwd(), "content/library");
 
-export function getAllEntries(): LearningEntry[] {
+export function getAllEntries(): LibraryEntry[] {
   if (!fs.existsSync(CONTENT_DIR)) return [];
 
   const files = fs.readdirSync(CONTENT_DIR).filter((f) => f.endsWith(".mdx"));
 
-  const entries: LearningEntry[] = files.map((file) => {
+  const entries: LibraryEntry[] = files.map((file) => {
     const slug = file.replace(/\.mdx$/, "");
     const raw = fs.readFileSync(path.join(CONTENT_DIR, file), "utf8");
     const { data, content } = matter(raw);
-    const fm = data as LearningFrontmatter;
+    const fm = data as LibraryFrontmatter;
     return {
       ...fm,
       tags: fm.tags ?? [],
@@ -52,12 +52,12 @@ export function getAllEntries(): LearningEntry[] {
   });
 }
 
-export function getEntryBySlug(slug: string): LearningEntry | null {
+export function getEntryBySlug(slug: string): LibraryEntry | null {
   const file = path.join(CONTENT_DIR, `${slug}.mdx`);
   if (!fs.existsSync(file)) return null;
   const raw = fs.readFileSync(file, "utf8");
   const { data, content } = matter(raw);
-  const fm = data as LearningFrontmatter;
+  const fm = data as LibraryFrontmatter;
   return {
     ...fm,
     tags: fm.tags ?? [],
@@ -76,8 +76,8 @@ export function getAllTags(): string[] {
 }
 
 export function getAdjacentEntries(slug: string): {
-  prev: LearningEntry | null;
-  next: LearningEntry | null;
+  prev: LibraryEntry | null;
+  next: LibraryEntry | null;
 } {
   const entries = getAllEntries();
   const idx = entries.findIndex((e) => e.slug === slug);
