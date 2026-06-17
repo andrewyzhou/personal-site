@@ -308,7 +308,7 @@ function StravaActivityDetail({
         href={`https://www.strava.com/activities/${activity.id}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors text-center mt-auto"
+        className="font-sans text-gray text-sm hover:text-off-white transition-colors text-center mt-auto"
       >
         view on strava &rarr;
       </a>
@@ -479,7 +479,7 @@ function LeetCodeProblemDetail({
           href={`https://leetcode.com/problems/${submission.problemTitle.toLowerCase().replace(/\s+/g, '-')}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors text-center"
+          className="font-sans text-gray text-sm hover:text-off-white transition-colors text-center"
         >
           view problem &rarr;
         </a>
@@ -487,7 +487,7 @@ function LeetCodeProblemDetail({
           href={submission.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-sans text-gray text-sm hover:text-off-white hover:underline transition-colors text-center"
+          className="font-sans text-gray text-sm hover:text-off-white transition-colors text-center"
         >
           view solution &rarr;
         </a>

@@ -87,7 +87,7 @@ export default function Experience({
         <p>{e.summary}</p>
         <Link
           href={`/library/${e.slug}`}
-          className="font-sans text-off-white link-highlight inline-block w-fit"
+          className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
           read full notes →
         </Link>
@@ -105,7 +105,7 @@ export default function Experience({
         <p>{e.summary}</p>
         <Link
           href={`/blog/${e.slug}`}
-          className="font-sans text-off-white link-highlight inline-block w-fit"
+          className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
           read post →
         </Link>
@@ -124,7 +124,7 @@ export default function Experience({
         <p className="font-sans text-gray text-sm italic">{e.count} photo{e.count === 1 ? "" : "s"}</p>
         <Link
           href={`/photos/${e.slug}`}
-          className="font-sans text-off-white link-highlight inline-block w-fit"
+          className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
           view set →
         </Link>
@@ -366,7 +366,7 @@ export default function Experience({
           <div style={{ marginTop: '1.5rem' }}>
             <Link
               href="/library"
-              className="font-sans text-off-white text-lg link-highlight"
+              className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
               see all library →
             </Link>
@@ -376,7 +376,7 @@ export default function Experience({
           <div style={{ marginTop: '1.5rem' }}>
             <Link
               href="/blog"
-              className="font-sans text-off-white text-lg link-highlight"
+              className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
               see all posts →
             </Link>
@@ -386,7 +386,7 @@ export default function Experience({
           <div style={{ marginTop: '1.5rem' }}>
             <Link
               href="/photos"
-              className="font-sans text-off-white text-lg link-highlight"
+              className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
               see all photos →
             </Link>
