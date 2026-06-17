@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
 import type { Semester } from "@/lib/content";
 
-type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "gallery" | "coursework";
+type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "photos" | "coursework";
 
 const categories: { id: Category; label: string }[] = [
   { id: "bio", label: "bio" },
@@ -15,7 +15,7 @@ const categories: { id: Category; label: string }[] = [
   { id: "projects", label: "projects" },
   { id: "library", label: "library" },
   { id: "blog", label: "blog" },
-  { id: "gallery", label: "gallery" },
+  { id: "photos", label: "photos" },
   { id: "coursework", label: "coursework" },
 ];
 
@@ -38,7 +38,7 @@ export interface BlogPreviewItem {
   year: string;
 }
 
-export interface GalleryPreviewItem {
+export interface PhotosetPreviewItem {
   slug: string;
   title: string;
   caption: string;
@@ -50,7 +50,7 @@ export interface GalleryPreviewItem {
 interface ExperienceProps {
   libraryPreview?: LibraryPreviewItem[];
   blogPreview?: BlogPreviewItem[];
-  galleryPreview?: GalleryPreviewItem[];
+  photosPreview?: PhotosetPreviewItem[];
   sectionDescriptions: Record<Exclude<Category, "bio">, string>;
   semesters: Semester[];
   bio: React.ReactNode;
@@ -63,7 +63,7 @@ interface ExperienceProps {
 export default function Experience({
   libraryPreview = [],
   blogPreview = [],
-  galleryPreview = [],
+  photosPreview = [],
   sectionDescriptions,
   semesters,
   bio,
@@ -113,7 +113,7 @@ export default function Experience({
     ),
   }));
 
-  const galleryItems: ExperienceItem[] = galleryPreview.map((e) => ({
+  const photosItems: ExperienceItem[] = photosPreview.map((e) => ({
     id: e.slug,
     title: e.title,
     company: e.dateLabel,
@@ -123,10 +123,10 @@ export default function Experience({
         <p>{e.caption}</p>
         <p className="font-sans text-gray text-sm italic">{e.count} photo{e.count === 1 ? "" : "s"}</p>
         <Link
-          href={`/gallery/${e.slug}`}
+          href={`/photos/${e.slug}`}
           className="font-sans text-off-white link-highlight inline-block w-fit"
         >
-          view gallery →
+          view set →
         </Link>
       </div>
     ),
@@ -167,8 +167,8 @@ export default function Experience({
         return libraryItems;
       case "blog":
         return blogItems;
-      case "gallery":
-        return galleryItems;
+      case "photos":
+        return photosItems;
       default:
         return [];
     }
@@ -382,13 +382,13 @@ export default function Experience({
             </Link>
           </div>
         )}
-        {activeCategory === "gallery" && (
+        {activeCategory === "photos" && (
           <div style={{ marginTop: '1.5rem' }}>
             <Link
-              href="/gallery"
+              href="/photos"
               className="font-sans text-off-white text-lg link-highlight"
             >
-              see all galleries →
+              see all photos →
             </Link>
           </div>
         )}

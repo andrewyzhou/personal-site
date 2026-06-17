@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Photo } from "@/lib/gallery";
+import type { Photo } from "@/lib/photos";
 import ProgressBar from "./ProgressBar";
 
 interface Props {
@@ -27,7 +27,7 @@ function formatDate(iso: string): string {
   return `${month} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-export default function GalleryViewer({
+export default function PhotosetViewer({
   slug,
   title,
   date,
@@ -87,13 +87,13 @@ export default function GalleryViewer({
         goPrev();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        if (nextSlug) router.push(`/gallery/${nextSlug}`);
+        if (nextSlug) router.push(`/photos/${nextSlug}`);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        if (prevSlug) router.push(`/gallery/${prevSlug}`);
+        if (prevSlug) router.push(`/photos/${prevSlug}`);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        router.push("/gallery");
+        router.push("/photos");
       } else if (e.key === " ") {
         e.preventDefault();
         setPaused((p) => !p);
@@ -103,7 +103,7 @@ export default function GalleryViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [goNext, goPrev, nextSlug, prevSlug, router]);
 
-  // reset on slug change (when nav crosses galleries)
+  // reset on slug change (when nav crosses sets)
   useEffect(() => {
     setIndex(0);
     setElapsed(0);
@@ -126,7 +126,7 @@ export default function GalleryViewer({
           <button
             aria-label="previous photo"
             onClick={goPrev}
-            className="gallery-nav-btn left-2"
+            className="photoset-nav-btn left-2"
           >
             <span aria-hidden>‹</span>
           </button>
@@ -160,7 +160,7 @@ export default function GalleryViewer({
           <button
             aria-label="next photo"
             onClick={goNext}
-            className="gallery-nav-btn right-2"
+            className="photoset-nav-btn right-2"
           >
             <span aria-hidden>›</span>
           </button>
@@ -182,31 +182,31 @@ export default function GalleryViewer({
 
       {/* controls row */}
       <div className="w-full flex justify-between items-center flex-wrap gap-3" style={{ maxWidth: "900px", marginTop: "1.5rem" }}>
-        <Link href="/gallery" className="font-sans text-gray text-base link-highlight">
-          ← back to gallery
+        <Link href="/photos" className="font-sans text-gray text-base link-highlight">
+          ← back to photos
         </Link>
 
         <div className="flex gap-3">
           <button
-            onClick={() => prevSlug && router.push(`/gallery/${prevSlug}`)}
+            onClick={() => prevSlug && router.push(`/photos/${prevSlug}`)}
             disabled={!prevSlug}
             className={`font-sans text-base ${prevSlug ? "text-off-white link-highlight" : "text-gray opacity-40 cursor-not-allowed"}`}
           >
-            ↑ previous gallery
+            ↑ previous set
           </button>
           <button
-            onClick={() => nextSlug && router.push(`/gallery/${nextSlug}`)}
+            onClick={() => nextSlug && router.push(`/photos/${nextSlug}`)}
             disabled={!nextSlug}
             className={`font-sans text-base ${nextSlug ? "text-off-white link-highlight" : "text-gray opacity-40 cursor-not-allowed"}`}
           >
-            ↓ next gallery
+            ↓ next set
           </button>
         </div>
       </div>
 
       {/* keyboard hint */}
       <p className="font-sans text-gray text-xs italic" style={{ marginTop: "1rem" }}>
-        ← → photos · ↑ ↓ galleries · space pause · esc back {paused ? "· paused" : ""}
+        ← → photos · ↑ ↓ sets · space pause · esc back {paused ? "· paused" : ""}
       </p>
     </div>
   );

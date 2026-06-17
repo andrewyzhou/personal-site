@@ -4,21 +4,21 @@ import yaml from "js-yaml";
 import { imageSize } from "image-size";
 
 export interface Photo {
-  src: string; // public url, e.g. /galleries/spring-2026/cover.jpg
+  src: string; // public url, e.g. /photos/spring-2026/cover.jpg
   width: number;
   height: number;
   alt: string;
 }
 
-export interface GalleryFrontmatter {
+export interface PhotosetFrontmatter {
   title: string;
   date: string; // ISO yyyy-mm-dd
   caption: string;
-  cover: string; // filename inside public/galleries/<slug>/
-  photos: string[]; // ordered filenames inside public/galleries/<slug>/
+  cover: string; // filename inside public/photos/<slug>/
+  photos: string[]; // ordered filenames inside public/photos/<slug>/
 }
 
-export interface Gallery {
+export interface Photoset {
   slug: string;
   title: string;
   date: string;
@@ -27,11 +27,11 @@ export interface Gallery {
   photos: Photo[];
 }
 
-const CONTENT_DIR = path.join(process.cwd(), "content/gallery");
-const PUBLIC_DIR = path.join(process.cwd(), "public/galleries");
+const CONTENT_DIR = path.join(process.cwd(), "content/photos");
+const PUBLIC_DIR = path.join(process.cwd(), "public/photos");
 
-// same convention as library/blog: subfolders of content/gallery/ are not
-// traversed. drafts live in content/gallery/wip/ and are published by moving
+// same convention as library/blog: subfolders of content/photos/ are not
+// traversed. drafts live in content/photos/wip/ and are published by moving
 // the yaml file up one level.
 function isValidSlug(slug: string): boolean {
   return /^[a-z0-9][a-z0-9-_]*$/.test(slug);
@@ -47,14 +47,14 @@ function readPhoto(slug: string, file: string): Photo {
   const abs = path.join(PUBLIC_DIR, slug, file);
   const dim = imageSize(fs.readFileSync(abs));
   return {
-    src: `/galleries/${slug}/${file}`,
+    src: `/photos/${slug}/${file}`,
     width: dim.width ?? 0,
     height: dim.height ?? 0,
     alt: `${slug} ${file}`,
   };
 }
 
-function buildGallery(slug: string, raw: GalleryFrontmatter): Gallery {
+function buildPhotoset(slug: string, raw: PhotosetFrontmatter): Photoset {
   const photos = raw.photos.map((f) => readPhoto(slug, f));
   const cover = readPhoto(slug, raw.cover);
   return {
@@ -67,33 +67,33 @@ function buildGallery(slug: string, raw: GalleryFrontmatter): Gallery {
   };
 }
 
-export function getAllGalleries(): Gallery[] {
+export function getAllPhotosets(): Photoset[] {
   if (!fs.existsSync(CONTENT_DIR)) return [];
 
   const dirents = fs
     .readdirSync(CONTENT_DIR, { withFileTypes: true })
     .filter((d) => d.isFile() && (d.name.endsWith(".yaml") || d.name.endsWith(".yml")));
 
-  const galleries: Gallery[] = [];
+  const sets: Photoset[] = [];
   for (const d of dirents) {
     const slug = d.name.replace(/\.ya?ml$/, "");
     if (!isValidSlug(slug)) {
       console.warn(
-        `[gallery] skipping ${d.name}: filename must match /^[a-z0-9][a-z0-9-_]*$/ (lowercase ascii, no spaces/dots)`
+        `[photos] skipping ${d.name}: filename must match /^[a-z0-9][a-z0-9-_]*$/ (lowercase ascii, no spaces/dots)`
       );
       continue;
     }
     const raw = fs.readFileSync(path.join(CONTENT_DIR, d.name), "utf8");
-    const data = yaml.load(raw) as GalleryFrontmatter;
+    const data = yaml.load(raw) as PhotosetFrontmatter;
     if (!data) continue;
-    galleries.push(buildGallery(slug, data));
+    sets.push(buildPhotoset(slug, data));
   }
 
   // newest first
-  return galleries.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return sets.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
 }
 
-export function getGalleryBySlug(slug: string): Gallery | null {
+export function getPhotosetBySlug(slug: string): Photoset | null {
   if (!isValidSlug(slug)) return null;
   const yamlFile = path.join(CONTENT_DIR, `${slug}.yaml`);
   const ymlFile = path.join(CONTENT_DIR, `${slug}.yml`);
@@ -101,20 +101,20 @@ export function getGalleryBySlug(slug: string): Gallery | null {
   if (!file) return null;
   if (path.dirname(file) !== CONTENT_DIR) return null;
   const raw = fs.readFileSync(file, "utf8");
-  const data = yaml.load(raw) as GalleryFrontmatter;
+  const data = yaml.load(raw) as PhotosetFrontmatter;
   if (!data) return null;
-  return buildGallery(slug, data);
+  return buildPhotoset(slug, data);
 }
 
-export function getAdjacentGalleries(slug: string): {
-  prev: Gallery | null;
-  next: Gallery | null;
+export function getAdjacentPhotosets(slug: string): {
+  prev: Photoset | null;
+  next: Photoset | null;
 } {
-  const galleries = getAllGalleries();
-  const idx = galleries.findIndex((g) => g.slug === slug);
+  const sets = getAllPhotosets();
+  const idx = sets.findIndex((s) => s.slug === slug);
   if (idx === -1) return { prev: null, next: null };
   return {
-    prev: idx > 0 ? galleries[idx - 1] : null,
-    next: idx < galleries.length - 1 ? galleries[idx + 1] : null,
+    prev: idx > 0 ? sets[idx - 1] : null,
+    next: idx < sets.length - 1 ? sets[idx + 1] : null,
   };
 }

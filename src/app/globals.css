@@ -341,24 +341,24 @@ ul.list-disc.list-inside li::marker {
 }
 
 /* ============================================
-   GALLERY
+   PHOTOS
    ============================================ */
 
 /* hover darken + title reveal on cover images */
-.gallery-cover-link {
+.photoset-cover-link {
   cursor: pointer;
 }
-.gallery-cover-overlay {
+.photoset-cover-overlay {
   position: absolute;
   inset: 0;
   background-color: rgba(16, 16, 16, 0);
   transition: background-color 0.2s ease;
   pointer-events: none;
 }
-.gallery-cover-link:hover .gallery-cover-overlay {
+.photoset-cover-link:hover .photoset-cover-overlay {
   background-color: rgba(16, 16, 16, 0.35);
 }
-.gallery-cover-caption {
+.photoset-cover-caption {
   position: absolute;
   left: 0;
   right: 0;
@@ -369,21 +369,21 @@ ul.list-disc.list-inside li::marker {
   transition: opacity 0.2s ease;
   pointer-events: none;
 }
-.gallery-cover-link:hover .gallery-cover-caption {
+.photoset-cover-link:hover .photoset-cover-caption {
   opacity: 1;
 }
-.theme-light .gallery-cover-overlay {
+.theme-light .photoset-cover-overlay {
   background-color: rgba(238, 238, 238, 0);
 }
-.theme-light .gallery-cover-link:hover .gallery-cover-overlay {
+.theme-light .photoset-cover-link:hover .photoset-cover-overlay {
   background-color: rgba(238, 238, 238, 0.35);
 }
-.theme-light .gallery-cover-caption {
+.theme-light .photoset-cover-caption {
   background: linear-gradient(to top, rgba(238, 238, 238, 0.55), rgba(238, 238, 238, 0));
 }
 
 /* viewer prev/next nav buttons — float over the image edges */
-.gallery-nav-btn {
+.photoset-nav-btn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
@@ -402,13 +402,13 @@ ul.list-disc.list-inside li::marker {
   z-index: 5;
   cursor: pointer;
 }
-.gallery-nav-btn:hover {
+.photoset-nav-btn:hover {
   opacity: 1;
   background-color: rgba(16, 16, 16, 0.6);
 }
-.theme-light .gallery-nav-btn {
+.theme-light .photoset-nav-btn {
   background-color: rgba(238, 238, 238, 0.5);
 }
-.theme-light .gallery-nav-btn:hover {
+.theme-light .photoset-nav-btn:hover {
   background-color: rgba(238, 238, 238, 0.8);
 }

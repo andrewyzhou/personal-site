@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { Photo } from "@/lib/gallery";
+import type { Photo } from "@/lib/photos";
 
 interface Props {
   slug: string;
@@ -13,12 +13,12 @@ interface Props {
   fill?: boolean;
 }
 
-export default function GalleryCover({ slug, title, cover, sizes, fill = false }: Props) {
+export default function PhotosetCover({ slug, title, cover, sizes, fill = false }: Props) {
   return (
     <Link
-      href={`/gallery/${slug}`}
+      href={`/photos/${slug}`}
       aria-label={title}
-      className="gallery-cover-link relative block overflow-hidden rounded"
+      className="photoset-cover-link relative block overflow-hidden rounded"
       style={fill ? { width: "100%", height: "100%" } : undefined}
     >
       {fill ? (
@@ -39,8 +39,8 @@ export default function GalleryCover({ slug, title, cover, sizes, fill = false }
           className="w-full h-auto"
         />
       )}
-      <div className="gallery-cover-overlay" aria-hidden />
-      <div className="gallery-cover-caption" aria-hidden>
+      <div className="photoset-cover-overlay" aria-hidden />
+      <div className="photoset-cover-caption" aria-hidden>
         <span className="font-sans text-off-white text-base">{title}</span>
       </div>
     </Link>

@@ -17,7 +17,7 @@ export type SectionKey =
   | "projects"
   | "library"
   | "blog"
-  | "gallery"
+  | "photos"
   | "coursework";
 
 export function getSectionDescriptions(): Record<SectionKey, string> {
