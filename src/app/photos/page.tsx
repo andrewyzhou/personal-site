@@ -1,15 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getAllGalleries } from "@/lib/gallery";
-import JustifiedLayout from "@/components/gallery/JustifiedLayout";
+import { getAllPhotosets } from "@/lib/photos";
+import JustifiedLayout from "@/components/photos/JustifiedLayout";
 
 export const metadata: Metadata = {
-  title: "gallery · andrew zhou",
+  title: "photos · andrew zhou",
   description: "photos i've taken.",
 };
 
-export default function GalleryPage() {
-  const galleries = getAllGalleries();
+export default function PhotosPage() {
+  const sets = getAllPhotosets();
 
   return (
     <main className="site-container">
@@ -21,7 +21,7 @@ export default function GalleryPage() {
 
       <section className="py-8">
         <h1 className="font-sans font-bold text-off-white text-6xl" style={{ letterSpacing: "-0.02em", marginBottom: "1rem" }}>
-          gallery
+          photos
         </h1>
         <p className="font-sans text-gray text-lg leading-[1.35] max-w-2xl">
           photos i&apos;ve taken when i remember to bring a camera — film, phone, whatever. click into a set for the full thing.
@@ -31,10 +31,10 @@ export default function GalleryPage() {
       <div className="section-divider" />
 
       <section className="py-8">
-        {galleries.length === 0 ? (
-          <p className="font-sans text-gray text-lg italic">no galleries yet.</p>
+        {sets.length === 0 ? (
+          <p className="font-sans text-gray text-lg italic">no photos yet.</p>
         ) : (
-          <JustifiedLayout galleries={galleries} />
+          <JustifiedLayout sets={sets} />
         )}
       </section>
 
