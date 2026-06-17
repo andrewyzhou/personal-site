@@ -1,5 +1,5 @@
 import Hero from "@/components/Hero";
-import Experience, { LibraryPreviewItem, BlogPreviewItem, GalleryPreviewItem } from "@/components/Experience";
+import Experience, { LibraryPreviewItem, BlogPreviewItem, PhotosetPreviewItem } from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
@@ -8,7 +8,7 @@ import Bio from "@/components/mdx/Bio";
 import ItemContent from "@/components/mdx/ItemContent";
 import { getAllEntries } from "@/lib/library";
 import { getAllPosts } from "@/lib/blog";
-import { getAllGalleries } from "@/lib/gallery";
+import { getAllPhotosets } from "@/lib/photos";
 import { getItems, type ItemCategory } from "@/lib/items";
 import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
 
@@ -65,13 +65,13 @@ export default function Home() {
     year: (p.date ?? "").slice(0, 4) || "",
   }));
 
-  const galleryPreview: GalleryPreviewItem[] = getAllGalleries().slice(0, 5).map((g) => ({
-    slug: g.slug,
-    title: g.title,
-    caption: g.caption,
-    dateLabel: formatDateLabel(g.date),
-    year: (g.date ?? "").slice(0, 4) || "",
-    count: g.photos.length,
+  const photosPreview: PhotosetPreviewItem[] = getAllPhotosets().slice(0, 5).map((s) => ({
+    slug: s.slug,
+    title: s.title,
+    caption: s.caption,
+    dateLabel: formatDateLabel(s.date),
+    year: (s.date ?? "").slice(0, 4) || "",
+    count: s.photos.length,
   }));
 
   return (
@@ -84,7 +84,7 @@ export default function Home() {
       <Experience
         libraryPreview={libraryPreview}
         blogPreview={blogPreview}
-        galleryPreview={galleryPreview}
+        photosPreview={photosPreview}
         sectionDescriptions={getSectionDescriptions()}
         semesters={getCoursework()}
         bio={<Bio />}
