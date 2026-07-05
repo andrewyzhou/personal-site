@@ -19,7 +19,15 @@ async function getAccessToken(): Promise<string> {
     }),
   });
 
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Failed to refresh Strava access token: ${response.status} ${response.statusText} — ${body}`);
+  }
+
   const data = await response.json();
+  if (!data.access_token) {
+    throw new Error("Strava token refresh returned no access_token");
+  }
   return data.access_token;
 }
 
@@ -84,7 +92,8 @@ export async function getAllActivities(after?: number): Promise<CalendarActivity
       });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch Strava activities");
+        const body = await response.text();
+        throw new Error(`Failed to fetch Strava activities: ${response.status} ${response.statusText} — ${body}`);
       }
 
       const activities = await response.json();
@@ -148,7 +157,8 @@ export async function getLatestActivity(): Promise<StravaActivity | null> {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch Strava activities");
+      const body = await response.text();
+      throw new Error(`Failed to fetch Strava activities: ${response.status} ${response.statusText} — ${body}`);
     }
 
     const activities = await response.json();
