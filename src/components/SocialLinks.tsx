@@ -18,7 +18,6 @@ const socialLinks: SocialLink[] = [
   { name: "x", url: "https://x.com/andrewyzhou", icon: "/icons/x.svg" },
   { name: "strava", url: "https://www.strava.com/athletes/161887324", icon: "/icons/strava.svg" },
   { name: "spotify", url: "https://open.spotify.com/user/andrewfanbois", icon: "/icons/spotify.svg" },
-  { name: "blog", url: "/blog", isText: true, internal: true },
   { name: "resume", url: "/resume.pdf", isText: true },
   { name: "cv", url: "/cv.pdf", isText: true },
 ];
