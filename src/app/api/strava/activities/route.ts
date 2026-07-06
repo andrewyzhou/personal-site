@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { getAllActivities, CalendarActivity } from "@/lib/strava";
+import { getAllActivities, isStravaApiEnabled, CalendarActivity } from "@/lib/strava";
+import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-auth";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +29,24 @@ export async function GET() {
 
     return NextResponse.json(stored);
   } catch (error) {
-    console.error("Error fetching stored activities:", error);
+    log.error("api:strava/activities", "failed to read stored activities", error);
     return NextResponse.json({ activities: [], lastFetchedAt: null }, { status: 500 });
   }
 }
 
-// POST: Fetch activities from Strava and store in Redis
-export async function POST() {
+// POST: admin-only incremental sync from Strava into Redis
+export async function POST(request: Request) {
+  if (!isAdminRequest(request)) {
+    return unauthorizedResponse();
+  }
+
+  if (!isStravaApiEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "strava api is disabled (STRAVA_API_ENABLED)" },
+      { status: 503 }
+    );
+  }
+
   try {
     const stored = await redis.get<StoredActivities>(CACHE_KEY);
 
@@ -76,7 +89,7 @@ export async function POST() {
       lastFetchedAt: data.lastFetchedAt
     });
   } catch (error) {
-    console.error("Error syncing activities:", error);
+    log.error("api:strava/activities", "sync failed, existing data untouched", error);
     return NextResponse.json({ success: false, error: "Failed to sync" }, { status: 500 });
   }
 }

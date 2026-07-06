@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { getAllActivities, CalendarActivity } from "@/lib/strava";
+import { getAllActivities, isStravaApiEnabled, CalendarActivity } from "@/lib/strava";
+import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-auth";
+import { log } from "@/lib/log";
 import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +18,25 @@ interface StoredActivities {
   lastFetchedAt: number;
 }
 
-export async function POST() {
-  try {
-    // Clear existing cache
-    await redis.del(CALENDAR_CACHE_KEY);
+// admin-only full re-fetch. never deletes before writing: the old delete-first
+// version wiped the whole activity history when the strava api died mid-refresh.
+export async function POST(request: Request) {
+  if (!isAdminRequest(request)) {
+    return unauthorizedResponse();
+  }
 
-    // Fetch all activities fresh
+  if (!isStravaApiEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "strava api is disabled (STRAVA_API_ENABLED)" },
+      { status: 503 }
+    );
+  }
+
+  try {
+    // fetch first — throws on api failure, leaving existing data untouched
     const activities = await getAllActivities();
 
-    // Sort by date descending
+    // sort by date descending
     activities.sort((a, b) => b.date.localeCompare(a.date));
 
     const data: StoredActivities = {
@@ -36,10 +48,10 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      activitiesCount: activities.length
+      activitiesCount: activities.length,
     });
   } catch (error) {
-    console.error("Error refreshing strava cache:", error);
-    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+    log.error("api:strava/refresh", "full refresh failed, existing data untouched", error);
+    return NextResponse.json({ success: false, error: "refresh failed" }, { status: 500 });
   }
 }

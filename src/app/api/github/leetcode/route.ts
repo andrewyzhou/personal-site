@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { getAllSubmissions, getLatestCommitSha, LeetCodeSubmission, StoredSubmissions } from "@/lib/leetcode";
+import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-auth";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +44,7 @@ async function syncSubmissions(stored: StoredSubmissions | null) {
     await redis.set(CACHE_KEY, data);
     return data;
   } catch (error) {
-    console.error("Error syncing leetcode submissions:", error);
+    log.error("api:github/leetcode", "sync failed, keeping existing data", error);
     return stored;
   }
 }
@@ -63,13 +65,17 @@ export async function GET() {
 
     return NextResponse.json(stored || { submissions: [], lastFetchedAt: null });
   } catch (error) {
-    console.error("Error fetching stored leetcode submissions:", error);
+    log.error("api:github/leetcode", "failed to read stored submissions", error);
     return NextResponse.json({ submissions: [], lastFetchedAt: null }, { status: 500 });
   }
 }
 
-// POST: Force sync submissions from GitHub
-export async function POST() {
+// POST: admin-only force sync from GitHub
+export async function POST(request: Request) {
+  if (!isAdminRequest(request)) {
+    return unauthorizedResponse();
+  }
+
   try {
     const stored = await redis.get<StoredSubmissions>(CACHE_KEY);
     const data = await syncSubmissions(stored);
@@ -80,7 +86,7 @@ export async function POST() {
       lastFetchedAt: data?.lastFetchedAt,
     });
   } catch (error) {
-    console.error("Error syncing leetcode submissions:", error);
+    log.error("api:github/leetcode", "force sync failed", error);
     return NextResponse.json({ success: false, error: "Failed to sync" }, { status: 500 });
   }
 }

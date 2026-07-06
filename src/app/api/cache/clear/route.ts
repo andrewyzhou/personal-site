@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-auth";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +11,10 @@ const redis = new Redis({
 });
 
 export async function POST(request: Request) {
+  if (!isAdminRequest(request)) {
+    return unauthorizedResponse();
+  }
+
   try {
     const { key } = await request.json();
 
@@ -17,10 +23,11 @@ export async function POST(request: Request) {
     }
 
     await redis.del(key);
+    log.info("api:cache/clear", `cleared redis key: ${key}`);
 
     return NextResponse.json({ success: true, deleted: key });
   } catch (error) {
-    console.error("Error clearing cache:", error);
-    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+    log.error("api:cache/clear", "failed to clear cache key", error);
+    return NextResponse.json({ success: false, error: "cache clear failed" }, { status: 500 });
   }
 }

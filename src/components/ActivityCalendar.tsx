@@ -514,8 +514,6 @@ export default function ActivityCalendar() {
   const [stravaData, setStravaData] = useState<StoredActivities | null>(null);
   const [stravaLoading, setStravaLoading] = useState(true);
   const [stravaViewState, setStravaViewState] = useState<StravaViewState>({ type: "calendar" });
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshDone, setRefreshDone] = useState(false);
 
   // LeetCode state
   const [leetcodeData, setLeetcodeData] = useState<StoredSubmissions | null>(null);
@@ -655,7 +653,7 @@ export default function ActivityCalendar() {
     const mostRecent = activityDates[0];
     if (mostRecent !== todayStr && mostRecent !== yesterdayStr) return 0;
     let streak = 0;
-    let checkDate = new Date(mostRecent);
+    const checkDate = new Date(mostRecent);
     for (const dateStr of activityDates) {
       const expectedStr = checkDate.toISOString().split("T")[0];
       if (dateStr === expectedStr) {
@@ -687,7 +685,7 @@ export default function ActivityCalendar() {
     const mostRecent = submissionDates[0];
     if (mostRecent !== todayStr && mostRecent !== yesterdayStr) return 0;
     let streak = 0;
-    let checkDate = new Date(mostRecent);
+    const checkDate = new Date(mostRecent);
     for (const dateStr of submissionDates) {
       const expectedStr = checkDate.toISOString().split("T")[0];
       if (dateStr === expectedStr) {
@@ -850,35 +848,9 @@ export default function ActivityCalendar() {
             </button>
           </div>
 
-          {/* Refresh button */}
-          {!refreshDone && (
-            <button
-              onClick={async () => {
-                if (refreshing) return;
-                setRefreshing(true);
-                try {
-                  const res = await fetch("/api/strava/activities/full-refresh", { method: "POST" });
-                  if (res.ok) {
-                    const cached = await fetch("/api/strava/activities");
-                    if (cached.ok) {
-                      const result = await cached.json();
-                      setStravaData(result);
-                    }
-                  }
-                } catch (err) {
-                  console.error("Failed to refresh:", err);
-                } finally {
-                  setRefreshing(false);
-                  setRefreshDone(true);
-                }
-              }}
-              className={`flex items-center justify-center transition-opacity ${refreshing ? "opacity-100 animate-spin" : "opacity-40 hover:opacity-100"}`}
-              aria-label="Refresh activities"
-              disabled={refreshing}
-            >
-              <Image src="/icons/refresh.svg" alt="" width={14} height={14} />
-            </button>
-          )}
+          {/* refresh button removed: it fired the destructive full-refresh endpoint
+              from the public page (one tap wiped the activity history once the
+              strava api died). syncs are admin-only now. */}
         </div>
 
         {/* Month navigation */}
