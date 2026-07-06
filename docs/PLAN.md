@@ -253,19 +253,19 @@ full inventory captured 2026-07-06 during audit. highlights:
 
 | decision | outcome |
 |---|---|
-| data layer | **hybrid**: git (authored) + postgres/neon (dynamic) + blob (binary, pending research) + redis (cache only) |
-| blob storage | **pending research** — user asked why blob vs committing to repo; answer with verified limits (vercel 4.5mb body cap, github repo limits, rebuild latency, image-optimization quotas) |
+| data layer | **hybrid**: git (authored) + postgres/neon (dynamic) + vercel blob (binary) + redis (cache only) |
+| blob storage | **vercel blob, decided by research** ([details](research/storage-blob-vs-git.md)): vercel's 4.5mb request-body cap hard-blocks phone photos through api routes, commit-per-upload costs minutes of rebuild vs instant blob urls, and photos-in-git bloats the public repo ~2.6gb/yr. mandatory: client-side heic→jpeg/webp downscale (~2000px) + store-size audit before the 1gb hobby cliff. existing public/photos stays in git. r2 = documented fallback |
 | auth | auth.js + google, admin email allowlist |
 | publish latency | ~1–2 min rebuild accepted for authored content |
-| fit source | garmin connect on phone; **research all data paths** (connect web export, app share, garmin express, official api, unofficial libs, bridge apps) |
+| fit source | **researched** ([details](research/garmin-fit-paths.md)): mvp = connect.garmin.com in phone browser → "export original" (zip w/ original .fit) → /admin upload (must accept + unzip .zip). phase 2 automation = intervals.icu (free official garmin partner, api serves original fit) with a "pull latest" button. bulk = strava archive, garmin gdpr export as gap-filler. unofficial garmin scraping rejected as primary (jan 2026 auth crackdown, garth deprecated) |
 | route privacy | **sliders** for arbitrary start/end trim + **one-click privacy trim** button |
 | maps | svg polyline cards + maplibre/openfreemap detail pages |
 | old strava code | kept dormant behind `STRAVA_API_ENABLED` (in case of strava+) |
 | editor | mdxeditor, restyled to theme |
-| leetcode url parse | yes, unofficial graphql with hard error gating + manual fallback; reliability researched |
+| leetcode url parse | **researched, viable** ([details](research/leetcode-graphql.md)): endpoint verified working unauthenticated (live-tested 2026-07-06), query shape stable since ~2018, vercel egress not blocked. direct ~25-line fetch (no wrapper), use questionFrontendId, gate on json content-type + null question + difficulty enum, 8s timeout, redis-cache successes, save path never depends on the lookup |
 | engagement | simple filters for guests AND signed-in; likes (signed-in, guests prompted); unlimited claps (anyone); view counters; no llm; no notifications |
 | blog/photos | **entirely separate** — photo essay format unique to photos |
 | coursework | expandable rows in shared list template + optional sort element (a–z / semester) |
 | css refactors | **never in bulk** — one at a time with user visual verification |
 | testing | vitest + github actions ci |
-| ws0 | go (scoped: no styling refactors) |
+| ws0 | **shipped 2026-07-06** (commits ac4f432…cdd7903): spotify crash fixed, stale-cache serving, timeouts, error boundaries, admin-gated mutations, non-destructive refresh, strava dormancy flag, blog button removed, optional blurbs, pinned posts, vitest + ci. remaining user actions: request strava archive; add ADMIN_API_SECRET (+ STRAVA_API_ENABLED=false optional) to vercel env |

@@ -8,10 +8,10 @@ strava made their api pay-only, so the site is moving to a self-hosted activity
 platform plus an admin dashboard. full plan with architecture notes lives in
 [docs/PLAN.md](docs/PLAN.md).
 
-- [ ] **ws0 — stabilize**: fix spotify crash, error boundaries, serve-stale caching,
+- [x] **ws0 — stabilize**: fix spotify crash, error boundaries, serve-stale caching,
       gate mutation endpoints, vitest + ci, small ui fixes
-- [ ] **ws1 — architecture decisions**: data layer (git + postgres + blob), auth,
-      maps, fit parsing, editor
+- [x] **ws1 — architecture decisions**: data layer (git + postgres + vercel blob),
+      google auth, maplibre maps, garmin fit ingestion, mdxeditor
 - [ ] **ws2 — activity platform** (`replace-strava`): .fit upload + parsing, route
       maps, activity photos, detail pages, strava archive import
 - [ ] **ws3 — admin cms**: content editing via github commits, new-entry flows,
