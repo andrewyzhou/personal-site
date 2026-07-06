@@ -7,6 +7,8 @@ const TOKEN_ENDPOINT = "https://accounts.spotify.com/api/token";
 const NOW_PLAYING_ENDPOINT = "https://api.spotify.com/v1/me/player/currently-playing";
 const RECENTLY_PLAYED_ENDPOINT = "https://api.spotify.com/v1/me/player/recently-played?limit=1";
 
+const FETCH_TIMEOUT_MS = 5000;
+
 async function getAccessToken(): Promise<string> {
   const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
@@ -18,9 +20,18 @@ async function getAccessToken(): Promise<string> {
       grant_type: "refresh_token",
       refresh_token: REFRESH_TOKEN || "",
     }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
 
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`spotify token refresh failed: ${response.status} ${response.statusText} — ${body}`);
+  }
+
   const data = await response.json();
+  if (!data.access_token) {
+    throw new Error("spotify token refresh returned no access_token");
+  }
   return data.access_token;
 }
 
@@ -33,62 +44,67 @@ export interface SpotifyTrack {
   playedAt?: string;
 }
 
+// throws on api/network failure so the cache layer can serve stale data.
+// resolves to null only for the legitimate "no track available" state.
 export async function getNowPlaying(): Promise<SpotifyTrack | null> {
   if (!REFRESH_TOKEN) {
     return null;
   }
 
-  try {
-    const accessToken = await getAccessToken();
+  const accessToken = await getAccessToken();
 
-    // try currently playing first
-    const nowPlayingResponse = await fetch(NOW_PLAYING_ENDPOINT, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+  // try currently playing first (204 = nothing playing, not an error)
+  const nowPlayingResponse = await fetch(NOW_PLAYING_ENDPOINT, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
 
-    if (nowPlayingResponse.status === 200) {
-      const data = await nowPlayingResponse.json();
-      if (data.item) {
-        return {
-          isPlaying: data.is_playing,
-          title: data.item.name,
-          artist: data.item.artists.map((a: { name: string }) => a.name).join(", "),
-          albumArt: data.item.album.images[0]?.url,
-          songUrl: data.item.external_urls.spotify,
-        };
-      }
+  if (nowPlayingResponse.status === 200) {
+    const data = await nowPlayingResponse.json();
+    if (data.item) {
+      return {
+        isPlaying: data.is_playing,
+        title: data.item.name,
+        artist: data.item.artists.map((a: { name: string }) => a.name).join(", "),
+        albumArt: data.item.album.images[0]?.url,
+        songUrl: data.item.external_urls.spotify,
+      };
     }
-
-    // fall back to recently played
-    const recentlyPlayedResponse = await fetch(RECENTLY_PLAYED_ENDPOINT, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (recentlyPlayedResponse.status === 200) {
-      const data = await recentlyPlayedResponse.json();
-      if (data.items && data.items.length > 0) {
-        const item = data.items[0];
-        const track = item.track;
-        return {
-          isPlaying: false,
-          title: track.name,
-          artist: track.artists.map((a: { name: string }) => a.name).join(", "),
-          albumArt: track.album.images[0]?.url,
-          songUrl: track.external_urls.spotify,
-          playedAt: item.played_at,
-        };
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error("spotify api error:", error);
-    return null;
+  } else if (nowPlayingResponse.status !== 204) {
+    const body = await nowPlayingResponse.text();
+    throw new Error(`spotify now-playing failed: ${nowPlayingResponse.status} — ${body}`);
   }
+
+  // fall back to recently played
+  const recentlyPlayedResponse = await fetch(RECENTLY_PLAYED_ENDPOINT, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+
+  if (recentlyPlayedResponse.status !== 200) {
+    const body = await recentlyPlayedResponse.text();
+    throw new Error(`spotify recently-played failed: ${recentlyPlayedResponse.status} — ${body}`);
+  }
+
+  const data = await recentlyPlayedResponse.json();
+  if (data.items && data.items.length > 0) {
+    const item = data.items[0];
+    const track = item.track;
+    return {
+      isPlaying: false,
+      title: track.name,
+      artist: track.artists.map((a: { name: string }) => a.name).join(", "),
+      albumArt: track.album.images[0]?.url,
+      songUrl: track.external_urls.spotify,
+      playedAt: item.played_at,
+    };
+  }
+
+  return null;
 }
 
 // generate auth URL for initial OAuth flow
