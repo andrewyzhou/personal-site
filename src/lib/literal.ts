@@ -26,6 +26,11 @@ async function graphqlRequest(query: string, variables: Record<string, unknown> 
     signal: AbortSignal.timeout(2000),
   });
 
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`literal api failed: ${response.status} — ${body.slice(0, 200)}`);
+  }
+
   const data = await response.json();
 
   if (data.errors) {
@@ -35,15 +40,16 @@ async function graphqlRequest(query: string, variables: Record<string, unknown> 
   return data.data;
 }
 
+// throws on api failure so the cache layer can serve stale data.
+// resolves to null when unconfigured or when no book is being read.
 export async function getCurrentlyReading(): Promise<LiteralBook | null> {
-  try {
-    const profileId = process.env.LITERAL_PROFILE_ID;
+  const profileId = process.env.LITERAL_PROFILE_ID;
 
-    if (!profileId) {
-      throw new Error("LITERAL_PROFILE_ID environment variable is required");
-    }
+  if (!profileId || !process.env.LITERAL_TOKEN) {
+    return null;
+  }
 
-    const query = `
+  const query = `
       query booksByReadingStateAndProfile(
         $limit: Int!
         $offset: Int!
@@ -69,22 +75,18 @@ export async function getCurrentlyReading(): Promise<LiteralBook | null> {
       }
     `;
 
-    const data = await graphqlRequest(query, {
-      limit: 1,
-      offset: 0,
-      readingStatus: "IS_READING",
-      profileId,
-    });
+  const data = await graphqlRequest(query, {
+    limit: 1,
+    offset: 0,
+    readingStatus: "IS_READING",
+    profileId,
+  });
 
-    const books = data.booksByReadingStateAndProfile;
+  const books = data.booksByReadingStateAndProfile;
 
-    if (books && books.length > 0) {
-      return books[0];
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Literal API error:", error);
-    return null;
+  if (books && books.length > 0) {
+    return books[0];
   }
+
+  return null;
 }

@@ -4,6 +4,7 @@ import GitHubActivity from "@/components/GitHubActivity";
 import Currently from "@/components/Currently";
 import Contact from "@/components/Contact";
 import ActivityCalendar from "@/components/ActivityCalendar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Bio from "@/components/mdx/Bio";
 import ItemContent from "@/components/mdx/ItemContent";
 import { getAllEntries } from "@/lib/library";
@@ -100,7 +101,9 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row justify-between gap-12">
           {/* left side - currently */}
           <div className="w-full sm:w-1/2">
-            <Currently />
+            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load this section.</p>}>
+              <Currently />
+            </ErrorBoundary>
           </div>
 
           {/* right side - contact */}
@@ -121,12 +124,16 @@ export default function Home() {
         <div className="flex flex-col activity-stack:flex-row justify-between gap-8 activity-stack:gap-12">
           {/* strava calendar - shows first on mobile, right on desktop */}
           <div className="w-full activity-stack:w-2/5 flex justify-center activity-stack:justify-end activity-stack:items-center order-first activity-stack:order-last">
-            <ActivityCalendar />
+            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load the activity calendar.</p>}>
+              <ActivityCalendar />
+            </ErrorBoundary>
           </div>
 
           {/* github activity - shows second on mobile, left on desktop */}
           <div className="w-full activity-stack:w-3/5 order-last activity-stack:order-first">
-            <GitHubActivity showHeading={true} mobileHeading={false} />
+            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load github activity.</p>}>
+              <GitHubActivity showHeading={true} mobileHeading={false} />
+            </ErrorBoundary>
           </div>
         </div>
       </section>
