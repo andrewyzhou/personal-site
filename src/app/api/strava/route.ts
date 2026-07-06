@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLatestActivity, getAllActivities, formatDistance, formatDuration, formatTimeAgo, CalendarActivity } from "@/lib/strava";
 import { getCachedData } from "@/lib/cache";
+import { log } from "@/lib/log";
 import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic"; // disable next.js caching, we use redis
@@ -51,7 +52,7 @@ async function syncCalendarActivities(stored: StoredActivities | null) {
 
     await redis.set(CALENDAR_CACHE_KEY, data);
   } catch (error) {
-    console.error("Error syncing calendar activities:", error);
+    log.error("api:strava", "calendar activity sync failed, keeping existing data", error);
   }
 }
 
@@ -81,15 +82,15 @@ async function fetchStravaData() {
 
 export async function GET() {
   try {
-    const { data, fetchedAt, previousFetchedAt } = await getCachedData("strava", fetchStravaData);
+    const { data, fetchedAt, previousFetchedAt, stale } = await getCachedData("strava", fetchStravaData);
 
     if (data === null) {
       return NextResponse.json(null);
     }
 
-    return NextResponse.json({ ...data, fetchedAt, previousFetchedAt });
+    return NextResponse.json({ ...data, fetchedAt, previousFetchedAt, stale });
   } catch (error) {
-    console.error("strava api error:", error);
+    log.error("api:strava", "request failed", error);
     return NextResponse.json(null, { status: 500 });
   }
 }

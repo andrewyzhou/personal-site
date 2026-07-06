@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { isSpotifyTrack, isStravaActivity, isLiteralBook, isStatsPayload } from "@/lib/validate";
 
 interface SpotifyTrack {
   isPlaying: boolean;
@@ -119,69 +120,79 @@ export default function Currently() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [spotifyRes, stravaRes, literalRes, statsRes] = await Promise.all([
+        // allSettled so one failed source can't discard the others' results
+        const [spotifyRes, stravaRes, literalRes, statsRes] = await Promise.allSettled([
           fetch("/api/spotify"),
           fetch("/api/strava"),
           fetch("/api/literal"),
           fetch("/api/stats"),
         ]);
 
+        // unwrap a settled fetch to parsed json, or null on any failure
+        const toJson = async (res: PromiseSettledResult<Response>) => {
+          if (res.status !== "fulfilled" || !res.value.ok) return null;
+          try {
+            return await res.value.json();
+          } catch {
+            return null;
+          }
+        };
+
         let maxFetchedAt: number | null = null;
         let maxPreviousFetchedAt: number | null = null;
 
-        if (spotifyRes.ok) {
-          const data = await spotifyRes.json();
-          if (data) {
-            setSpotify(data);
-            if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
-              maxFetchedAt = data.fetchedAt;
-            }
-            // track the most recent previousFetchedAt (indicates a refetch happened)
-            if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
-              maxPreviousFetchedAt = data.previousFetchedAt;
-            }
+        // every payload is shape-checked before use: the api once returned a
+        // truthy `{fetchedAt}`-only object that crashed rendering
+        const spotifyData = await toJson(spotifyRes);
+        if (isSpotifyTrack(spotifyData)) {
+          const data = spotifyData as SpotifyTrack;
+          setSpotify(data);
+          if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
+            maxFetchedAt = data.fetchedAt;
+          }
+          // track the most recent previousFetchedAt (indicates a refetch happened)
+          if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
+            maxPreviousFetchedAt = data.previousFetchedAt;
           }
         }
 
-        if (stravaRes.ok) {
-          const data = await stravaRes.json();
-          if (data) {
-            setStrava(data);
-            if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
-              maxFetchedAt = data.fetchedAt;
-            }
-            if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
-              maxPreviousFetchedAt = data.previousFetchedAt;
-            }
-            if (data.latestActivityId) {
-              window.dispatchEvent(
-                new CustomEvent("strava-latest-activity", {
-                  detail: { latestActivityId: data.latestActivityId },
-                })
-              );
-            }
+        const stravaData = await toJson(stravaRes);
+        if (isStravaActivity(stravaData)) {
+          const data = stravaData as StravaActivity & { latestActivityId?: number };
+          setStrava(data);
+          if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
+            maxFetchedAt = data.fetchedAt;
+          }
+          if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
+            maxPreviousFetchedAt = data.previousFetchedAt;
+          }
+          if (data.latestActivityId) {
+            window.dispatchEvent(
+              new CustomEvent("strava-latest-activity", {
+                detail: { latestActivityId: data.latestActivityId },
+              })
+            );
           }
         }
 
-        if (literalRes.ok) {
-          const data = await literalRes.json();
-          if (data) {
-            setBook(data);
-            if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
-              maxFetchedAt = data.fetchedAt;
-            }
-            if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
-              maxPreviousFetchedAt = data.previousFetchedAt;
-            }
+        const literalData = await toJson(literalRes);
+        if (isLiteralBook(literalData)) {
+          const data = literalData as LiteralBook;
+          setBook(data);
+          if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
+            maxFetchedAt = data.fetchedAt;
+          }
+          if (data.previousFetchedAt && (!maxPreviousFetchedAt || data.previousFetchedAt > maxPreviousFetchedAt)) {
+            maxPreviousFetchedAt = data.previousFetchedAt;
           }
         }
 
-        if (statsRes.ok) {
-          const data = await statsRes.json();
-          setPrevApiCalls(data.prevCount);
-          setApiCalls(data.apiCalls);
+        const statsData = await toJson(statsRes);
+        if (isStatsPayload(statsData)) {
+          setPrevApiCalls(statsData.prevCount);
+          setApiCalls(statsData.apiCalls);
           // set initial displayed values immediately
-          setDisplayedApiCalls(data.prevCount.toLocaleString());
+          setDisplayedApiCalls(statsData.prevCount.toLocaleString());
         }
 
         // if any API was refetched, show the previous cached time first

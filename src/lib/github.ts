@@ -44,10 +44,11 @@ export async function getContributions(username: string): Promise<GitHubContribu
       variables: { username },
     }),
     next: { revalidate: 300 }, // cache for 5 minutes
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
-    throw new Error("failed to fetch github contributions");
+    throw new Error(`failed to fetch github contributions: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();
@@ -90,11 +91,12 @@ export async function getLatestCommit(
         ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
         : {},
       next: { revalidate: 300 }, // cache for 5 minutes
+      signal: AbortSignal.timeout(10000),
     }
   );
 
   if (!response.ok) {
-    throw new Error("failed to fetch latest commit");
+    throw new Error(`failed to fetch latest commit: ${response.status} ${response.statusText}`);
   }
 
   const commits = await response.json();

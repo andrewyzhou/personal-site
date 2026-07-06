@@ -2,8 +2,20 @@ const CLIENT_ID = process.env.STRAVA_CLIENT_ID;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET;
 const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN;
 
+// strava's api went pay-only (403 "Application Inactive") — the integration is
+// kept dormant in case of strava+ later. flip STRAVA_API_ENABLED=true to revive.
+const API_ENABLED = process.env.STRAVA_API_ENABLED === "true";
+
+// sync/refresh endpoints must refuse to run while the api is disabled: a fetch
+// that "succeeds" with zero activities would overwrite stored history with nothing
+export function isStravaApiEnabled(): boolean {
+  return API_ENABLED;
+}
+
 const TOKEN_ENDPOINT = "https://www.strava.com/oauth/token";
 const ACTIVITIES_ENDPOINT = "https://www.strava.com/api/v3/athlete/activities";
+
+const FETCH_TIMEOUT_MS = 10000;
 
 async function getAccessToken(): Promise<string> {
   const response = await fetch(TOKEN_ENDPOINT, {
@@ -17,6 +29,7 @@ async function getAccessToken(): Promise<string> {
       refresh_token: REFRESH_TOKEN,
       grant_type: "refresh_token",
     }),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -64,96 +77,33 @@ export interface CalendarActivity {
   sufferScore: number | null;
 }
 
-// fetch all activities with pagination, optionally after a timestamp
+// fetch all activities with pagination, optionally after a timestamp.
+// throws on api failure — callers must decide what to do; swallowing errors here
+// once let a refresh endpoint overwrite the activity history with an empty array.
 export async function getAllActivities(after?: number): Promise<CalendarActivity[]> {
-  if (!REFRESH_TOKEN) {
+  if (!API_ENABLED || !REFRESH_TOKEN) {
     return [];
   }
 
-  try {
-    const accessToken = await getAccessToken();
-    const allActivities: CalendarActivity[] = [];
-    let page = 1;
-    const perPage = 200;
+  const accessToken = await getAccessToken();
+  const allActivities: CalendarActivity[] = [];
+  let page = 1;
+  const perPage = 200;
 
-    while (true) {
-      const params = new URLSearchParams({
-        per_page: perPage.toString(),
-        page: page.toString(),
-      });
-      if (after) {
-        params.set("after", after.toString());
-      }
-
-      const response = await fetch(`${ACTIVITIES_ENDPOINT}?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`Failed to fetch Strava activities: ${response.status} ${response.statusText} — ${body}`);
-      }
-
-      const activities = await response.json();
-      if (activities.length === 0) {
-        break;
-      }
-
-      for (const activity of activities) {
-        // convert to local date string (YYYY-MM-DD) and time (HH:MM)
-        const [localDate, localTimeRaw] = activity.start_date_local.split("T");
-        const localTime = localTimeRaw ? localTimeRaw.slice(0, 5) : "00:00";
-
-        allActivities.push({
-          id: activity.id,
-          name: activity.name || "",
-          type: activity.sport_type || activity.type,
-          date: localDate,
-          startTime: localTime,
-          distance: activity.distance || 0,
-          duration: activity.moving_time || 0,
-          elapsedTime: activity.elapsed_time || 0,
-          totalElevationGain: activity.total_elevation_gain || 0,
-          averageSpeed: activity.average_speed || 0,
-          maxSpeed: activity.max_speed || 0,
-          averageHeartrate: activity.has_heartrate ? activity.average_heartrate : null,
-          maxHeartrate: activity.has_heartrate ? activity.max_heartrate : null,
-          averageCadence: activity.average_cadence || null,
-          averageWatts: activity.average_watts || null,
-          maxWatts: activity.max_watts || null,
-          kilojoules: activity.kilojoules || null,
-          description: activity.description || null,
-          sufferScore: activity.suffer_score || null,
-        });
-      }
-
-      if (activities.length < perPage) {
-        break;
-      }
-      page++;
+  while (true) {
+    const params = new URLSearchParams({
+      per_page: perPage.toString(),
+      page: page.toString(),
+    });
+    if (after) {
+      params.set("after", after.toString());
     }
 
-    return allActivities;
-  } catch (error) {
-    console.error("Strava API error fetching all activities:", error);
-    return [];
-  }
-}
-
-export async function getLatestActivity(): Promise<StravaActivity | null> {
-  if (!REFRESH_TOKEN) {
-    return null;
-  }
-
-  try {
-    const accessToken = await getAccessToken();
-
-    const response = await fetch(`${ACTIVITIES_ENDPOINT}?per_page=1`, {
+    const response = await fetch(`${ACTIVITIES_ENDPOINT}?${params.toString()}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -163,23 +113,82 @@ export async function getLatestActivity(): Promise<StravaActivity | null> {
 
     const activities = await response.json();
     if (activities.length === 0) {
-      return null;
+      break;
     }
 
-    const activity = activities[0];
-    return {
-      id: activity.id,
-      name: activity.name,
-      type: activity.type,
-      distance: activity.distance,
-      movingTime: activity.moving_time,
-      startDate: activity.start_date,
-      elapsedTime: activity.elapsed_time,
-    };
-  } catch (error) {
-    console.error("Strava API error:", error);
+    for (const activity of activities) {
+      // convert to local date string (YYYY-MM-DD) and time (HH:MM)
+      const [localDate, localTimeRaw] = activity.start_date_local.split("T");
+      const localTime = localTimeRaw ? localTimeRaw.slice(0, 5) : "00:00";
+
+      allActivities.push({
+        id: activity.id,
+        name: activity.name || "",
+        type: activity.sport_type || activity.type,
+        date: localDate,
+        startTime: localTime,
+        distance: activity.distance || 0,
+        duration: activity.moving_time || 0,
+        elapsedTime: activity.elapsed_time || 0,
+        totalElevationGain: activity.total_elevation_gain || 0,
+        averageSpeed: activity.average_speed || 0,
+        maxSpeed: activity.max_speed || 0,
+        averageHeartrate: activity.has_heartrate ? activity.average_heartrate : null,
+        maxHeartrate: activity.has_heartrate ? activity.max_heartrate : null,
+        averageCadence: activity.average_cadence || null,
+        averageWatts: activity.average_watts || null,
+        maxWatts: activity.max_watts || null,
+        kilojoules: activity.kilojoules || null,
+        description: activity.description || null,
+        sufferScore: activity.suffer_score || null,
+      });
+    }
+
+    if (activities.length < perPage) {
+      break;
+    }
+    page++;
+  }
+
+  return allActivities;
+}
+
+// throws on api failure so the cache layer can serve stale data.
+// resolves to null when the api is disabled or there are no activities.
+export async function getLatestActivity(): Promise<StravaActivity | null> {
+  if (!API_ENABLED || !REFRESH_TOKEN) {
     return null;
   }
+
+  const accessToken = await getAccessToken();
+
+  const response = await fetch(`${ACTIVITIES_ENDPOINT}?per_page=1`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Failed to fetch Strava activities: ${response.status} ${response.statusText} — ${body}`);
+  }
+
+  const activities = await response.json();
+  if (activities.length === 0) {
+    return null;
+  }
+
+  const activity = activities[0];
+  return {
+    id: activity.id,
+    name: activity.name,
+    type: activity.type,
+    distance: activity.distance,
+    movingTime: activity.moving_time,
+    startDate: activity.start_date,
+    elapsedTime: activity.elapsed_time,
+  };
 }
 
 // format distance in miles
