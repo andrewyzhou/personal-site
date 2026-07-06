@@ -18,7 +18,8 @@ platform plus an admin dashboard. full plan with architecture notes lives in
       leetcode auto-commit, unified activity calendar
 - [ ] **ws4 — design system**: shared primitives (cards, headers, chips, carousel,
       maps, date utils), token cleanup
-- [ ] **ws5 — comments**: guest + google sign-in, moderation queue
+- [ ] **ws5 — engagement**: comments (guest + google sign-in, simple filtering),
+      likes, claps, view counters
 - [ ] **ws6 — content model**: photo-essay block format with exif/map sidebar,
       detailed coursework tab
 
