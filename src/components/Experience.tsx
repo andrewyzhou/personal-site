@@ -231,10 +231,15 @@ export default function Experience({
 
       {/* category content */}
       <div style={{ marginTop: '0.5rem' }}>
-        <p className="font-sans text-gray text-lg leading-[1.35] mb-8">
-          {sectionDescriptions[activeCategory]}
-        </p>
-        <br />
+        {/* blurb is optional per tab — sections.yaml may leave it empty (e.g. blog) */}
+        {sectionDescriptions[activeCategory] && (
+          <>
+            <p className="font-sans text-gray text-lg leading-[1.35] mb-8">
+              {sectionDescriptions[activeCategory]}
+            </p>
+            <br />
+          </>
+        )}
         {activeCategory === "coursework" ? (
           /* coursework uses a 2x2 grid layout */
           <>
