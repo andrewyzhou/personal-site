@@ -8,6 +8,7 @@ export interface BlogFrontmatter {
   summary: string;
   tags: string[];
   cover?: string; // optional hero image, e.g. /blog/my-post/cover.jpg
+  pinned?: boolean; // pinned posts sort first everywhere (home blog tab + /blog index)
 }
 
 export interface BlogPost extends BlogFrontmatter {
@@ -68,8 +69,11 @@ export function getAllPosts(): BlogPost[] {
     });
   }
 
-  // newest first
-  return posts.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  // pinned first, then newest first
+  return posts.sort((a, b) => {
+    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    return (b.date ?? "").localeCompare(a.date ?? "");
+  });
 }
 
 export function getPostBySlug(slug: string): BlogPost | null {
