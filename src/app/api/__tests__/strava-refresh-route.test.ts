@@ -87,6 +87,32 @@ describe("POST /api/strava/activities/full-refresh", () => {
     expect(redisSet).not.toHaveBeenCalled();
   });
 
+  it("refuses to overwrite a non-empty history with an empty fetch result (review finding: enabled-but-tokenless wipe)", async () => {
+    getAllActivities.mockResolvedValue([]);
+    redisGet.mockResolvedValue({
+      activities: [{ id: 1, date: "2026-07-01" }],
+      lastFetchedAt: 123,
+    });
+
+    const res = await POST(makeRequest(SECRET));
+
+    expect(res.status).toBe(409);
+    expect(redisSet).not.toHaveBeenCalled();
+  });
+
+  it("allows an empty fetch result when nothing is stored (bootstrap case)", async () => {
+    getAllActivities.mockResolvedValue([]);
+    redisGet.mockResolvedValue(null);
+    redisSet.mockResolvedValue("OK");
+
+    const res = await POST(makeRequest(SECRET));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.count).toBe(0);
+  });
+
   it("stores fetched activities on success without deleting first", async () => {
     getAllActivities.mockResolvedValue([
       { id: 1, date: "2026-07-01" },
