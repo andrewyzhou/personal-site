@@ -70,7 +70,18 @@ behind admin auth (workstream 2).
 maps the original items 1–12 into ordered, dependency-aware groups.
 
 ### WS0 — stabilize (no architecture decisions needed) — items 1, 3, 4, 10
+
+> constraint (2026-07-06): **no styling / inline-css refactors in this phase.**
+> existing inline styles are intentional render-fixes; any visual consolidation
+> happens later, one change at a time with user verification. WS0 ui changes are
+> limited to functional element removal and conditional rendering.
+
 - [ ] request strava archive export (user action — unblocks WS2 seed data)
+- [ ] `STRAVA_API_ENABLED` env flag — strava code stays dormant (no calls to the
+      dead api, no 403 log spam) but is preserved in case strava+ ever happens
+- [ ] observability pattern for every dependency/error path: structured server-side
+      logging (source-tagged), user-side degraded states instead of crashes or
+      blank sections — applies to all current and future integrations
 - [ ] fix spotify route null guard; normalize all `/api/*` responses to a common
       `{data | null}` envelope; add missing fetch timeouts (spotify, strava, github
       have none; literal already has 2s)
@@ -90,7 +101,8 @@ maps the original items 1–12 into ordered, dependency-aware groups.
 - [ ] item 10: roadmap tracker in README (seeded, links here)
 
 ### WS1 — architecture decisions (blocks everything below) — items 2, 3, 8 (storage part)
-decide and document:
+decisions locked 2026-07-06 (user confirmation), except blob storage which is
+pending the storage research (git-vs-blob comparison with verified limits):
 - **data layer (recommended: hybrid)** — git stays system-of-record for authored
   content (blog/library/photo-essays/bio/sections/coursework), edited from admin via
   github api commits → vercel auto-deploy (keeps the github history + activity graph
@@ -115,7 +127,11 @@ decide and document:
 
 ### WS2 — activity platform, `replace-strava` branch — items 2, 5, 7
 - [ ] postgres schema: `activities` (summary stats mirroring `CalendarActivity`, plus
-      polyline, privacy-zone-applied flag, photo refs), `activity_photos`
+      polyline, trim metadata, photo refs), `activity_photos`
+- [ ] route privacy controls in upload flow: start-trim and end-trim **sliders**
+      (arbitrary distance from either end) plus a **one-click privacy trim** button
+      applying a default trim; trimming affects the published route/stats, original
+      .fit retained
 - [ ] `/admin` shell: google auth, mobile-friendly (pwa manifest), minimal theme
 - [ ] .fit upload (drag/drop + file picker) → parse → preview → publish; idempotent
       by activity start-time+hash; never destructive
@@ -139,15 +155,24 @@ decide and document:
 - [ ] leetcode entry: form (number/title/difficulty/code) → commits solution file to
       `andrewyzhou/leetcode` with the `"N. Title (Difficulty)"` message the existing
       pipeline already parses (activity graph preserved); url-paste mode fills
-      number/title/difficulty via leetcode's public graphql (unofficial; manual
-      fallback)
+      number/title/difficulty via leetcode's public graphql (unofficial — reliability
+      research 2026-07-06; hard error gating: timeout, non-json/schema-drift
+      detection, clear user-facing failure message, manual-entry fallback always
+      available)
 - [ ] unified multi-month calendar: every event type (activity, leetcode, commit,
       blog, photos, library) with per-type icons / blurred thumbnails; month →
       day → entry drill-down; doubles as the browse ui. generalizes
       ActivityCalendar's existing view-state machine.
 
 ### WS4 — design system consolidation — items 6, 12 (audit half)
-full component inventory completed 2026-07-06 (see §5). extract shared primitives:
+full component inventory completed 2026-07-06 (see §5).
+
+> constraint: existing-component visual refactors happen **one at a time, each
+> user-verified** — inline styles are intentional render-fixes, not cleanup fodder.
+> new features are built on shared primitives from day one; consolidating old
+> components onto them is a slow, verified migration, not a batch rewrite.
+
+extract shared primitives (for new code first):
 - [ ] `formatDate` util (currently 5 duplicate implementations)
 - [ ] `<ContentCard>` (BlogIndex PostRow ≈ LibraryIndex EntryRow ≈ experience rows)
 - [ ] `<PageHeader>` (identical in blog/library/photos index pages)
@@ -160,25 +185,32 @@ full component inventory completed 2026-07-06 (see §5). extract shared primitiv
 timed before/alongside WS2 ui work so new features are built on the primitives, not
 added to the duplication.
 
-### WS5 — comments — item 9
-- [ ] postgres `comments` table (target type+slug, author, body, status)
-- [ ] guest comments → approval queue; signed-in (google) → auto-publish through
-      basic filters (word list, link limit, upstash rate limit, honeypot)
-- [ ] optional llm screen later (claude haiku ~$0.001/comment; "free local llm"
-      isn't runnable on vercel serverless)
-- [ ] admin moderation queue in WS3 dashboard
+### WS5 — engagement (comments, likes, claps, views) — item 9
+scope updated 2026-07-06 per user:
+- [ ] comments: guests and signed-in (google) both auto-publish through **simple
+      filtering** (word list, link limit, upstash rate limit, honeypot). no llm
+      screening for now. no notifications for now.
+- [ ] likes: signed-in users only; guests tapping like get a sign-in prompt
+- [ ] claps: second button, pressable unlimited times, signed-in or not
+- [ ] view counter per blog post / photoset / activity
+- [ ] postgres tables: `comments`, `likes`, `claps`, `views` (or counter rows)
+- [ ] admin: comment delete/hide in WS3 dashboard (filtering is automatic, but
+      removal must be possible after the fact)
 
 ### WS6 — content model evolution — items 11, 12 (coursework half), 4 (pin)
-- [ ] "photo essay" block format: ordered blocks of image | gallery | text; image
-      blocks get caption below the frame (box shape never changes with text length)
-      and a collapsible right sidebar: exif (aperture, shutter, iso, camera,
-      dimensions) + coordinates + minimap pin. serves pure galleries (label-only),
-      road-trip essays (photos + paragraphs), and single showcase photos.
-- [ ] blog and photos both render through the block engine; keep separate tabs
-      (blog = text-first, photos = image-first) unless merge is chosen in Q17
-- [ ] coursework detailed version per the new sections.yaml blurb: per-class
-      experience, review, notes/cheatsheet links
-- [ ] homepage tab template unification on WS4 primitives
+- [ ] "photo essay" block format (photos section only): ordered blocks of
+      image | gallery | text; image blocks get caption below the frame (box shape
+      never changes with text length) and a collapsible right sidebar: exif
+      (aperture, shutter, iso, camera, dimensions) + coordinates + minimap pin.
+      serves pure galleries (label-only), road-trip essays (photos + paragraphs),
+      and single showcase photos.
+- [ ] blog and photos stay **entirely separate** (decided 2026-07-06) — the block
+      format and sidebar layout are unique to photos; blog remains the mdx pipeline
+- [ ] coursework detailed version per the new sections.yaml blurb: **expandable
+      rows in the same list template as other tabs**, with per-class experience,
+      review, notes/cheatsheet links; add a **sort control (a–z / by semester) as an
+      optional element of the shared list template** so other tabs can opt in later
+- [ ] homepage tab template unification on WS4 primitives (one-at-a-time, verified)
 
 ---
 
@@ -217,32 +249,23 @@ full inventory captured 2026-07-06 during audit. highlights:
   detail — the template for the unified calendar), GitHubActivity (responsive
   week-count graph).
 
-## 6. decisions pending (answers drive WS1+ detailed plans)
+## 6. decisions (locked 2026-07-06 unless noted)
 
-see the numbered question list in the planning conversation / below. defaults are
-the recommendations in §3.
-
-| # | decision | recommendation |
-|---|---|---|
-| Q1 | data layer | hybrid: git (authored) + postgres (dynamic) + blob (binary) + redis (cache) |
-| Q2 | postgres provider | neon free tier |
-| Q3 | blob provider | cloudflare r2 (10gb free) — vercel blob if no new account wanted |
-| Q4 | auth | auth.js + google, admin email allowlist |
-| Q5 | publish latency | accept ~1–2 min rebuild for authored content |
-| Q6 | fit source device | **user input needed** (garmin / apple watch+healthfit / other) |
-| Q7 | strava archive | request immediately |
-| Q8 | route privacy | privacy zone on by default |
-| Q9 | maps | svg cards + maplibre/openfreemap detail |
-| Q10 | old strava code | keep dormant behind env flag |
-| Q11 | editor | mdxeditor, restyled |
-| Q12 | admin pwa manifest | yes |
-| Q13 | leetcode via github commits + graphql url parse | yes |
-| Q14 | moderation | queue guests, filter+publish signed-in, llm later |
-| Q15 | comment notifications | **user input needed** |
-| Q16 | comment threading | flat v1 |
-| Q17 | blog/photos merge | shared block engine, separate tabs |
-| Q18 | exif gps precision | round to ~1km publicly |
-| Q19 | coursework format | **user input needed** |
-| Q20 | blog tab pre-first-post | plain list, no blurb |
-| Q21 | vitest + gh actions ci | yes |
-| Q22 | ws0 go-ahead | awaiting confirmation |
+| decision | outcome |
+|---|---|
+| data layer | **hybrid**: git (authored) + postgres/neon (dynamic) + blob (binary, pending research) + redis (cache only) |
+| blob storage | **pending research** — user asked why blob vs committing to repo; answer with verified limits (vercel 4.5mb body cap, github repo limits, rebuild latency, image-optimization quotas) |
+| auth | auth.js + google, admin email allowlist |
+| publish latency | ~1–2 min rebuild accepted for authored content |
+| fit source | garmin connect on phone; **research all data paths** (connect web export, app share, garmin express, official api, unofficial libs, bridge apps) |
+| route privacy | **sliders** for arbitrary start/end trim + **one-click privacy trim** button |
+| maps | svg polyline cards + maplibre/openfreemap detail pages |
+| old strava code | kept dormant behind `STRAVA_API_ENABLED` (in case of strava+) |
+| editor | mdxeditor, restyled to theme |
+| leetcode url parse | yes, unofficial graphql with hard error gating + manual fallback; reliability researched |
+| engagement | simple filters for guests AND signed-in; likes (signed-in, guests prompted); unlimited claps (anyone); view counters; no llm; no notifications |
+| blog/photos | **entirely separate** — photo essay format unique to photos |
+| coursework | expandable rows in shared list template + optional sort element (a–z / semester) |
+| css refactors | **never in bulk** — one at a time with user visual verification |
+| testing | vitest + github actions ci |
+| ws0 | go (scoped: no styling refactors) |
