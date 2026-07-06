@@ -81,8 +81,13 @@ export interface CalendarActivity {
 // throws on api failure — callers must decide what to do; swallowing errors here
 // once let a refresh endpoint overwrite the activity history with an empty array.
 export async function getAllActivities(after?: number): Promise<CalendarActivity[]> {
-  if (!API_ENABLED || !REFRESH_TOKEN) {
+  if (!API_ENABLED) {
     return [];
+  }
+  if (!REFRESH_TOKEN) {
+    // enabled-but-tokenless must throw, not resolve []: a "successful" empty
+    // result would let refresh routes overwrite stored history with nothing
+    throw new Error("strava api is enabled but STRAVA_REFRESH_TOKEN is not set");
   }
 
   const accessToken = await getAccessToken();
@@ -156,8 +161,11 @@ export async function getAllActivities(after?: number): Promise<CalendarActivity
 // throws on api failure so the cache layer can serve stale data.
 // resolves to null when the api is disabled or there are no activities.
 export async function getLatestActivity(): Promise<StravaActivity | null> {
-  if (!API_ENABLED || !REFRESH_TOKEN) {
+  if (!API_ENABLED) {
     return null;
+  }
+  if (!REFRESH_TOKEN) {
+    throw new Error("strava api is enabled but STRAVA_REFRESH_TOKEN is not set");
   }
 
   const accessToken = await getAccessToken();

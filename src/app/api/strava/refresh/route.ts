@@ -36,6 +36,19 @@ export async function POST(request: Request) {
     // fetch first — throws on api failure, leaving existing data untouched
     const activities = await getAllActivities();
 
+    // refuse to replace a non-empty history with an empty fetch result: an
+    // "empty success" here has only ever meant a broken upstream, not reality
+    if (activities.length === 0) {
+      const stored = await redis.get<StoredActivities>(CALENDAR_CACHE_KEY);
+      if (stored && stored.activities.length > 0) {
+        log.warn("api:strava/refresh", "fetch returned 0 activities but store is non-empty, refusing to overwrite");
+        return NextResponse.json(
+          { success: false, error: "fetch returned no activities; refusing to overwrite existing history" },
+          { status: 409 }
+        );
+      }
+    }
+
     // sort by date descending
     activities.sort((a, b) => b.date.localeCompare(a.date));
 
