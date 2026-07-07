@@ -6,6 +6,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { getDb, activities, activityPhotos, type ActivityRow } from "@/lib/db";
 import RouteMap from "@/components/RouteMap";
 import ActivityPhotoCarousel from "@/components/ActivityPhotoCarousel";
+import EngagementSection from "@/components/EngagementSection";
 import {
   DURATION_ONLY_TYPES,
   PACE_TYPES,
@@ -126,6 +127,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
         )}
 
         <ActivityPhotoCarousel photos={photos} />
+
+        <EngagementSection target={`activity:${row.id}`} />
       </article>
 
       <div className="section-divider" />

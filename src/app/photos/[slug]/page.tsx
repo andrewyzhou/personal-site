@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getAllPhotosets, getPhotosetBySlug, getAdjacentPhotosets } from "@/lib/photos";
 import PhotosetViewer from "@/components/photos/PhotosetViewer";
+import EngagementSection from "@/components/EngagementSection";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -57,6 +58,10 @@ export default async function PhotosetDetailPage({ params }: PageProps) {
           prevSlug={prev?.slug ?? null}
           nextSlug={next?.slug ?? null}
         />
+
+        <div style={{ maxWidth: "720px", margin: "0 auto" }}>
+          <EngagementSection target={`photos:${set.slug}`} />
+        </div>
       </section>
 
       <div className="section-divider" />

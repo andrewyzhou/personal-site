@@ -105,6 +105,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link href="/admin/calendar" className="font-sans text-gray text-sm link-highlight">
           calendar
         </Link>
+        <Link href="/admin/comments" className="font-sans text-gray text-sm link-highlight">
+          comments
+        </Link>
         <Link href="/admin/upload" className="font-sans text-gray text-sm link-highlight">
           upload
         </Link>

@@ -94,3 +94,52 @@ export const activityPhotos = pgTable(
 export type ActivityRow = typeof activities.$inferSelect;
 export type NewActivityRow = typeof activities.$inferInsert;
 export type ActivityPhotoRow = typeof activityPhotos.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// engagement (ws5): comments, likes, and per-target counters (claps/views).
+// targets are (target_type, target_slug): blog:<slug>, photos:<slug>,
+// activity:<id>. moderation is post-hoc (hidden flag), never destructive.
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    targetType: text("target_type").notNull(), // 'blog' | 'photos' | 'activity'
+    targetSlug: text("target_slug").notNull(),
+    authorName: text("author_name").notNull(),
+    authorEmail: text("author_email"), // null for guests
+    isGuest: boolean("is_guest").notNull().default(true),
+    body: text("body").notNull(),
+    ipHash: text("ip_hash"), // sha256(ip + salt); raw ips never stored
+    hidden: boolean("hidden").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("comments_target_idx").on(t.targetType, t.targetSlug, t.createdAt)]
+);
+
+export const likes = pgTable(
+  "likes",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    targetType: text("target_type").notNull(),
+    targetSlug: text("target_slug").notNull(),
+    userEmail: text("user_email").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("likes_unique_idx").on(t.targetType, t.targetSlug, t.userEmail)]
+);
+
+// claps + views as counter rows (kind: 'clap' | 'view')
+export const counters = pgTable(
+  "counters",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    targetType: text("target_type").notNull(),
+    targetSlug: text("target_slug").notNull(),
+    kind: text("kind").notNull(),
+    count: bigint("count", { mode: "number" }).notNull().default(0),
+  },
+  (t) => [uniqueIndex("counters_unique_idx").on(t.targetType, t.targetSlug, t.kind)]
+);
+
+export type CommentRow = typeof comments.$inferSelect;
