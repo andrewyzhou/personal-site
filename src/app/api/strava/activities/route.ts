@@ -36,7 +36,7 @@ export async function GET() {
 
 // POST: admin-only incremental sync from Strava into Redis
 export async function POST(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return unauthorizedResponse();
   }
 

@@ -19,6 +19,11 @@ const { getAllActivities, isStravaApiEnabled } = vi.hoisted(() => ({
   isStravaApiEnabled: vi.fn(),
 }));
 
+// no session in these tests: exercises the x-admin-secret fallback path
+vi.mock("@/lib/auth", () => ({
+  getSessionUser: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/strava", () => ({
   getAllActivities: (...args: unknown[]) => getAllActivities(...args),
   isStravaApiEnabled: () => isStravaApiEnabled(),

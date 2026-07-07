@@ -11,7 +11,7 @@ const redis = new Redis({
 });
 
 export async function POST(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return unauthorizedResponse();
   }
 
