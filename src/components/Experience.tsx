@@ -224,11 +224,11 @@ export default function Experience({
 
   const items = getItemsData();
 
-  // reset selected item when category or coursework sort changes
+  // reset selected item when category or coursework sort changes — always,
+  // including to null for empty tabs, so a previous tab's detail panel can
+  // never linger on the right side
   useEffect(() => {
-    if (items.length > 0) {
-      setSelectedItem(items[0]);
-    }
+    setSelectedItem(items.length > 0 ? items[0] : null);
     setSelectedCourseId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, courseworkSort]);
