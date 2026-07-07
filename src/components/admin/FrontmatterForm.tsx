@@ -45,6 +45,7 @@ export default function FrontmatterForm({ typeId, value, onChange, uploadPrefix 
             options={["book", "video", "podcast", "course", "article"].map((t) => ({ value: t, label: t }))}
           />
           <TextField label="source url (optional)" value={s(value.sourceUrl)} onChange={(v) => set("sourceUrl", v)} />
+          <CoverField label="cover / header image (optional)" value={s(value.cover)} onChange={(v) => set("cover", v)} uploadPrefix={uploadPrefix} />
           <DateField label="date started (optional)" value={s(value.dateStarted)} onChange={(v) => set("dateStarted", v)} />
           <DateField label="date completed (optional — setting this marks the entry completed)" value={s(value.dateCompleted)} onChange={(v) => set("dateCompleted", v)} />
           <NumberField label="rating (0–5, optional)" value={n(value.rating)} onChange={(v) => set("rating", v === "" ? undefined : v)} step={0.5} min={0} max={5} />
