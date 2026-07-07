@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
-import { courseHasDetail, semesterShortLabel, type Course, type Semester } from "@/lib/content";
+import { courseHasDetail, semesterShortLabel, type Course, type Semester } from "@/lib/coursework";
 import SortControl from "@/components/SortControl";
 
 type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "photos" | "coursework";
