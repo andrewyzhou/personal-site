@@ -12,8 +12,10 @@ platform plus an admin dashboard. full plan with architecture notes lives in
       gate mutation endpoints, vitest + ci, small ui fixes
 - [x] **ws1 — architecture decisions**: data layer (git + postgres + vercel blob),
       google auth, maplibre maps, garmin fit ingestion, mdxeditor
-- [ ] **ws2 — activity platform** (`replace-strava`): .fit upload + parsing, route
-      maps, activity photos, detail pages, strava archive import
+- [~] **ws2 — activity platform** (`replace-strava` branch, awaiting visual
+      verification + google oauth setup): .fit upload + parsing, route maps,
+      activity photos, detail pages, 221 activities imported from the strava
+      archive into neon + r2
 - [ ] **ws3 — admin cms**: content editing via github commits, new-entry flows,
       leetcode auto-commit, unified activity calendar
 - [ ] **ws4 — design system**: shared primitives (cards, headers, chips, carousel,
