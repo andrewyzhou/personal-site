@@ -9,6 +9,7 @@ export interface LibraryFrontmatter {
   creator: string;
   type: LibraryType;
   sourceUrl?: string;
+  cover?: string; // optional header image, local path or https (cdn)
   dateStarted?: string;
   dateCompleted?: string;
   rating?: number;

@@ -2,8 +2,8 @@
 // submissions (redis store), github commit days, and content entries (github
 // tree). every source fails independently.
 
-import { desc, eq, and, gte, lte } from "drizzle-orm";
-import { getDb, activities } from "@/lib/db";
+import { desc, eq, and, gte, lte, inArray, asc } from "drizzle-orm";
+import { getDb, activities, activityPhotos } from "@/lib/db";
 import { readStoredSubmissions } from "@/lib/leetcode-sync";
 import { getContributions } from "@/lib/github";
 import { listEntries } from "./content-store";
@@ -11,7 +11,7 @@ import { CONTENT_TYPES } from "./content-registry";
 import { log } from "@/lib/log";
 
 export type AdminCalendarEvent =
-  | { kind: "activity"; id: number; date: string; startTime: string; type: string; name: string }
+  | { kind: "activity"; id: number; date: string; startTime: string; type: string; name: string; thumb?: string }
   | { kind: "leetcode"; sha: string; date: string; problemNumber: number; problemTitle: string; difficulty: string; url: string }
   | { kind: "commit"; date: string; count: number }
   | { kind: "blog" | "library" | "photos"; slug: string; date: string; title: string; status: "published" | "wip"; thumb?: string };
@@ -26,7 +26,8 @@ function inRange(date: string, from: string, to: string): boolean {
 }
 
 async function activityEvents(from: string, to: string): Promise<AdminCalendarEvent[]> {
-  const rows = await getDb()
+  const db = getDb();
+  const rows = await db
     .select({
       id: activities.id,
       date: activities.localDate,
@@ -37,7 +38,24 @@ async function activityEvents(from: string, to: string): Promise<AdminCalendarEv
     .from(activities)
     .where(and(eq(activities.hidden, false), gte(activities.localDate, `${from}-01`), lte(activities.localDate, `${to}-31`)))
     .orderBy(desc(activities.localDate));
-  return rows.map((r) => ({ kind: "activity" as const, ...r }));
+
+  // first photo per activity in range → day-cell thumbnail
+  const firstPhoto = new Map<number, string>();
+  if (rows.length > 0) {
+    const photoRows = await db
+      .select({ activityId: activityPhotos.activityId, url: activityPhotos.blobUrl })
+      .from(activityPhotos)
+      .where(inArray(activityPhotos.activityId, rows.map((r) => r.id)))
+      .orderBy(asc(activityPhotos.activityId), asc(activityPhotos.position));
+    for (const p of photoRows) {
+      if (!firstPhoto.has(p.activityId)) firstPhoto.set(p.activityId, p.url);
+    }
+  }
+
+  return rows.map((r) => {
+    const thumb = firstPhoto.get(r.id);
+    return { kind: "activity" as const, ...r, ...(thumb ? { thumb } : {}) };
+  });
 }
 
 async function leetcodeEvents(from: string, to: string): Promise<AdminCalendarEvent[]> {
@@ -83,7 +101,7 @@ async function contentEvents(from: string, to: string): Promise<AdminCalendarEve
       if (!date || typeof date !== "string" || !inRange(date, from, to)) continue;
 
       let thumb: string | undefined;
-      if (typeId === "blog" && typeof fm.cover === "string") thumb = fm.cover;
+      if ((typeId === "blog" || typeId === "library") && typeof fm.cover === "string") thumb = fm.cover;
       if (typeId === "photos") {
         if (typeof fm.cover === "string") thumb = `/photos/${item.slug}/${fm.cover}`;
         else if (typeof (fm.cover as Record<string, unknown>)?.src === "string")
