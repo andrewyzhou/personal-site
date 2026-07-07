@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getAllPosts, getPostBySlug, getAdjacentPosts } from "@/lib/blog";
 import BlogContent from "@/components/blog/BlogContent";
 import { Figure } from "@/components/blog/mdx";
+import EngagementSection from "@/components/EngagementSection";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -95,6 +96,8 @@ export default async function BlogPostPage({ params }: PageProps) {
         )}
 
         <BlogContent slug={post.slug} />
+
+        <EngagementSection target={`blog:${post.slug}`} />
       </article>
 
       {(prev || next) && (
