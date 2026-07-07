@@ -72,7 +72,7 @@ export default function Home() {
     caption: s.caption,
     dateLabel: formatDateLabel(s.date),
     year: (s.date ?? "").slice(0, 4) || "",
-    count: s.photos.length,
+    count: s.photoCount,
   }));
 
   return (
