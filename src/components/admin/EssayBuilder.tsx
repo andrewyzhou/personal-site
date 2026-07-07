@@ -23,6 +23,8 @@ interface ImageBlockDraft {
   caption: string;
   text: string;
   includeLocation: boolean;
+  // consecutive images marked groupWithPrev merge into one gallery block on save
+  groupWithPrev: boolean;
   meta: ExtractedMeta;
 }
 
@@ -57,7 +59,7 @@ export default function EssayBuilder() {
       const previewUrl = URL.createObjectURL(file);
       const draft: ImageBlockDraft = {
         kind: "image", key, status: "working", previewUrl,
-        caption: "", text: "", includeLocation: true, meta: {},
+        caption: "", text: "", includeLocation: true, groupWithPrev: false, meta: {},
       };
       setBlocks((prev) => [...prev, draft]);
       try {
@@ -104,26 +106,37 @@ export default function EssayBuilder() {
     setSaving(true);
     setMessage(null);
     try {
-      const yamlBlocks = blocks
-        .map((b) => {
-          if (b.kind === "text") {
-            return b.body.trim() ? { kind: "text", body: b.body.trim() } : null;
-          }
-          if (b.status !== "done" || !b.src) return null;
-          return {
-            kind: "image",
-            src: b.src,
-            width: b.width,
-            height: b.height,
-            alt: b.caption || title || "photo",
-            ...(b.caption ? { caption: b.caption } : {}),
-            ...(b.text ? { text: b.text } : {}),
-            ...(b.meta.exif ? { exif: b.meta.exif } : {}),
-            ...(b.includeLocation && b.meta.gps ? { gps: b.meta.gps } : {}),
-            ...(b.meta.takenAt ? { takenAt: b.meta.takenAt } : {}),
-          };
-        })
-        .filter(Boolean);
+      const imageYaml = (b: ImageBlockDraft) => ({
+        src: b.src!,
+        width: b.width,
+        height: b.height,
+        alt: b.caption || title || "photo",
+        ...(b.caption ? { caption: b.caption } : {}),
+        ...(b.text ? { text: b.text } : {}),
+        ...(b.meta.exif ? { exif: b.meta.exif } : {}),
+        ...(b.includeLocation && b.meta.gps ? { gps: b.meta.gps } : {}),
+        ...(b.meta.takenAt ? { takenAt: b.meta.takenAt } : {}),
+      });
+
+      // fold consecutive grouped images into gallery blocks
+      const yamlBlocks: Record<string, unknown>[] = [];
+      for (const b of blocks) {
+        if (b.kind === "text") {
+          if (b.body.trim()) yamlBlocks.push({ kind: "text", body: b.body.trim() });
+          continue;
+        }
+        if (b.status !== "done" || !b.src) continue;
+        const prev = yamlBlocks[yamlBlocks.length - 1];
+        if (b.groupWithPrev && prev && prev.kind === "gallery") {
+          (prev.images as unknown[]).push(imageYaml(b));
+        } else if (b.groupWithPrev && prev && prev.kind === "image") {
+          const { kind: _dropped, ...prevImage } = prev;
+          void _dropped;
+          yamlBlocks[yamlBlocks.length - 1] = { kind: "gallery", images: [prevImage, imageYaml(b)] };
+        } else {
+          yamlBlocks.push({ kind: "image", ...imageYaml(b) });
+        }
+      }
 
       if (yamlBlocks.length === 0) {
         setMessage("add at least one photo or text block");
@@ -220,6 +233,13 @@ export default function EssayBuilder() {
                       label="include location (rounded to ~1 km)"
                       checked={b.includeLocation}
                       onChange={(v) => updateBlock(b.key, { includeLocation: v })}
+                    />
+                  )}
+                  {blocks[blocks.indexOf(b) - 1]?.kind === "image" && (
+                    <CheckboxField
+                      label="group with photo above (gallery)"
+                      checked={b.groupWithPrev}
+                      onChange={(v) => updateBlock(b.key, { groupWithPrev: v })}
                     />
                   )}
                 </div>
