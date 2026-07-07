@@ -412,3 +412,9 @@ ul.list-disc.list-inside li::marker {
 .theme-light .photoset-nav-btn:hover {
   background-color: rgba(238, 238, 238, 0.8);
 }
+
+/* route map (ws2): keep the light openfreemap basemap monochrome and on-theme
+   in dark mode; canvas-safe */
+.theme-dark .route-map-container {
+  filter: invert(0.92) hue-rotate(180deg);
+}
