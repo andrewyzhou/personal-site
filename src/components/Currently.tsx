@@ -123,7 +123,7 @@ export default function Currently() {
         // allSettled so one failed source can't discard the others' results
         const [spotifyRes, stravaRes, literalRes, statsRes] = await Promise.allSettled([
           fetch("/api/spotify"),
-          fetch("/api/strava"),
+          fetch("/api/activities/latest"),
           fetch("/api/literal"),
           fetch("/api/stats"),
         ]);
@@ -396,7 +396,7 @@ export default function Currently() {
       links.push({
         start: linkStart,
         end: text.length,
-        url: `https://www.strava.com/activities/${strava.id}`,
+        url: `/activities/${strava.id}`,
       });
       text += " " + timeAgo + ".";
     }
