@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
-import type { Semester } from "@/lib/content";
+import { courseHasDetail, semesterShortLabel, type Course, type Semester } from "@/lib/content";
+import SortControl from "@/components/SortControl";
 
 type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "photos" | "coursework";
 
@@ -75,6 +76,9 @@ export default function Experience({
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
+  // coursework detail view (ws6): sort mode + expanded course
+  const [courseworkSort, setCourseworkSort] = useState<"semester" | "az">("semester");
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   const libraryItems: ExperienceItem[] = libraryPreview.map((e) => ({
     id: e.slug,
@@ -153,6 +157,48 @@ export default function Experience({
     }
   };
 
+  // detail body shared by the a–z list panel and the below-grid card
+  const courseDetail = (course: Course) => (
+    <div className="flex flex-col gap-2">
+      {course.review && <p className="font-sans text-secondary text-lg italic">{course.review}</p>}
+      {course.experience &&
+        course.experience.split(/\n\s*\n/).map((para, i) => (
+          <p key={i} className="font-sans text-gray text-lg leading-[1.35]">
+            {para}
+          </p>
+        ))}
+      {((course.cheatsheets?.length ?? 0) > 0 || (course.links?.length ?? 0) > 0) && (
+        <p className="font-sans text-gray text-lg">
+          {[...(course.cheatsheets ?? []), ...(course.links ?? [])].map((l, i, all) => (
+            <span key={`${l.label}-${i}`}>
+              <a href={l.url} target="_blank" rel="noopener noreferrer" className="link-highlight">
+                {l.label}
+              </a>
+              {i < all.length - 1 && ", "}
+            </span>
+          ))}
+        </p>
+      )}
+    </div>
+  );
+
+  // a–z view maps courses onto the same list/detail template the other tabs use
+  const courseworkItems: ExperienceItem[] = semesters
+    .flatMap((sem) =>
+      sem.courses.map((course) => ({
+        id: `${sem.name}:${course.code}`,
+        title: course.code,
+        company: course.title,
+        year: semesterShortLabel(sem.name),
+        description: courseHasDetail(course) ? (
+          courseDetail(course)
+        ) : (
+          <p className="font-sans text-gray text-lg italic">no writeup for this one (yet)</p>
+        ),
+      }))
+    )
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
+
   const getItemsData = (): ExperienceItem[] => {
     switch (activeCategory) {
       case "work":
@@ -169,6 +215,8 @@ export default function Experience({
         return blogItems;
       case "photos":
         return photosItems;
+      case "coursework":
+        return courseworkSort === "az" ? courseworkItems : [];
       default:
         return [];
     }
@@ -176,13 +224,14 @@ export default function Experience({
 
   const items = getItemsData();
 
-  // reset selected item when category changes
+  // reset selected item when category or coursework sort changes
   useEffect(() => {
     if (items.length > 0) {
       setSelectedItem(items[0]);
     }
+    setSelectedCourseId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory]);
+  }, [activeCategory, courseworkSort]);
 
   const categoryTabs = (
     <div className="flex flex-wrap gap-2">
@@ -240,7 +289,17 @@ export default function Experience({
             <br />
           </>
         )}
-        {activeCategory === "coursework" ? (
+        {activeCategory === "coursework" && (
+          <SortControl
+            options={[
+              { id: "semester", label: "by semester" },
+              { id: "az", label: "a–z" },
+            ]}
+            value={courseworkSort}
+            onChange={(v) => setCourseworkSort(v as "semester" | "az")}
+          />
+        )}
+        {activeCategory === "coursework" && courseworkSort === "semester" ? (
           /* coursework uses a 2x2 grid layout */
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -254,32 +313,77 @@ export default function Experience({
                     {semester.name}
                   </h3>
                   <ul className="space-y-2">
-                    {semester.courses.map((course) => (
-                      <li key={course.code} className="font-sans text-gray text-lg">
-                        <span className="text-off-white">{course.code}</span>: {course.title}
-                        {course.cheatsheets && course.cheatsheets.length > 0 && (
-                          <span>
-                            {" "}({course.cheatsheets.map((cs, idx) => (
-                              <span key={cs.label}>
-                                <a
-                                  href={cs.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="link-highlight"
-                                >
-                                  {cs.label}
-                                </a>
-                                {idx < course.cheatsheets!.length - 1 && ", "}
-                              </span>
-                            ))})
-                          </span>
-                        )}
-                      </li>
-                    ))}
+                    {semester.courses.map((course) => {
+                      const courseId = `${semester.name}:${course.code}`;
+                      const inner = (
+                        <>
+                          <span className="text-off-white">{course.code}</span>: {course.title}
+                          {course.cheatsheets && course.cheatsheets.length > 0 && (
+                            <span>
+                              {" "}({course.cheatsheets.map((cs, idx) => (
+                                <span key={cs.label}>
+                                  <a
+                                    href={cs.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="link-highlight"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {cs.label}
+                                  </a>
+                                  {idx < course.cheatsheets!.length - 1 && ", "}
+                                </span>
+                              ))})
+                            </span>
+                          )}
+                        </>
+                      );
+                      return (
+                        <li key={course.code} className="font-sans text-gray text-lg">
+                          {courseHasDetail(course) ? (
+                            <button
+                              onClick={() =>
+                                setSelectedCourseId(selectedCourseId === courseId ? null : courseId)
+                              }
+                              className={`w-full text-left rounded transition-all duration-200 ${
+                                selectedCourseId === courseId ? "card-bg" : "card-bg-hover"
+                              }`}
+                              style={{ padding: '0.1rem 0.5rem', margin: '-0.1rem -0.5rem' }}
+                            >
+                              {inner}
+                            </button>
+                          ) : (
+                            inner
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}
             </div>
+            {selectedCourseId &&
+              (() => {
+                const [semName, code] = selectedCourseId.split(":");
+                const course = semesters
+                  .find((s) => s.name === semName)
+                  ?.courses.find((c) => c.code === code);
+                if (!course) return null;
+                return (
+                  <div className="card-bg rounded-lg" style={{ padding: '1rem', paddingLeft: '1.25rem', marginTop: '1.5rem' }}>
+                    <div className="flex justify-between" style={{ marginBottom: '0.5rem' }}>
+                      <div>
+                        <p className="font-sans text-off-white text-lg font-bold">{course.code}</p>
+                        <p className="font-sans text-secondary text-lg">{course.title}</p>
+                      </div>
+                      <span className="font-sans font-semibold text-gray text-lg text-right shrink-0" style={{ marginLeft: '1rem' }}>
+                        {semName}
+                      </span>
+                    </div>
+                    {courseDetail(course)}
+                  </div>
+                );
+              })()}
             <p className="font-sans text-gray text-lg" style={{ marginTop: '2rem' }}>
               * accredited courses taken outside of uc berkeley
             </p>
