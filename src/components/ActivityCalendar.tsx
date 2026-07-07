@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Image from "next/image";
 import { LeetCodeSubmission, StoredSubmissions, getDifficultyColor, getDifficultyLetter } from "@/lib/leetcode";
+import RouteThumb from "@/components/RouteThumb";
 
 // ============================================================================
 // SHARED TYPES & CONSTANTS
@@ -251,6 +252,24 @@ function StravaActivityDetail({
   activity: CalendarActivity;
   onBack: () => void;
 }) {
+  // lazy enhancement: fetch route thumbnail + photos for this activity; quiet
+  // no-op on failure (list payload stays polyline-free to keep load cost flat)
+  const [detail, setDetail] = useState<{ cardPolyline: string | null; photos: { url: string }[] } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/activities/${activity.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => {
+        if (!cancelled && body?.activity) {
+          setDetail({ cardPolyline: body.activity.cardPolyline ?? null, photos: body.activity.photos ?? [] });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activity.id]);
+
   const showDistance = DISTANCE_TYPES.includes(activity.type);
   const showPace = PACE_TYPES.includes(activity.type);
   const showSpeed = SPEED_TYPES.includes(activity.type);
@@ -296,6 +315,11 @@ function StravaActivityDetail({
       {activity.description && (
         <p className="font-sans text-gray text-sm mb-4 leading-relaxed">{activity.description}</p>
       )}
+      {detail?.cardPolyline && (
+        <div className="flex justify-center" style={{ marginBottom: '12px' }}>
+          <RouteThumb polyline={detail.cardPolyline} height={80} />
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-3" style={{ marginBottom: '24px' }}>
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
@@ -304,13 +328,19 @@ function StravaActivityDetail({
           </div>
         ))}
       </div>
+      {detail && detail.photos.length > 0 && (
+        <div className="flex" style={{ gap: '6px', marginBottom: '12px', overflowX: 'auto' }}>
+          {detail.photos.map((p, i) => (
+            // eslint-disable-next-line @next/next/no-img-element -- pre-downscaled photos bypass image optimization by design
+            <img key={i} src={p.url} alt="" className="rounded" style={{ width: 48, height: 48, objectFit: 'cover', flexShrink: 0 }} />
+          ))}
+        </div>
+      )}
       <a
-        href={`https://www.strava.com/activities/${activity.id}`}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={`/activities/${activity.id}`}
         className="font-sans text-gray text-sm hover:text-off-white transition-colors text-center mt-auto"
       >
-        view on strava &rarr;
+        view activity &rarr;
       </a>
     </div>
   );
@@ -524,7 +554,7 @@ export default function ActivityCalendar() {
   useEffect(() => {
     async function fetchStravaActivities() {
       try {
-        const response = await fetch("/api/strava/activities");
+        const response = await fetch("/api/activities");
         if (response.ok) {
           const result = await response.json();
           setStravaData(result);
@@ -544,7 +574,7 @@ export default function ActivityCalendar() {
       const { latestActivityId } = (e as CustomEvent).detail;
       const cachedLatestId = stravaData?.activities?.[0]?.id;
       if (latestActivityId && latestActivityId !== cachedLatestId) {
-        fetch("/api/strava/activities")
+        fetch("/api/activities")
           .then(res => res.ok ? res.json() : null)
           .then(result => { if (result) setStravaData(result); })
           .catch(err => console.error("Failed to refresh strava activities:", err));
@@ -834,9 +864,9 @@ export default function ActivityCalendar() {
             <button
               onClick={() => handleModeSwitch("strava")}
               className={`flex items-center justify-center transition-opacity ${mode === "strava" ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
-              aria-label="Strava mode"
+              aria-label="activities mode"
             >
-              <Image src="/icons/strava.svg" alt="Strava" width={16} height={16} />
+              <Image src="/icons/activity.svg" alt="activities" width={16} height={16} />
             </button>
             <span className="text-gray mx-1.5 text-xs">|</span>
             <button
