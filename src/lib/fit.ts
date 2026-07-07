@@ -194,8 +194,11 @@ function decodeFit(bytes: Uint8Array): ParsedTrackFile {
     throw new Error(`could not decode fit file: ${String(errors[0]).slice(0, 120)}`);
   }
 
-  const session: FitSessionMesg = messages.sessionMesgs?.[0] ?? {};
-  const recordMesgs: FitRecordMesg[] = messages.recordMesgs ?? [];
+  // the sdk's type defs allow raw enum/epoch values, but with default decoder
+  // options (convertTypesToStrings, convertDateTimesToDates — verified against
+  // real files) sports are strings and timestamps are Dates
+  const session = (messages.sessionMesgs?.[0] ?? {}) as unknown as FitSessionMesg;
+  const recordMesgs = (messages.recordMesgs ?? []) as unknown as FitRecordMesg[];
   const sportType = mapSport(session.sport, session.subSport);
 
   const withTs = recordMesgs.filter((r): r is FitRecordMesg & { timestamp: Date } => r.timestamp instanceof Date);

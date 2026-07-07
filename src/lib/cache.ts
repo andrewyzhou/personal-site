@@ -23,6 +23,8 @@ const CACHE_TTL = {
   spotify: 60 * 1000, // 1 minute
   strava: 5 * 60 * 1000, // 5 minutes
   literal: 60 * 60 * 1000, // 1 hour
+  activities_list: 5 * 60 * 1000, // 5 minutes — postgres is source of truth
+  activities_latest: 60 * 1000, // 1 minute
 } as const;
 
 type CacheKey = keyof typeof CACHE_TTL;
@@ -88,6 +90,18 @@ export async function getCachedData<T>(
 
   // fetch returned null, return it without caching so next request will retry
   return { data, fetchedAt: Date.now(), previousFetchedAt };
+}
+
+/**
+ * drop cached entries so the next read hits the source of truth — used by
+ * activity publish/edit/delete so new data appears immediately despite ttls
+ */
+export async function invalidateCache(...keys: CacheKey[]): Promise<void> {
+  try {
+    await Promise.all(keys.map((k) => redis.del(k)));
+  } catch (error) {
+    log.error("cache:invalidate", `failed to drop ${keys.join(",")}`, error);
+  }
 }
 
 /**
