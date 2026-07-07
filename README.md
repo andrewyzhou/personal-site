@@ -12,18 +12,19 @@ platform plus an admin dashboard. full plan with architecture notes lives in
       gate mutation endpoints, vitest + ci, small ui fixes
 - [x] **ws1 — architecture decisions**: data layer (git + postgres + vercel blob),
       google auth, maplibre maps, garmin fit ingestion, mdxeditor
-- [~] **ws2 — activity platform** (`replace-strava` branch, awaiting visual
-      verification + google oauth setup): .fit upload + parsing, route maps,
-      activity photos, detail pages, 221 activities imported from the strava
-      archive into neon + r2
-- [ ] **ws3 — admin cms**: content editing via github commits, new-entry flows,
-      leetcode auto-commit, unified activity calendar
-- [ ] **ws4 — design system**: shared primitives (cards, headers, chips, carousel,
-      maps, date utils), token cleanup
-- [ ] **ws5 — engagement**: comments (guest + google sign-in, simple filtering),
-      likes, claps, view counters
-- [ ] **ws6 — content model**: photo-essay block format with exif/map sidebar,
-      detailed coursework tab
+- [x] **ws2 — activity platform**: .fit upload + parsing, route maps, activity
+      photos, detail pages, 221 activities imported from the strava archive
+      into neon + r2
+- [x] **ws3 — admin cms**: content editing via github commits, mdx editor with
+      live preview, new-entry flows, leetcode auto-commit with url autofill,
+      unified multi-month calendar, deploy status
+- [ ] **ws4 — design system**: shared primitives + token cleanup — held for
+      step-by-step manual review (visual changes reviewed one at a time)
+- [x] **ws5 — engagement**: comments (guest + google sign-in, simple filtering,
+      honeypot, rate limits), likes, claps, view counters, admin moderation
+- [x] **ws6 — content model**: photo-essay block format with exif/location
+      sidebar + minimap, essay builder, detailed coursework tab with sort
+      (visual polish pending owner review)
 
 ## note on usage
 
