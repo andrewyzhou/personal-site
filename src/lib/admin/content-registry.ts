@@ -99,11 +99,12 @@ export const CONTENT_TYPES: Record<ContentTypeId, ContentTypeDef> = {
     dir: "content/library",
     hasWip: true,
     commitNoun: "library entry",
-    keyOrder: ["title", "creator", "type", "sourceUrl", "dateStarted", "dateCompleted", "rating", "tags", "summary"],
+    keyOrder: ["title", "creator", "type", "sourceUrl", "cover", "dateStarted", "dateCompleted", "rating", "tags", "summary"],
     validate: (fm) => {
       const errors: string[] = [];
       if (!str(fm.title)) errors.push("title is required");
       if (!str(fm.creator)) errors.push("creator is required");
+      if (!optStr(fm.cover)) errors.push("cover must be a path or url");
       if (!LIBRARY_TYPES.includes(fm.type as string)) errors.push(`type must be one of ${LIBRARY_TYPES.join(", ")}`);
       if (!optDate(fm.dateStarted) || !optDate(fm.dateCompleted)) errors.push("dates must be yyyy-mm-dd");
       if (fm.rating !== undefined && (typeof fm.rating !== "number" || fm.rating < 0 || fm.rating > 5))

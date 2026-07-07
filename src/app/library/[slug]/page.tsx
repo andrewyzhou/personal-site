@@ -5,6 +5,7 @@ import { getAllEntries, getEntryBySlug, getAdjacentEntries } from "@/lib/library
 import SourceIcon from "@/components/library/SourceIcon";
 import Rating from "@/components/library/Rating";
 import MDXContent from "@/components/library/MDXContent";
+import { Figure } from "@/components/blog/mdx";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -97,6 +98,8 @@ export default async function LibraryEntryPage({ params }: PageProps) {
             ))}
           </div>
         )}
+
+        {entry.cover && <Figure src={entry.cover} alt={entry.title} />}
 
         <hr
           style={{
