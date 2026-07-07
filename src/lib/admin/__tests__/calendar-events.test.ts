@@ -85,6 +85,18 @@ describe("getCalendarEvents", () => {
     expect(activity && "thumb" in activity).toBe(false);
   });
 
+  it("photo-thumbnail query failure degrades to thumbless events, not a dead source (review finding)", async () => {
+    queue.push(
+      [{ id: 3, date: "2026-06-10", startTime: "07:00", type: "Run", name: "run" }],
+      new Error("neon transient failure")
+    );
+    const payload = await getCalendarEvents("2026-06", "2026-06");
+    expect(payload.sources.activities).toBe("ok");
+    const activity = payload.events.find((e) => e.kind === "activity");
+    expect(activity).toBeDefined();
+    expect(activity && "thumb" in activity).toBe(false);
+  });
+
   it("isolates a failing source and flags it", async () => {
     queue.push([]); // activities: no rows → no photo query
     getContributions.mockRejectedValue(new Error("github down"));
