@@ -195,6 +195,9 @@ export default function AdminCalendar() {
           {cells.map((date, i) => {
             const dayEvents = date ? byDate.get(date) ?? [] : [];
             const kinds = [...new Set(dayEvents.map((e) => e.kind))];
+            // image-carrying entries (blog covers, photo essays) paint a blurred
+            // thumbnail behind the day's icons
+            const thumb = dayEvents.find((e): e is Extract<AdminCalendarEvent, { thumb?: string }> => "thumb" in e && !!e.thumb)?.thumb;
             return (
               <button
                 key={i}
@@ -205,18 +208,32 @@ export default function AdminCalendar() {
                   aspectRatio: "1",
                   backgroundColor: date ? "var(--theme-highlight-bg)" : "transparent",
                   position: "relative",
+                  overflow: "hidden",
                 }}
               >
-                {date && <span className="font-sans text-gray" style={{ fontSize: "0.6rem", position: "absolute", top: 2, left: 4 }}>{Number(date.slice(-2))}</span>}
+                {thumb && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      backgroundImage: `url(${thumb})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      filter: "blur(2px) brightness(0.6)",
+                    }}
+                  />
+                )}
+                {date && <span className="font-sans text-gray" style={{ fontSize: "0.6rem", position: "absolute", top: 2, left: 4, zIndex: 1 }}>{Number(date.slice(-2))}</span>}
                 {kinds.length > 0 && (
-                  <span className="flex" style={{ gap: "2px" }}>
+                  <span className="flex" style={{ gap: "2px", zIndex: 1 }}>
                     {kinds.slice(0, 3).map((k) => (
                       <Image key={k} src={eventIcon(dayEvents.find((e) => e.kind === k)!)} alt={k} width={12} height={12} />
                     ))}
                   </span>
                 )}
                 {dayEvents.length > 1 && (
-                  <span className="font-sans text-gray" style={{ fontSize: "0.55rem", position: "absolute", top: 2, right: 3 }}>
+                  <span className="font-sans text-gray" style={{ fontSize: "0.55rem", position: "absolute", top: 2, right: 3, zIndex: 1 }}>
                     {dayEvents.length}
                   </span>
                 )}
