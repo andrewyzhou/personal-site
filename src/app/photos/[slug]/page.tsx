@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getAllPhotosets, getPhotosetBySlug, getAdjacentPhotosets } from "@/lib/photos";
 import PhotosetViewer from "@/components/photos/PhotosetViewer";
+import EssayViewer from "@/components/photos/EssayViewer";
 import EngagementSection from "@/components/EngagementSection";
 
 interface PageProps {
@@ -49,15 +50,27 @@ export default async function PhotosetDetailPage({ params }: PageProps) {
           {set.title}
         </h1>
 
-        <PhotosetViewer
-          slug={set.slug}
-          title={set.title}
-          date={set.date}
-          caption={set.caption}
-          photos={set.photos}
-          prevSlug={prev?.slug ?? null}
-          nextSlug={next?.slug ?? null}
-        />
+        {set.kind === "essay" ? (
+          <EssayViewer
+            slug={set.slug}
+            title={set.title}
+            date={set.date}
+            caption={set.caption}
+            blocks={set.blocks}
+            prevSlug={prev?.slug ?? null}
+            nextSlug={next?.slug ?? null}
+          />
+        ) : (
+          <PhotosetViewer
+            slug={set.slug}
+            title={set.title}
+            date={set.date}
+            caption={set.caption}
+            photos={set.photos}
+            prevSlug={prev?.slug ?? null}
+            nextSlug={next?.slug ?? null}
+          />
+        )}
 
         <div style={{ maxWidth: "720px", margin: "0 auto" }}>
           <EngagementSection target={`photos:${set.slug}`} />

@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Photoset } from "@/lib/photos";
+import type { Photo } from "@/lib/photos";
+
+// only the fields the cover grid consumes — accepts flat sets and essays alike
+interface CoverSet {
+  slug: string;
+  title: string;
+  cover: Photo;
+}
 import PhotosetCover from "./PhotosetCover";
 
 interface Props {
-  sets: Photoset[];
+  sets: CoverSet[];
 }
 
 const TARGET_ROW_HEIGHT_DESKTOP = 260;
@@ -16,25 +23,25 @@ const MAX_PER_ROW = 4;
 const MAX_SCALE = 1.5; // allow scaling rows up to fit container when needed
 
 interface Row {
-  sets: Photoset[];
+  sets: CoverSet[];
   height: number;
 }
 
 // flickr-style justified rows: greedy pack covers into rows of 2-4 photos,
 // scale each row to fill container width exactly.
 function packRows(
-  sets: Photoset[],
+  sets: CoverSet[],
   containerWidth: number,
   targetHeight: number
 ): Row[] {
   if (containerWidth <= 0 || sets.length === 0) return [];
   const rows: Row[] = [];
-  let current: Photoset[] = [];
+  let current: CoverSet[] = [];
   let currentWidthAtTarget = 0;
 
   const availableWidth = containerWidth;
 
-  const flushRow = (rowSets: Photoset[], widthAtTarget: number, isLast: boolean) => {
+  const flushRow = (rowSets: CoverSet[], widthAtTarget: number, isLast: boolean) => {
     if (rowSets.length === 0) return;
     const totalGap = (rowSets.length - 1) * GAP;
     const usableWidth = availableWidth - totalGap;
