@@ -1,0 +1,81 @@
+/* cms-only styles, scoped under .admin-cms — additive, never touches public
+   component styles. maps mdxeditor's theme variables onto the site theme. */
+
+.admin-cms input,
+.admin-cms textarea,
+.admin-cms select {
+  background-color: var(--theme-card-bg);
+  border: 1px solid var(--theme-highlight-bg);
+  border-radius: 8px;
+  color: var(--theme-text-primary);
+  padding: 8px 12px;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+}
+
+.admin-cms input:focus,
+.admin-cms textarea:focus,
+.admin-cms select:focus {
+  outline: 1px solid var(--theme-text-muted);
+}
+
+.admin-cms label {
+  color: var(--theme-text-muted);
+  font-size: 0.75rem;
+  display: block;
+}
+
+.admin-cms .field-error {
+  color: var(--theme-text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+/* mdxeditor theme mapping */
+.admin-cms .mdxeditor {
+  --baseBg: var(--theme-bg);
+  --baseBgActive: var(--theme-card-bg);
+  --baseText: var(--theme-text);
+  --baseTextContrast: var(--theme-text-primary);
+  --baseBorder: var(--theme-divider);
+  --baseBorderHover: var(--theme-text-muted);
+  --basePageBg: var(--theme-bg);
+  --accentBg: var(--theme-card-bg);
+  --accentBgActive: var(--theme-highlight-bg-active);
+  --accentText: var(--theme-text-primary);
+  --accentBorder: var(--theme-divider);
+  --admonitionTipBg: var(--theme-card-bg);
+  font-family: var(--font-sans);
+  background-color: var(--theme-card-bg);
+  border: 1px solid var(--theme-highlight-bg);
+  border-radius: 8px;
+  color: var(--theme-text);
+}
+
+.admin-cms .mdxeditor-toolbar {
+  background-color: var(--theme-card-bg);
+  border-bottom: 1px solid var(--theme-divider);
+  border-radius: 8px 8px 0 0;
+  text-transform: lowercase;
+}
+
+.admin-cms .mdxeditor [contenteditable="true"] {
+  min-height: 220px;
+  color: var(--theme-text);
+  font-family: var(--font-sans);
+}
+
+.admin-cms .mdxeditor-popup-container > * {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+  border: 1px solid var(--theme-divider);
+}
+
+/* preview pane mirrors the public article constraints */
+.admin-cms .mdx-preview {
+  max-width: 720px;
+  border: 1px dashed var(--theme-divider);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { auth, signIn, signOut, isGoogleAuthConfigured } from "@/lib/auth";
+import NewEntryMenu from "@/components/admin/NewEntryMenu";
+import "./admin.css";
 
 export const metadata: Metadata = {
   title: "admin · andrew zhou",
@@ -77,19 +80,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminShell>
-      <div className="flex items-center justify-between" style={{ marginBottom: "1.5rem" }}>
-        <h1 className="font-sans font-bold text-off-white text-3xl">admin</h1>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/admin" });
-          }}
-        >
-          <button type="submit" className="font-sans text-gray text-sm link-highlight">
-            sign out
-          </button>
-        </form>
+      <div className="flex items-center justify-between" style={{ marginBottom: "0.75rem" }}>
+        <h1 className="font-sans font-bold text-off-white text-3xl">
+          <Link href="/admin">admin</Link>
+        </h1>
+        <div className="flex items-center" style={{ gap: "10px" }}>
+          <NewEntryMenu />
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/admin" });
+            }}
+          >
+            <button type="submit" className="font-sans text-gray text-sm link-highlight">
+              sign out
+            </button>
+          </form>
+        </div>
       </div>
+      <nav className="flex items-center" style={{ gap: "12px", marginBottom: "1.5rem" }}>
+        <Link href="/admin/content" className="font-sans text-gray text-sm link-highlight">
+          content
+        </Link>
+        <Link href="/admin/calendar" className="font-sans text-gray text-sm link-highlight">
+          calendar
+        </Link>
+        <Link href="/admin/upload" className="font-sans text-gray text-sm link-highlight">
+          upload
+        </Link>
+      </nav>
       {children}
     </AdminShell>
   );
