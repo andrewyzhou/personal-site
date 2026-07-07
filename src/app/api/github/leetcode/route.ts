@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { getAllSubmissions, getLatestCommitSha, LeetCodeSubmission, StoredSubmissions } from "@/lib/leetcode";
+import { getLatestCommitSha, StoredSubmissions } from "@/lib/leetcode";
+import { syncSubmissions, LEETCODE_CACHE_KEY as CACHE_KEY } from "@/lib/leetcode-sync";
 import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-auth";
 import { log } from "@/lib/log";
 
@@ -10,44 +11,6 @@ const redis = new Redis({
   url: process.env.KV_REST_API_URL || "",
   token: process.env.KV_REST_API_TOKEN || "",
 });
-
-const CACHE_KEY = "leetcode_submissions";
-
-async function syncSubmissions(stored: StoredSubmissions | null) {
-  try {
-    let submissions: LeetCodeSubmission[];
-
-    if (stored && stored.submissions.length > 0) {
-      // Incremental update: fetch commits since the most recent date
-      const mostRecentDate = stored.submissions[0].date;
-      const sinceDate = new Date(mostRecentDate + "T00:00:00Z");
-      sinceDate.setDate(sinceDate.getDate() - 1);
-
-      const newSubmissions = await getAllSubmissions(sinceDate.toISOString());
-
-      // Merge, avoiding duplicates by SHA
-      const existingShas = new Set(stored.submissions.map(s => s.sha));
-      const uniqueNew = newSubmissions.filter(s => !existingShas.has(s.sha));
-      submissions = [...uniqueNew, ...stored.submissions];
-    } else {
-      submissions = await getAllSubmissions();
-    }
-
-    // Sort by date descending
-    submissions.sort((a, b) => b.date.localeCompare(a.date));
-
-    const data: StoredSubmissions = {
-      submissions,
-      lastFetchedAt: Date.now(),
-    };
-
-    await redis.set(CACHE_KEY, data);
-    return data;
-  } catch (error) {
-    log.error("api:github/leetcode", "sync failed, keeping existing data", error);
-    return stored;
-  }
-}
 
 // GET: Return cached submissions, auto-sync if new commits detected
 export async function GET() {
