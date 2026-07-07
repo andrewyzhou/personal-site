@@ -110,11 +110,26 @@ for (const row of rows) {
   try {
     let values: NewActivityRow;
 
+    // strava exports indoor/manual activities as empty gpx shells (0 trkpt) —
+    // those rows carry their stats only in the csv
+    let parsedOk = false;
+    let parsed: ReturnType<typeof parseTrackFile> | null = null;
+    let fileBytes: Uint8Array | null = null;
     if (row.Filename) {
       const filePath = path.join(dir, row.Filename);
       if (!fs.existsSync(filePath)) throw new Error(`missing file ${row.Filename}`);
-      const bytes = new Uint8Array(fs.readFileSync(filePath));
-      const parsed = parseTrackFile(bytes, row.Filename);
+      fileBytes = new Uint8Array(fs.readFileSync(filePath));
+      try {
+        parsed = parseTrackFile(fileBytes, row.Filename);
+        parsedOk = true;
+      } catch (error) {
+        if (!(error as Error).message.includes("could not extract a timed track")) throw error;
+        console.warn(`  ~ ${label}: file has no track points, importing from csv row`);
+      }
+    }
+
+    if (parsedOk && parsed && fileBytes) {
+      const bytes = fileBytes;
 
       const hasGps = parsed.records.some((r) => r.lat !== null);
       const trim = hasGps && !noTrim ? DEFAULT_PRIVACY_TRIM_M : 0;
