@@ -72,6 +72,13 @@ function eventThumb(e: AdminCalendarEvent): string | undefined {
   return "thumb" in e ? e.thumb : undefined;
 }
 
+// route thumbs through the next/image optimizer so tiny cells never download
+// full-resolution originals (photos are stored at ≤2000px; a 12-month grid
+// would otherwise eagerly fetch tens of mb). w must be a default size bucket.
+function thumbUrl(thumb: string, w: 64 | 96 | 128 | 384): string {
+  return `/_next/image?url=${encodeURIComponent(thumb)}&w=${w}&q=50`;
+}
+
 function ymKey(year: number, month: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}`;
 }
@@ -95,7 +102,8 @@ function monthCells(year: number, month: number): (string | null)[] {
   ];
 }
 
-// blurred cover painted behind a day cell's symbols
+// blurred cover painted behind a day cell's symbols. optimizer-resized and
+// css-quoted; a broken url degrades invisibly (background just doesn't paint)
 function ThumbBackdrop({ thumb, blur = 2 }: { thumb: string; blur?: number }) {
   return (
     <span
@@ -103,12 +111,38 @@ function ThumbBackdrop({ thumb, blur = 2 }: { thumb: string; blur?: number }) {
       style={{
         position: "absolute",
         inset: 0,
-        backgroundImage: `url(${thumb})`,
+        backgroundImage: `url("${thumbUrl(thumb, 64)}")`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         filter: `blur(${blur}px) brightness(0.55)`,
         transform: "scale(1.15)", // hide blur edge bleed
       }}
+    />
+  );
+}
+
+// day-list / detail thumbnail with a quiet fallback to the kind icon when the
+// underlying image is gone (deleted blob, typo'd cover path)
+function SafeThumb({ thumb, icon, size = 48 }: { thumb?: string; icon: string; size?: number }) {
+  const [broken, setBroken] = useState(false);
+  if (!thumb || broken) {
+    return (
+      <span
+        className="rounded flex items-center justify-center"
+        style={{ width: size, height: size, border: "1px solid var(--theme-highlight-bg)", flexShrink: 0 }}
+      >
+        <Image src={icon} alt="" width={Math.round(size * 0.42)} height={Math.round(size * 0.42)} />
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- already optimizer-resized via thumbUrl
+    <img
+      src={thumbUrl(thumb, 96)}
+      alt=""
+      onError={() => setBroken(true)}
+      className="rounded"
+      style={{ width: size, height: size, objectFit: "cover", flexShrink: 0 }}
     />
   );
 }
@@ -176,7 +210,7 @@ export default function AdminCalendar() {
     const dayEvents = byDate.get(view.date) ?? [];
     const d = new Date(view.date + "T12:00:00");
     return (
-      <div className="flex flex-col" style={{ gap: "8px", maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
+      <div className="flex flex-col" style={{ gap: "8px", maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>
         <BackRow
           onBack={() => setView({ level: "month", year: d.getFullYear(), month: d.getMonth() })}
           label={d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toLowerCase()}
@@ -190,17 +224,7 @@ export default function AdminCalendar() {
               className="card-bg-hover rounded-lg flex items-center text-left"
               style={{ padding: "8px 10px", gap: "10px" }}
             >
-              {thumb ? (
-                // eslint-disable-next-line @next/next/no-img-element -- small pre-sized thumbs, quota protection
-                <img src={thumb} alt="" className="rounded" style={{ width: 48, height: 48, objectFit: "cover", flexShrink: 0 }} />
-              ) : (
-                <span
-                  className="rounded flex items-center justify-center"
-                  style={{ width: 48, height: 48, border: "1px solid var(--theme-highlight-bg)", flexShrink: 0 }}
-                >
-                  <Image src={eventIcon(e)} alt="" width={20} height={20} />
-                </span>
-              )}
+              <SafeThumb thumb={thumb} icon={eventIcon(e)} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="font-sans text-off-white text-sm block truncate">{eventLabel(e)}</span>
                 <span className="font-sans text-gray text-xs">
@@ -438,8 +462,16 @@ function EventDetail({ event: e, onBack }: { event: AdminCalendarEvent; onBack: 
 
       {/* header image for image-carrying entries */}
       {thumb && e.kind !== "activity" && (
-        // eslint-disable-next-line @next/next/no-img-element -- pre-sized covers, quota protection
-        <img src={thumb} alt="" className="rounded-lg" style={{ maxHeight: 220, objectFit: "cover", width: "100%" }} />
+        // eslint-disable-next-line @next/next/no-img-element -- optimizer-resized via thumbUrl
+        <img
+          src={thumbUrl(thumb, 384)}
+          alt=""
+          onError={(ev) => {
+            ev.currentTarget.style.display = "none";
+          }}
+          className="rounded-lg"
+          style={{ maxHeight: 220, objectFit: "cover", width: "100%" }}
+        />
       )}
 
       {/* activity enhancement: route + photos */}
@@ -451,8 +483,17 @@ function EventDetail({ event: e, onBack }: { event: AdminCalendarEvent; onBack: 
       {e.kind === "activity" && activityExtra && activityExtra.photos.length > 0 && (
         <div className="flex" style={{ gap: "6px", overflowX: "auto" }}>
           {activityExtra.photos.map((p, i) => (
-            // eslint-disable-next-line @next/next/no-img-element -- pre-downscaled photos, quota protection
-            <img key={i} src={p.url} alt="" className="rounded" style={{ width: 64, height: 64, objectFit: "cover", flexShrink: 0 }} />
+            // eslint-disable-next-line @next/next/no-img-element -- optimizer-resized via thumbUrl
+            <img
+              key={i}
+              src={thumbUrl(p.url, 128)}
+              alt=""
+              onError={(ev) => {
+                ev.currentTarget.style.display = "none";
+              }}
+              className="rounded"
+              style={{ width: 64, height: 64, objectFit: "cover", flexShrink: 0 }}
+            />
           ))}
         </div>
       )}

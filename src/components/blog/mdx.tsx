@@ -35,13 +35,25 @@ export function Figure({ src, alt, caption }: FigureProps) {
   const isLocal = src.startsWith("/");
   const altText = alt ?? caption ?? "";
 
+  // a local path that doesn't exist under /public must never crash a build:
+  // covers are free-text frontmatter, and one typo'd path would otherwise fail
+  // the prerender of every page that renders it. degrade to a plain <img>.
+  let dims: { width: number; height: number } | null = null;
+  if (isLocal) {
+    try {
+      dims = localDimensions(src);
+    } catch {
+      dims = null;
+    }
+  }
+
   return (
     <figure className="blog-figure">
-      {isLocal ? (
+      {isLocal && dims ? (
         <Image
           src={src}
           alt={altText}
-          {...localDimensions(src)}
+          {...dims}
           sizes="(max-width: 720px) 100vw, 720px"
           style={{ width: "100%", height: "auto", borderRadius: 8 }}
         />
