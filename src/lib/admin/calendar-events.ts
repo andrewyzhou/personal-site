@@ -37,18 +37,25 @@ async function activityEvents(from: string, to: string): Promise<AdminCalendarEv
     })
     .from(activities)
     .where(and(eq(activities.hidden, false), gte(activities.localDate, `${from}-01`), lte(activities.localDate, `${to}-31`)))
-    .orderBy(desc(activities.localDate));
+    // localTime + id tiebreakers keep same-date ordering (and therefore the
+    // day-cell thumbnail choice) deterministic across refetches
+    .orderBy(desc(activities.localDate), desc(activities.localTime), asc(activities.id));
 
-  // first photo per activity in range → day-cell thumbnail
+  // first photo per activity in range → day-cell thumbnail. decoration only:
+  // a failure here degrades to thumbless events, never kills the source
   const firstPhoto = new Map<number, string>();
   if (rows.length > 0) {
-    const photoRows = await db
-      .select({ activityId: activityPhotos.activityId, url: activityPhotos.blobUrl })
-      .from(activityPhotos)
-      .where(inArray(activityPhotos.activityId, rows.map((r) => r.id)))
-      .orderBy(asc(activityPhotos.activityId), asc(activityPhotos.position));
-    for (const p of photoRows) {
-      if (!firstPhoto.has(p.activityId)) firstPhoto.set(p.activityId, p.url);
+    try {
+      const photoRows = await db
+        .select({ activityId: activityPhotos.activityId, url: activityPhotos.blobUrl })
+        .from(activityPhotos)
+        .where(inArray(activityPhotos.activityId, rows.map((r) => r.id)))
+        .orderBy(asc(activityPhotos.activityId), asc(activityPhotos.position));
+      for (const p of photoRows) {
+        if (!firstPhoto.has(p.activityId)) firstPhoto.set(p.activityId, p.url);
+      }
+    } catch (error) {
+      log.warn("admin:calendar", "photo thumbnail query failed, serving thumbless activities", error);
     }
   }
 
