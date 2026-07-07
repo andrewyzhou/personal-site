@@ -72,7 +72,7 @@ export async function GET() {
 
 // POST: admin-only force sync from GitHub
 export async function POST(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return unauthorizedResponse();
   }
 
