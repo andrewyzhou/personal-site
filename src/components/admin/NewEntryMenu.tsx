@@ -6,7 +6,8 @@ import Link from "next/link";
 const ENTRIES = [
   { label: "blog post", href: "/admin/content/blog/new" },
   { label: "library entry", href: "/admin/content/library/new" },
-  { label: "photo essay", href: "/admin/content/photos/new" },
+  { label: "photo essay", href: "/admin/essays/new" },
+  { label: "classic photoset", href: "/admin/content/photos/new" },
   { label: "activity", href: "/admin/upload" },
   { label: "leetcode solution", href: "/admin/leetcode/new" },
   { label: "work item", href: "/admin/content/work/new" },
