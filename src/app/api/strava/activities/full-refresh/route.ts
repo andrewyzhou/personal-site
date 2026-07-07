@@ -22,7 +22,7 @@ const CACHE_KEY = "strava_activities";
 // old delete-first version wiped the whole activity history when the strava api
 // died mid-refresh.
 export async function POST(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return unauthorizedResponse();
   }
 

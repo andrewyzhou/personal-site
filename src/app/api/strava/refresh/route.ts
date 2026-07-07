@@ -21,7 +21,7 @@ interface StoredActivities {
 // admin-only full re-fetch. never deletes before writing: the old delete-first
 // version wiped the whole activity history when the strava api died mid-refresh.
 export async function POST(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return unauthorizedResponse();
   }
 
