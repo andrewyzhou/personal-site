@@ -69,6 +69,13 @@ behind admin auth (workstream 2).
 
 maps the original items 1–12 into ordered, dependency-aware groups.
 
+implementation-ready design docs (2026-07-06, written against the locked
+decisions in §6 and the research in docs/research/):
+[ws2 activity platform](plans/ws2-activity-platform.md) ·
+[ws3 admin cms](plans/ws3-admin-cms.md) ·
+[ws5 engagement](plans/ws5-engagement.md) ·
+[ws6 content model](plans/ws6-content-model.md)
+
 ### WS0 — stabilize (no architecture decisions needed) — items 1, 3, 4, 10
 
 > constraint (2026-07-06): **no styling / inline-css refactors in this phase.**
