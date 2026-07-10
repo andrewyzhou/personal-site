@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   images: {
     // photo-essay images served from r2 via the custom domain
     remotePatterns: [{ protocol: "https", hostname: "cdn.andrewzhou.org" }],
+    // next 16 rejects any quality not listed here (default [75]); the admin
+    // calendar requests q=50 for its tiny day-cell thumbnails
+    qualities: [50, 75],
   },
 };
 
