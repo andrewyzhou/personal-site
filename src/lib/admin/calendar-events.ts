@@ -11,7 +11,7 @@ import { CONTENT_TYPES } from "./content-registry";
 import { log } from "@/lib/log";
 
 export type AdminCalendarEvent =
-  | { kind: "activity"; id: number; date: string; startTime: string; type: string; name: string; thumb?: string }
+  | { kind: "activity"; id: number; date: string; startTime: string; type: string; name: string; thumb?: string; routePolyline?: string }
   | { kind: "leetcode"; sha: string; date: string; problemNumber: number; problemTitle: string; difficulty: string; url: string }
   | { kind: "commit"; date: string; count: number }
   | { kind: "blog" | "library" | "photos"; slug: string; date: string; title: string; status: "published" | "wip"; thumb?: string };
@@ -34,6 +34,7 @@ async function activityEvents(from: string, to: string): Promise<AdminCalendarEv
       startTime: activities.localTime,
       type: activities.sportType,
       name: activities.name,
+      cardPolyline: activities.cardPolyline,
     })
     .from(activities)
     .where(and(eq(activities.hidden, false), gte(activities.localDate, `${from}-01`), lte(activities.localDate, `${to}-31`)))
@@ -59,9 +60,15 @@ async function activityEvents(from: string, to: string): Promise<AdminCalendarEv
     }
   }
 
-  return rows.map((r) => {
+  // a photo is the day-cell image when one exists; otherwise the route
+  // polyline lets the client draw the map rendering as the image
+  return rows.map(({ cardPolyline, ...r }) => {
     const thumb = firstPhoto.get(r.id);
-    return { kind: "activity" as const, ...r, ...(thumb ? { thumb } : {}) };
+    return {
+      kind: "activity" as const,
+      ...r,
+      ...(thumb ? { thumb } : cardPolyline ? { routePolyline: cardPolyline } : {}),
+    };
   });
 }
 
