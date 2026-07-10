@@ -264,6 +264,12 @@ body {
   filter: invert(1);
 }
 
+/* svg route data-uris (admin calendar thumbs) are stroked #EEEEEE like the
+   icon set, so they invert the same way in light mode */
+.theme-light .route-uri-thumb {
+  filter: invert(1);
+}
+
 /* ============================================
    STRAVA CALENDAR
    ============================================ */
