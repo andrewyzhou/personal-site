@@ -1,4 +1,5 @@
 import { decodePolyline } from "@/lib/polyline";
+import { quadraticPathD } from "@/lib/route-smooth";
 
 // self-contained svg route rendered as a data uri, for places that need the
 // route as an *image url* (css backgrounds, <img> src) rather than a react
@@ -28,15 +29,13 @@ export function routeThumbDataUri(polyline: string): string | null {
   const pad = Math.max(w, h) * 0.08;
 
   // rescale to a ~100-unit viewbox so coordinates serialize short (2 decimals)
-  // and the data uri stays ~1kb for a 100-point card polyline
+  // and the data uri stays a few kb for a 100-point card polyline. midpoint
+  // quadratic smoothing rounds the ~20m-apart gps corners at thumbnail scale.
   const scale = 100 / Math.max(w, h);
-  const d = pts
-    .map((_, i) => {
-      const x = ((xs[i] - minX + pad) * scale).toFixed(2);
-      const y = ((ys[i] - minY + pad) * scale).toFixed(2);
-      return `${i === 0 ? "M" : "L"}${x} ${y}`;
-    })
-    .join("");
+  const d = quadraticPathD(
+    pts.map((_, i): [number, number] => [(xs[i] - minX + pad) * scale, (ys[i] - minY + pad) * scale]),
+    2
+  );
 
   const vw = ((w + 2 * pad) * scale).toFixed(2);
   const vh = ((h + 2 * pad) * scale).toFixed(2);
