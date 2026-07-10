@@ -342,32 +342,53 @@ export default function AdminCalendar() {
             ))}
             {cells.map((date, i) => {
               const dayEvents = date ? byDate.get(date) ?? [] : [];
-              const thumb = dayThumb(dayEvents);
-              const shown = dayEvents.slice(0, 3);
+              const thumbs = dayEvents.map(eventThumb).filter((t): t is string => Boolean(t));
+              const photo = thumbs.find((t) => !isRouteThumb(t));
+              const route = thumbs.find((t) => isRouteThumb(t));
+              const shown = dayEvents.slice(0, 2);
+              // quadrant square: side calc(50% - 10px) → 6px gap to the cell
+              // edges, 4px to the midline on each axis (8px between squares)
+              const quadrant: React.CSSProperties = {
+                position: "absolute",
+                bottom: 6,
+                width: "calc(50% - 10px)",
+                height: "calc(50% - 10px)",
+                border: "1px solid var(--theme-highlight-bg)",
+              };
               return (
                 <button
                   key={i}
                   onClick={() => date && dayEvents.length > 0 && setView({ level: "day", date })}
                   disabled={!date || dayEvents.length === 0}
                   title={dayEvents.map(eventLabel).join("\n")}
-                  className="rounded flex flex-col"
+                  className="rounded"
                   style={{
                     aspectRatio: "1",
                     backgroundColor: date ? "var(--theme-highlight-bg)" : "transparent",
                     position: "relative",
                     overflow: "hidden",
-                    padding: "4px 6px",
-                    textAlign: "left",
-                    alignItems: "stretch",
                   }}
                 >
-                  {thumb && <ThumbBackdrop thumb={thumb} />}
-                  {date && (
-                    <span className="font-sans text-gray" style={{ fontSize: "0.7rem", zIndex: 1 }}>
-                      {Number(date.slice(-2))}
-                    </span>
-                  )}
-                  <span className="flex flex-col" style={{ gap: "2px", zIndex: 1, marginTop: "2px", minHeight: 0 }}>
+                  {/* top half: date + event rows, hard-capped at the midline */}
+                  <span
+                    className="flex flex-col"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: "50%",
+                      padding: "4px 6px",
+                      gap: "2px",
+                      overflow: "hidden",
+                      textAlign: "left",
+                    }}
+                  >
+                    {date && (
+                      <span className="font-sans text-gray" style={{ fontSize: "0.7rem", lineHeight: 1 }}>
+                        {Number(date.slice(-2))}
+                      </span>
+                    )}
                     {shown.map((ev, j) => (
                       <span key={j} className="flex items-center" style={{ gap: "4px", minWidth: 0 }}>
                         <Image src={eventIcon(ev)} alt={ev.kind} width={12} height={12} style={{ flexShrink: 0 }} />
@@ -383,6 +404,34 @@ export default function AdminCalendar() {
                       </span>
                     )}
                   </span>
+                  {/* bottom-left quadrant: the day's photo/cover */}
+                  {photo && (
+                    // eslint-disable-next-line @next/next/no-img-element -- optimizer-resized via thumbUrl
+                    <img
+                      src={thumbUrl(photo, 96)}
+                      alt=""
+                      onError={(ev) => {
+                        ev.currentTarget.style.display = "none";
+                      }}
+                      className="rounded hidden sm:block"
+                      style={{ ...quadrant, left: 6, objectFit: "cover" }}
+                    />
+                  )}
+                  {/* bottom-right quadrant: the day's route rendering */}
+                  {route && (
+                    <span className="rounded hidden sm:flex items-center justify-center" style={{ ...quadrant, right: 6, padding: 4 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- inline svg data uri */}
+                      <img
+                        src={route}
+                        alt=""
+                        onError={(ev) => {
+                          ev.currentTarget.parentElement!.style.display = "none";
+                        }}
+                        className="route-uri-thumb"
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      />
+                    </span>
+                  )}
                 </button>
               );
             })}
