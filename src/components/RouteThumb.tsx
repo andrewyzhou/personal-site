@@ -1,4 +1,5 @@
 import { decodePolyline } from "@/lib/polyline";
+import { quadraticPathD } from "@/lib/route-smooth";
 
 // zero-dependency inline svg route thumbnail. equirectangular projection is
 // plenty at activity scale. inline svg themes via the css variable directly —
@@ -30,9 +31,12 @@ export default function RouteThumb({
   const h = maxY - minY || 1e-6;
   const pad = Math.max(w, h) * 0.05;
 
-  const d = pts
-    .map((_, i) => `${i === 0 ? "M" : "L"}${(xs[i] - minX + pad).toFixed(6)} ${(ys[i] - minY + pad).toFixed(6)}`)
-    .join("");
+  // midpoint quadratic smoothing: gps points land ~20m apart (smart
+  // recording), so straight chords read jagged at thumbnail scale
+  const d = quadraticPathD(
+    pts.map((_, i): [number, number] => [xs[i] - minX + pad, ys[i] - minY + pad]),
+    6
+  );
 
   return (
     <svg

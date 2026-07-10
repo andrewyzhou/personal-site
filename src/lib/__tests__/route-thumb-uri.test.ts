@@ -17,9 +17,9 @@ describe("routeThumbDataUri", () => {
     const svg = decodeURIComponent(uri!.slice("data:image/svg+xml,".length));
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
     expect(svg).toContain('stroke="#EEEEEE"');
-    expect(svg).toMatch(/<path d="M[\d.]+ [\d.]+L/);
-    // 5 points → M + 4 L segments
-    expect(svg.match(/L/g)).toHaveLength(4);
+    // midpoint quadratic smoothing: 5 points → M + 3 Q segments, no chords
+    expect(svg).toMatch(/<path d="M[\d.]+ [\d.]+Q/);
+    expect(svg.match(/Q/g)).toHaveLength(3);
   });
 
   it("scales coordinates into a ~100-unit viewbox regardless of route size", () => {
