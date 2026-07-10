@@ -83,6 +83,27 @@ describe("getCalendarEvents", () => {
     const activity = payload.events.find((e) => e.kind === "activity");
     expect(activity).toBeDefined();
     expect(activity && "thumb" in activity).toBe(false);
+    expect(activity && "routePolyline" in activity).toBe(false);
+  });
+
+  it("photo-less gps activities carry routePolyline so the client can draw the map", async () => {
+    queue.push([{ id: 5, date: "2026-06-10", startTime: "07:00", type: "Run", name: "run", cardPolyline: "abc123" }], []);
+    const payload = await getCalendarEvents("2026-06", "2026-06");
+    const activity = payload.events.find((e) => e.kind === "activity");
+    expect(activity && "routePolyline" in activity && activity.routePolyline).toBe("abc123");
+    expect(activity && "thumb" in activity).toBe(false);
+    expect(activity && "cardPolyline" in activity).toBe(false); // raw column never leaks
+  });
+
+  it("a photo thumb wins over the route polyline", async () => {
+    queue.push(
+      [{ id: 6, date: "2026-06-10", startTime: "07:00", type: "Run", name: "run", cardPolyline: "abc123" }],
+      [{ activityId: 6, url: "https://cdn.andrewzhou.org/p.jpg" }]
+    );
+    const payload = await getCalendarEvents("2026-06", "2026-06");
+    const activity = payload.events.find((e) => e.kind === "activity");
+    expect(activity && "thumb" in activity && activity.thumb).toBe("https://cdn.andrewzhou.org/p.jpg");
+    expect(activity && "routePolyline" in activity).toBe(false);
   });
 
   it("photo-thumbnail query failure degrades to thumbless events, not a dead source (review finding)", async () => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import RouteThumb from "@/components/RouteThumb";
+import { routeThumbDataUri } from "@/lib/route-thumb-uri";
 import type { AdminCalendarEvent } from "@/lib/admin/calendar-events";
 
 // unified multi-month admin calendar: every event kind with per-kind symbols
@@ -68,14 +69,35 @@ function eventLabel(e: AdminCalendarEvent): string {
   }
 }
 
+// svg data uris are the client-drawn route renderings; real photos/covers are
+// remote urls. the distinction drives styling (contain vs cover, theme invert)
+const isRouteThumb = (t: string) => t.startsWith("data:");
+
+// memoized per polyline string: cells re-derive thumbs on every repaint
+const routeUriCache = new Map<string, string | null>();
+function routeUri(polyline: string): string | undefined {
+  if (!routeUriCache.has(polyline)) routeUriCache.set(polyline, routeThumbDataUri(polyline));
+  return routeUriCache.get(polyline) ?? undefined;
+}
+
 function eventThumb(e: AdminCalendarEvent): string | undefined {
-  return "thumb" in e ? e.thumb : undefined;
+  if ("thumb" in e && e.thumb) return e.thumb;
+  if (e.kind === "activity" && e.routePolyline) return routeUri(e.routePolyline);
+  return undefined;
+}
+
+// day-cell image: prefer an actual photo/cover over a route rendering
+function dayThumb(dayEvents: AdminCalendarEvent[]): string | undefined {
+  const thumbs = dayEvents.map(eventThumb).filter((t): t is string => Boolean(t));
+  return thumbs.find((t) => !isRouteThumb(t)) ?? thumbs[0];
 }
 
 // route thumbs through the next/image optimizer so tiny cells never download
 // full-resolution originals (photos are stored at ≤2000px; a 12-month grid
 // would otherwise eagerly fetch tens of mb). w must be a default size bucket.
+// data uris are already tiny final images — they pass through untouched.
 function thumbUrl(thumb: string, w: 64 | 96 | 128 | 384): string {
+  if (isRouteThumb(thumb)) return thumb;
   return `/_next/image?url=${encodeURIComponent(thumb)}&w=${w}&q=50`;
 }
 
@@ -102,27 +124,34 @@ function monthCells(year: number, month: number): (string | null)[] {
   ];
 }
 
-// blurred cover painted behind a day cell's symbols. optimizer-resized and
-// css-quoted; a broken url degrades invisibly (background just doesn't paint)
+// image painted behind a day cell's symbols. photos blur + dim so the icons
+// stay legible; route renderings draw crisp at reduced opacity (a blurred line
+// is just a smudge). optimizer-resized and css-quoted; a broken url degrades
+// invisibly (background just doesn't paint)
 function ThumbBackdrop({ thumb, blur = 2 }: { thumb: string; blur?: number }) {
+  const route = isRouteThumb(thumb);
   return (
     <span
       aria-hidden
+      className={route ? "route-uri-thumb" : undefined}
       style={{
         position: "absolute",
-        inset: 0,
+        inset: route ? "14%" : 0,
         backgroundImage: `url("${thumbUrl(thumb, 64)}")`,
-        backgroundSize: "cover",
+        backgroundSize: route ? "contain" : "cover",
+        backgroundRepeat: "no-repeat",
         backgroundPosition: "center",
-        filter: `blur(${blur}px) brightness(0.55)`,
-        transform: "scale(1.15)", // hide blur edge bleed
+        ...(route
+          ? { opacity: 0.55 }
+          : { filter: `blur(${blur}px) brightness(0.55)`, transform: "scale(1.15)" /* hide blur edge bleed */ }),
       }}
     />
   );
 }
 
 // day-list / detail thumbnail with a quiet fallback to the kind icon when the
-// underlying image is gone (deleted blob, typo'd cover path)
+// underlying image is gone (deleted blob, typo'd cover path). route renderings
+// sit bordered like the icon fallback instead of cropping to a square.
 function SafeThumb({ thumb, icon, size = 48 }: { thumb?: string; icon: string; size?: number }) {
   const [broken, setBroken] = useState(false);
   if (!thumb || broken) {
@@ -132,6 +161,23 @@ function SafeThumb({ thumb, icon, size = 48 }: { thumb?: string; icon: string; s
         style={{ width: size, height: size, border: "1px solid var(--theme-highlight-bg)", flexShrink: 0 }}
       >
         <Image src={icon} alt="" width={Math.round(size * 0.42)} height={Math.round(size * 0.42)} />
+      </span>
+    );
+  }
+  if (isRouteThumb(thumb)) {
+    return (
+      <span
+        className="rounded flex items-center justify-center"
+        style={{ width: size, height: size, border: "1px solid var(--theme-highlight-bg)", flexShrink: 0, padding: 5 }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- inline svg data uri */}
+        <img
+          src={thumb}
+          alt=""
+          onError={() => setBroken(true)}
+          className="route-uri-thumb"
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        />
       </span>
     );
   }
@@ -147,12 +193,18 @@ function SafeThumb({ thumb, icon, size = 48 }: { thumb?: string; icon: string; s
   );
 }
 
+const MAX_MONTHS = 24;
+
 export default function AdminCalendar() {
   const [monthCount, setMonthCount] = useState(6);
   const [events, setEvents] = useState<AdminCalendarEvent[]>([]);
   const [failedSources, setFailedSources] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<View>({ level: "grid" });
+  // land on the big single-month view of the current month
+  const [view, setView] = useState<View>(() => {
+    const now = new Date();
+    return { level: "month", year: now.getFullYear(), month: now.getMonth() };
+  });
 
   const months = useMemo(() => monthsBack(monthCount), [monthCount]);
 
@@ -244,53 +296,93 @@ export default function AdminCalendar() {
   }
 
   // ------------------------------------------------------------------ month
+  // the primary view: one big month at full breakout width, every day cell
+  // listing exactly what was posted (icon + title rows over the day's image)
   if (view.level === "month") {
     const { year, month } = view;
     const cells = monthCells(year, month);
+    const now = new Date();
+    const atCurrent = year === now.getFullYear() && month === now.getMonth();
+    const go = (delta: number) => {
+      const d = new Date(year, month + delta, 1);
+      // widen the fetch window when stepping past the oldest loaded month
+      const needed = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth()) + 1;
+      if (needed > monthCount) setMonthCount(Math.min(Math.max(needed, monthCount + 6), MAX_MONTHS));
+      setView({ level: "month", year: d.getFullYear(), month: d.getMonth() });
+    };
     return (
       <div style={BREAKOUT}>
-        <div className="flex flex-col" style={{ gap: "10px", maxWidth: 720, marginLeft: "auto", marginRight: "auto" }}>
-          <BackRow onBack={() => setView({ level: "grid" })} label={`${MONTHS[month]} ${year}`} />
-          <div className="grid grid-cols-7 gap-1">
+        <div className="flex flex-col" style={{ gap: "10px" }}>
+          <div className="flex items-center justify-between">
+            <button onClick={() => setView({ level: "grid" })} className="font-sans text-gray text-sm link-highlight">
+              all months
+            </button>
+            <div className="flex items-center" style={{ gap: "16px" }}>
+              <button onClick={() => go(-1)} aria-label="previous month" className="font-sans text-gray text-base link-highlight">
+                ‹
+              </button>
+              <span className="font-sans text-off-white text-base" style={{ minWidth: 130, textAlign: "center" }}>
+                {MONTHS[month]} {year}
+              </span>
+              <button
+                onClick={() => go(1)}
+                disabled={atCurrent}
+                aria-label="next month"
+                className="font-sans text-gray text-base link-highlight"
+                style={{ opacity: atCurrent ? 0.3 : 1 }}
+              >
+                ›
+              </button>
+            </div>
+            <div style={{ width: 72 }} />
+          </div>
+          <div className="grid grid-cols-7" style={{ gap: "6px" }}>
             {DAYS.map((d, i) => (
               <div key={i} className="font-sans text-gray text-xs text-center">{d}</div>
             ))}
             {cells.map((date, i) => {
               const dayEvents = date ? byDate.get(date) ?? [] : [];
-              const kinds = [...new Set(dayEvents.map((e) => e.kind))];
-              const thumb = dayEvents.map(eventThumb).find(Boolean);
+              const thumb = dayThumb(dayEvents);
+              const shown = dayEvents.slice(0, 3);
               return (
                 <button
                   key={i}
                   onClick={() => date && dayEvents.length > 0 && setView({ level: "day", date })}
                   disabled={!date || dayEvents.length === 0}
                   title={dayEvents.map(eventLabel).join("\n")}
-                  className="rounded flex flex-col items-center justify-center"
+                  className="rounded flex flex-col"
                   style={{
                     aspectRatio: "1",
                     backgroundColor: date ? "var(--theme-highlight-bg)" : "transparent",
                     position: "relative",
                     overflow: "hidden",
+                    padding: "4px 6px",
+                    textAlign: "left",
+                    alignItems: "stretch",
                   }}
                 >
                   {thumb && <ThumbBackdrop thumb={thumb} />}
                   {date && (
-                    <span className="font-sans text-gray" style={{ fontSize: "0.65rem", position: "absolute", top: 3, left: 5, zIndex: 1 }}>
+                    <span className="font-sans text-gray" style={{ fontSize: "0.7rem", zIndex: 1 }}>
                       {Number(date.slice(-2))}
                     </span>
                   )}
-                  {kinds.length > 0 && (
-                    <span className="flex flex-wrap items-center justify-center" style={{ gap: "3px", zIndex: 1, padding: "0 4px" }}>
-                      {kinds.slice(0, 4).map((k) => (
-                        <Image key={k} src={eventIcon(dayEvents.find((e) => e.kind === k)!)} alt={k} width={14} height={14} />
-                      ))}
-                    </span>
-                  )}
-                  {dayEvents.length > 1 && (
-                    <span className="font-sans text-gray" style={{ fontSize: "0.6rem", position: "absolute", top: 3, right: 4, zIndex: 1 }}>
-                      {dayEvents.length}
-                    </span>
-                  )}
+                  <span className="flex flex-col" style={{ gap: "2px", zIndex: 1, marginTop: "2px", minHeight: 0 }}>
+                    {shown.map((ev, j) => (
+                      <span key={j} className="flex items-center" style={{ gap: "4px", minWidth: 0 }}>
+                        <Image src={eventIcon(ev)} alt={ev.kind} width={12} height={12} style={{ flexShrink: 0 }} />
+                        {/* titles need room — phones keep just the icons */}
+                        <span className="font-sans text-off-white truncate hidden sm:inline" style={{ fontSize: "0.62rem" }}>
+                          {eventLabel(ev)}
+                        </span>
+                      </span>
+                    ))}
+                    {dayEvents.length > shown.length && (
+                      <span className="font-sans text-gray hidden sm:inline" style={{ fontSize: "0.6rem" }}>
+                        +{dayEvents.length - shown.length} more
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
@@ -322,7 +414,7 @@ export default function AdminCalendar() {
                     if (!date) return <div key={`pad-${i}`} style={{ aspectRatio: "1" }} />;
                     const dayEvents = byDate.get(date) ?? [];
                     const kinds = [...new Set(dayEvents.map((e) => e.kind))];
-                    const thumb = dayEvents.map(eventThumb).find(Boolean);
+                    const thumb = dayThumb(dayEvents);
                     return (
                       <button
                         key={date}
@@ -365,10 +457,10 @@ export default function AdminCalendar() {
         </div>
         <div className="flex items-center justify-between flex-wrap" style={{ gap: "10px" }}>
           <button
-            onClick={() => setMonthCount((c) => Math.min(c + 6, 12))}
-            disabled={monthCount >= 12}
+            onClick={() => setMonthCount((c) => Math.min(c + 6, MAX_MONTHS))}
+            disabled={monthCount >= MAX_MONTHS}
             className="font-sans text-gray text-sm link-highlight"
-            style={{ opacity: monthCount >= 12 ? 0.4 : 1 }}
+            style={{ opacity: monthCount >= MAX_MONTHS ? 0.4 : 1 }}
           >
             load earlier
           </button>
@@ -474,10 +566,12 @@ function EventDetail({ event: e, onBack }: { event: AdminCalendarEvent; onBack: 
         />
       )}
 
-      {/* activity enhancement: route + photos */}
-      {e.kind === "activity" && activityExtra?.cardPolyline && (
+      {/* activity enhancement: route + photos. the event's own polyline (when
+          present) renders instantly; the fetch covers photographed activities
+          whose events carry a photo thumb instead */}
+      {e.kind === "activity" && (activityExtra?.cardPolyline ?? e.routePolyline) && (
         <div className="card-bg rounded-lg flex justify-center" style={{ padding: "0.75rem" }}>
-          <RouteThumb polyline={activityExtra.cardPolyline} height={90} />
+          <RouteThumb polyline={(activityExtra?.cardPolyline ?? e.routePolyline)!} height={90} />
         </div>
       )}
       {e.kind === "activity" && activityExtra && activityExtra.photos.length > 0 && (
