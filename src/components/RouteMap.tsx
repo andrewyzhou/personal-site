@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import RouteThumb from "./RouteThumb";
 import { encodePolyline, decodePolyline } from "@/lib/polyline";
+import { chaikin } from "@/lib/route-smooth";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 interface RouteMapProps {
@@ -69,12 +70,15 @@ export default function RouteMap({ polyline, fullTrack, keptTrack, bounds, heigh
 
         map.on("load", () => {
           if (timeout) clearTimeout(timeout);
+          // maplibre draws straight chords between vertices, and smart
+          // recording spaces gps points ~20m apart — chaikin subdivision
+          // rounds the corners in geometry (line-join only rounds the caps)
           const toGeojson = (pts: [number, number][]) => ({
             type: "Feature" as const,
             properties: {},
             geometry: {
               type: "LineString" as const,
-              coordinates: pts.map(([lat, lng]) => [lng, lat]),
+              coordinates: chaikin(pts).map(([lat, lng]) => [lng, lat]),
             },
           });
 
@@ -131,7 +135,7 @@ export default function RouteMap({ polyline, fullTrack, keptTrack, bounds, heigh
       src.setData({
         type: "Feature",
         properties: {},
-        geometry: { type: "LineString", coordinates: keptTrack.map(([lat, lng]) => [lng, lat]) },
+        geometry: { type: "LineString", coordinates: chaikin(keptTrack).map(([lat, lng]) => [lng, lat]) },
       });
     }
   }, [keptTrack]);
