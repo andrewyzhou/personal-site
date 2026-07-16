@@ -101,11 +101,16 @@ body {
 }
 
 /* squares + spiral: same width and brightness, driven by the component's
-   STROKE_WIDTH / LINE_OPACITY knobs (css vars set on the svg root) */
+   STROKE_WIDTH / LINE_BRIGHTNESS knobs (css vars set on the svg root).
+   brightness mixes the stroke color toward the theme background instead of
+   using opacity, so overlapping lines don't compound darker. */
 .golden-logo .gl-line {
-  stroke: currentColor;
+  stroke: color-mix(
+    in oklab,
+    currentColor calc(var(--gl-line-brightness, 1) * 100%),
+    var(--theme-bg)
+  );
   stroke-width: var(--gl-stroke, 1px);
-  opacity: var(--gl-line-opacity, 1);
 }
 
 /* letters: bold EB Garamond glyphs, filled not stroked */

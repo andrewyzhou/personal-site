@@ -18,27 +18,29 @@
 const LETTERS = {
   horizontal: {
     fontSize: 450,
-    A: { x: 410, y: 350 }, // top-left 382 square (center 191,191)
-    Z: { x: 650, y: 500 }, // big right 618 square (center 691,309)
+    A: { x: 410, y: 340 }, // top-left 382 square (center 191,191)
+    Z: { x: 670, y: 520 }, // big right 618 square (center 691,309)
   },
   vertical: {
-    fontSize: 350,
-    A: { x: 309, y: 431 }, // top 618 square (center 309,309)
-    Z: { x: 427, y: 931 }, // bottom-right 382 square (center 427,809)
+    fontSize: 450,
+    A: { x: 190, y: 550 }, // top 618 square (center 309,309)
+    Z: { x: 440, y: 705 }, // bottom-right 382 square (center 427,809)
   },
 };
 
 // letter weight — eb garamond is variable 400-800:
 // 400 regular · 500 medium · 600 semibold · 700 bold · 800 extrabold
-const LETTER_WEIGHT = 500;
+const LETTER_WEIGHT = 700;
 
 // ═══════════════════════════════════════════════════════════════════
 // LINE CONTROLS
 // stroke width in on-screen pixels (strokes don't scale with logo size)
-// brightness: 0 = invisible → 1 = full; applies to squares AND curve
+// brightness: 0 = background color (invisible) → 1 = full theme color.
+// mixes the line COLOR toward the background (not opacity), so overlapping
+// lines never darken. applies to squares AND curve.
 // ═══════════════════════════════════════════════════════════════════
-const STROKE_WIDTH = { hero: 1, mark: 0.75 };
-const LINE_OPACITY = 1;
+const STROKE_WIDTH = { hero: 2, mark: 0.5 };
+const LINE_BRIGHTNESS = 0.5;
 
 // dot lap time in seconds (spiral + return leg through every square)
 const DOT_DUR = 10;
@@ -159,7 +161,7 @@ export default function GoldenLogo({
       style={
         {
           "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
-          "--gl-line-opacity": LINE_OPACITY,
+          "--gl-line-brightness": LINE_BRIGHTNESS,
         } as React.CSSProperties
       }
       fill="none"
