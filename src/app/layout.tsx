@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Funnel_Sans } from "next/font/google";
+import { EB_Garamond, Funnel_Sans } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -7,6 +7,14 @@ import "./globals.css";
 const funnelSans = Funnel_Sans({
   subsets: ["latin"],
   variable: "--font-funnel",
+  display: "swap",
+});
+
+// bold serif for the golden-logo letterforms
+const ebGaramond = EB_Garamond({
+  subsets: ["latin"],
+  weight: "700",
+  variable: "--font-garamond",
   display: "swap",
 });
 
@@ -27,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${funnelSans.variable} theme-dark`}>
+    <html lang="en" className={`${funnelSans.variable} ${ebGaramond.variable} theme-dark`}>
       <body className="antialiased">
         <ThemeProvider>
           {children}
