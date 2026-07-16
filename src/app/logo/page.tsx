@@ -14,7 +14,8 @@ export default function LogoPreview() {
         <GoldenLogo layout="horizontal" className="w-full gl-show-dots" />
         <p className="text-gray text-sm">horizontal — curve starts bottom right</p>
       </div>
-      <div className="flex flex-col items-center" style={{ gap: "1.25rem", width: "21rem", maxWidth: "70vw" }}>
+      {/* 36rem x 610/987 — exact transpose of the horizontal, so both render at identical scale */}
+      <div className="flex flex-col items-center" style={{ gap: "1.25rem", width: "22.25rem", maxWidth: "70vw" }}>
         <GoldenLogo layout="vertical" className="w-full gl-show-dots" />
         <p className="text-gray text-sm">vertical — curve starts top left</p>
       </div>
