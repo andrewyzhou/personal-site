@@ -150,6 +150,41 @@ body {
   opacity: 1;
 }
 
+/* comet streak: the track path dashed down to a short visible segment,
+   slid along the path on the same clock as the head dot */
+.golden-logo .gl-tail {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-dashoffset: var(--gl-tail-len);
+  animation: gl-tail-slide var(--gl-dot-dur, 10s) linear infinite;
+}
+
+.golden-logo .gl-dot-head {
+  offset-rotate: 0deg;
+  animation: gl-dot-ride var(--gl-dot-dur, 10s) linear infinite;
+}
+
+/* head position at time t is fraction t of the lap; the visible dash
+   segment [t - len, t] trails it. offset = len - t, wrapping each lap */
+@keyframes gl-tail-slide {
+  from {
+    stroke-dashoffset: var(--gl-tail-len);
+  }
+  to {
+    stroke-dashoffset: calc(var(--gl-tail-len) - 1);
+  }
+}
+
+@keyframes gl-dot-ride {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
 /* ============================================
    EQUALIZER (currently: music card)
    ============================================ */

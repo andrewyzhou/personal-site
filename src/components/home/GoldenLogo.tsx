@@ -5,9 +5,9 @@
 // algorithmically in generateCanonical()/buildLayout() below from the
 // fibonacci chain 610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5 — no
 // hand-plotted coordinates. letters are EB Garamond glyphs; draw-on
-// animation is pure CSS (see globals.css). on hover, two comet-tailed dots
-// loop a closed track: down the spiral, then back out through every square
-// via its bulge-side corner (3 corners per square).
+// animation is pure CSS (see globals.css). on hover, two dots trailing
+// continuous comet streaks loop a closed track: down the spiral, then back
+// out through every square via its bulge-side corner (3 corners per square).
 
 // ═══════════════════════════════════════════════════════════════════
 // LETTER CONTROLS — tweak these, preview live at /logo
@@ -50,10 +50,18 @@ const LINE_BRIGHTNESS = 0.5;
 const DOT_RADIUS = 4.5;
 // seconds per lap (spiral + return leg through every square)
 const DOT_DUR = 10;
-// comet tail: how many seconds of track the tail smears over, and how many
-// segments approximate it (more = smoother)
+// comet tail: a continuous streak — the track path itself, dashed so only a
+// short segment is visible, slid along the path in sync with the head dot.
+// TRAIL_SPAN = seconds of travel the tail covers (tail length).
+// layers stack to taper the streak: longer = thinner + fainter.
+// len is relative to TRAIL_SPAN, width relative to DOT_RADIUS.
 const TRAIL_SPAN = 0.6;
-const TRAIL_SEGMENTS = 12;
+const TAIL_LAYERS = [
+  { len: 1, width: 0.8, opacity: 0.1 },
+  { len: 0.7, width: 1.15, opacity: 0.14 },
+  { len: 0.45, width: 1.5, opacity: 0.18 },
+  { len: 0.25, width: 1.8, opacity: 0.24 },
+];
 
 // share of the lap spent on the curve — exact for any square count, since
 // each square contributes a quarter-arc (π/2)·s vs two sides 2·s
@@ -196,31 +204,34 @@ export default function GoldenLogo({
     style: { ...props.style, fontWeight: LETTER_WEIGHT },
   });
 
-  // one looping dot with a comet tail: TRAIL_SEGMENTS followers smeared over
-  // TRAIL_SPAN seconds of track, tapering in size and fading out
-  const dot = (begin: number) => (
-    <g className="gl-dot" key={begin}>
-      <circle r={DOT_RADIUS} fill="currentColor">
-        <animateMotion dur={`${DOT_DUR}s`} repeatCount="indefinite" begin={`${begin}s`} path={geo.track} />
-      </circle>
-      {Array.from({ length: TRAIL_SEGMENTS }, (_, i) => {
-        const f = (i + 1) / (TRAIL_SEGMENTS + 1); // 0 → head, 1 → tail tip
+  // one looping dot with a continuous comet streak. the tail is the track
+  // path itself, dash-normalized (pathLength=1) so only a `len`-long segment
+  // is visible, slid along the path by the gl-tail-slide keyframes. the head
+  // rides the same path via css offset-path on the same clock, so head and
+  // tail can never drift apart. `delay` (negative) sets the start position.
+  const dot = (delay: number) => (
+    <g className="gl-dot" key={delay}>
+      {TAIL_LAYERS.map((l, i) => {
+        const len = (TRAIL_SPAN / DOT_DUR) * l.len; // fraction of the lap
         return (
-          <circle
+          <path
             key={i}
-            r={DOT_RADIUS * (1 - 0.7 * f)}
-            fill="currentColor"
-            opacity={0.5 * Math.pow(1 - f, 1.6)}
-          >
-            <animateMotion
-              dur={`${DOT_DUR}s`}
-              repeatCount="indefinite"
-              begin={`${begin + f * TRAIL_SPAN}s`}
-              path={geo.track}
-            />
-          </circle>
+            className="gl-tail"
+            d={geo.track}
+            pathLength={1}
+            strokeWidth={DOT_RADIUS * l.width}
+            opacity={l.opacity}
+            strokeDasharray={`${len} ${1 - len}`}
+            style={{ "--gl-tail-len": len, animationDelay: `${delay}s` } as React.CSSProperties}
+          />
         );
       })}
+      <circle
+        className="gl-dot-head"
+        r={DOT_RADIUS}
+        fill="currentColor"
+        style={{ offsetPath: `path("${geo.track}")`, animationDelay: `${delay}s` } as React.CSSProperties}
+      />
     </g>
   );
 
@@ -232,6 +243,7 @@ export default function GoldenLogo({
         {
           "--gl-stroke": STROKE_WIDTH[variant],
           "--gl-line-brightness": LINE_BRIGHTNESS,
+          "--gl-dot-dur": `${DOT_DUR}s`,
         } as React.CSSProperties
       }
       fill="none"
