@@ -6,7 +6,9 @@
 // squares and spiral share the same thin, full-brightness stroke; letters are
 // bold EB Garamond glyphs. draw-on animation is pure CSS (see globals.css).
 // on hover, two dots with fading trails loop a closed track: down the spiral,
-// then back along the construction lines to the spiral's start.
+// then back out through every square — each square's two straight sides via
+// its outer (bulge-side) corner, hitting 3 corners per square (the middle
+// corner is P_in + P_out - C_arc, diagonal to the arc's center corner).
 
 // ═══════════════════════════════════════════════════════════════════
 // LETTER CONTROLS — tweak these, preview live at /logo
@@ -28,10 +30,18 @@ const LETTERS = {
 
 // letter weight — eb garamond is variable 400-800:
 // 400 regular · 500 medium · 600 semibold · 700 bold · 800 extrabold
-const LETTER_WEIGHT = 700;
+const LETTER_WEIGHT = 500;
 
-// dot lap time in seconds (spiral + return leg)
-const DOT_DUR = 7;
+// ═══════════════════════════════════════════════════════════════════
+// LINE CONTROLS
+// stroke width in on-screen pixels (strokes don't scale with logo size)
+// brightness: 0 = invisible → 1 = full; applies to squares AND curve
+// ═══════════════════════════════════════════════════════════════════
+const STROKE_WIDTH = { hero: 1, mark: 0.75 };
+const LINE_OPACITY = 1;
+
+// dot lap time in seconds (spiral + return leg through every square)
+const DOT_DUR = 10;
 // trail followers: radius, opacity, seconds behind the lead dot
 const TRAIL = [
   { r: 3.4, o: 0.45, lag: 0.12 },
@@ -61,8 +71,9 @@ const GEOMETRY = {
     ],
     spiral:
       "M 987 610 A 610 610 0 0 0 377 0 A 377 377 0 0 0 0 377 A 233 233 0 0 0 233 610 A 144 144 0 0 0 377 466 A 89 89 0 0 0 288 377 A 55 55 0 0 0 233 432 A 34 34 0 0 0 267 466 A 21 21 0 0 0 288 445 A 13 13 0 0 0 275 432 A 8 8 0 0 0 267 440 A 5 5 0 0 0 272 445",
-    trackReturn: " L 267 445 L 267 466 L 233 466 L 233 610 L 987 610",
-    curveFraction: 0.723,
+    trackReturn:
+      " L 267 445 L 267 440 L 275 440 L 275 432 L 288 432 L 288 445 L 267 445 L 267 466 L 233 466 L 233 432 L 288 432 L 288 377 L 377 377 L 377 466 L 377 610 L 233 610 L 0 610 L 0 377 L 0 0 L 377 0 L 987 0 L 987 610",
+    curveFraction: 0.44,
   },
   vertical: {
     viewBox: "-12 -12 634 1011",
@@ -82,8 +93,9 @@ const GEOMETRY = {
     ],
     spiral:
       "M 0 0 A 610 610 0 0 1 610 610 A 377 377 0 0 1 233 987 A 233 233 0 0 1 0 754 A 144 144 0 0 1 144 610 A 89 89 0 0 1 233 699 A 55 55 0 0 1 178 754 A 34 34 0 0 1 144 720 A 21 21 0 0 1 165 699 A 13 13 0 0 1 178 712 A 8 8 0 0 1 170 720 A 5 5 0 0 1 165 715",
-    trackReturn: " L 165 720 L 144 720 L 144 610 L 0 610 L 0 0",
-    curveFraction: 0.737,
+    trackReturn:
+      " L 165 720 L 170 720 L 170 712 L 178 712 L 178 699 L 165 699 L 165 720 L 144 720 L 144 754 L 178 754 L 178 699 L 233 699 L 233 610 L 144 610 L 0 610 L 0 754 L 0 987 L 233 987 L 610 987 L 610 610 L 610 0 L 0 0",
+    curveFraction: 0.44,
   },
 } as const;
 
@@ -144,6 +156,12 @@ export default function GoldenLogo({
     <svg
       viewBox={geo.viewBox}
       className={`golden-logo ${variant === "hero" ? "gl-hero" : "gl-mark"} ${className}`}
+      style={
+        {
+          "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
+          "--gl-line-opacity": LINE_OPACITY,
+        } as React.CSSProperties
+      }
       fill="none"
       aria-label="andrew zhou logo"
       role="img"
