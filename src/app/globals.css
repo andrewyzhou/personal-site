@@ -110,7 +110,8 @@ body {
     currentColor calc(var(--gl-line-brightness, 1) * 100%),
     var(--theme-bg)
   );
-  stroke-width: var(--gl-stroke, 1px);
+  /* user units (scales with the logo), not px — keeps zoom proportions */
+  stroke-width: var(--gl-stroke, 1);
 }
 
 /* letters: bold EB Garamond glyphs, filled not stroked */
@@ -161,20 +162,6 @@ body {
 @keyframes eq-bounce {
   0%, 100% { transform: scaleY(0.35); }
   50% { transform: scaleY(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .golden-logo .gl-draw {
-    animation: none;
-    stroke-dashoffset: 0;
-  }
-  .golden-logo .gl-fade {
-    animation: none;
-    opacity: 1;
-  }
-  .eq-bar {
-    animation: none !important;
-  }
 }
 
 /* ============================================

@@ -1,14 +1,13 @@
 // hand-coded golden-ratio mark, two layouts:
 //   horizontal — 987x610 fibonacci rectangle, spiral starts bottom-right
 //   vertical   — 610x987 fibonacci rectangle, spiral starts top-left
-// square sides run the fibonacci chain 610, 377, 233, 144, 89, 55, 34, 21,
-// 13, 8, 5 (11 squares) so the progression stays exact all the way in.
-// squares and spiral share the same thin, full-brightness stroke; letters are
-// bold EB Garamond glyphs. draw-on animation is pure CSS (see globals.css).
-// on hover, two dots with fading trails loop a closed track: down the spiral,
-// then back out through every square — each square's two straight sides via
-// its outer (bulge-side) corner, hitting 3 corners per square (the middle
-// corner is P_in + P_out - C_arc, diagonal to the arc's center corner).
+// ALL geometry (squares, division lines, spiral, dot track) is generated
+// algorithmically in generateCanonical()/buildLayout() below from the
+// fibonacci chain 610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5 — no
+// hand-plotted coordinates. letters are EB Garamond glyphs; draw-on
+// animation is pure CSS (see globals.css). on hover, two comet-tailed dots
+// loop a closed track: down the spiral, then back out through every square
+// via its bulge-side corner (3 corners per square).
 
 // ═══════════════════════════════════════════════════════════════════
 // LETTER CONTROLS — tweak these, preview live at /logo
@@ -18,88 +17,146 @@
 const LETTERS = {
   horizontal: {
     fontSize: 450,
-    A: { x: 410, y: 340 }, // top-left 382 square (center 191,191)
-    Z: { x: 670, y: 520 }, // big right 618 square (center 691,309)
+    A: { x: 405, y: 360 },
+    Z: { x: 655, y: 520 },
   },
   vertical: {
     fontSize: 450,
-    A: { x: 190, y: 550 }, // top 618 square (center 309,309)
-    Z: { x: 440, y: 705 }, // bottom-right 382 square (center 427,809)
+    A: { x: 190, y: 550 },
+    Z: { x: 440, y: 710 },
   },
 };
 
-// letter weight — eb garamond is variable 400-800:
+// letter weight
 // 400 regular · 500 medium · 600 semibold · 700 bold · 800 extrabold
 const LETTER_WEIGHT = 700;
 
 // ═══════════════════════════════════════════════════════════════════
 // LINE CONTROLS
-// stroke width in on-screen pixels (strokes don't scale with logo size)
+// stroke width is in SVG USER UNITS, so it scales with the logo — zooming
+// keeps line/dot/letter proportions locked. rough px equivalents: at the
+// 576px-wide hero render 1 unit ≈ 0.58px (so 3.4 ≈ 2px); at the 48px
+// sidebar mark 1 unit ≈ 0.049px (so 10 ≈ 0.5px).
 // brightness: 0 = background color (invisible) → 1 = full theme color.
 // mixes the line COLOR toward the background (not opacity), so overlapping
 // lines never darken. applies to squares AND curve.
 // ═══════════════════════════════════════════════════════════════════
-const STROKE_WIDTH = { hero: 2, mark: 0.5 };
+const STROKE_WIDTH = { hero: 3.4, mark: 10 };
 const LINE_BRIGHTNESS = 0.5;
 
-// dot lap time in seconds (spiral + return leg through every square)
+// ═══════════════════════════════════════════════════════════════════
+// DOT CONTROLS
+// ═══════════════════════════════════════════════════════════════════
+const DOT_RADIUS = 4.5;
+// seconds per lap (spiral + return leg through every square)
 const DOT_DUR = 10;
-// trail followers: radius, opacity, seconds behind the lead dot
-const TRAIL = [
-  { r: 3.4, o: 0.45, lag: 0.12 },
-  { r: 2.6, o: 0.3, lag: 0.24 },
-  { r: 1.9, o: 0.18, lag: 0.36 },
-];
+// comet tail: how many seconds of track the tail smears over, and how many
+// segments approximate it (more = smoother)
+const TRAIL_SPAN = 0.6;
+const TRAIL_SEGMENTS = 12;
 
-// construction geometry: outer rect, square-division lines, spiral path,
-// closed dot track (spiral + return along construction lines), and the
-// fraction of the track the spiral occupies (dot 2 starts at the spiral end)
+// share of the lap spent on the curve — exact for any square count, since
+// each square contributes a quarter-arc (π/2)·s vs two sides 2·s
+const CURVE_FRACTION = Math.PI / (Math.PI + 4);
+
+// ═══════════════════════════════════════════════════════════════════
+// GEOMETRY — generated, not hand-plotted
+// ═══════════════════════════════════════════════════════════════════
+const FIB = [610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5];
+const W = 987;
+const H = 610;
+
+interface Pt {
+  x: number;
+  y: number;
+}
+
+interface Arc {
+  from: Pt;
+  to: Pt;
+  center: Pt;
+  r: number;
+}
+
+// canonical construction on a 987x610 rect with the curve starting at the
+// bottom-left: cut a square off the rect cycling left → top → right →
+// bottom, spiraling inward. each square contributes:
+//   - its quarter-arc: the center is the square corner that continues the
+//     previous arc's radius, which is what makes the spiral tangent-smooth
+//   - its division line (the cut edge)
+// the bulge-side corner used by the return leg is derived per-arc later as
+// from + to - center (the corner diagonal to the arc's center).
+function generateCanonical(): { arcs: Arc[]; lines: [Pt, Pt][] } {
+  let rect = { x: 0, y: 0, w: W, h: H };
+  const arcs: Arc[] = [];
+  const lines: [Pt, Pt][] = [];
+  FIB.forEach((s, k) => {
+    const { x, y, w, h } = rect;
+    switch (k % 4) {
+      case 0: // square on the left
+        arcs.push({ from: { x, y: y + s }, to: { x: x + s, y }, center: { x: x + s, y: y + s }, r: s });
+        lines.push([{ x: x + s, y }, { x: x + s, y: y + h }]);
+        rect = { x: x + s, y, w: w - s, h };
+        break;
+      case 1: // square on the top
+        arcs.push({ from: { x, y }, to: { x: x + s, y: y + s }, center: { x, y: y + s }, r: s });
+        lines.push([{ x, y: y + s }, { x: x + w, y: y + s }]);
+        rect = { x, y: y + s, w, h: h - s };
+        break;
+      case 2: // square on the right
+        arcs.push({ from: { x: x + w, y }, to: { x: x + w - s, y: y + s }, center: { x: x + w - s, y }, r: s });
+        lines.push([{ x: x + w - s, y }, { x: x + w - s, y: y + h }]);
+        rect = { x, y, w: w - s, h };
+        break;
+      case 3: // square on the bottom
+        arcs.push({ from: { x: x + s, y: y + h }, to: { x, y: y + h - s }, center: { x: x + s, y: y + h - s }, r: s });
+        lines.push([{ x, y: y + h - s }, { x: x + w, y: y + h - s }]);
+        rect = { x, y, w, h: h - s };
+        break;
+    }
+  });
+  return { arcs, lines };
+}
+
+function buildLayout(orient: "horizontal" | "vertical") {
+  const { arcs, lines } = generateCanonical();
+  // horizontal: mirror across x so the curve starts bottom-right
+  // vertical: rotate 90° clockwise so the curve starts top-left
+  const tf =
+    orient === "horizontal"
+      ? (p: Pt): Pt => ({ x: W - p.x, y: p.y })
+      : (p: Pt): Pt => ({ x: H - p.y, y: p.x });
+  const sweep = orient === "horizontal" ? 0 : 1; // mirroring flips arc direction
+  const t = arcs.map((a) => ({ from: tf(a.from), to: tf(a.to), center: tf(a.center), r: a.r }));
+
+  const spiral =
+    `M ${t[0].from.x} ${t[0].from.y} ` +
+    t.map((a) => `A ${a.r} ${a.r} 0 0 ${sweep} ${a.to.x} ${a.to.y}`).join(" ");
+
+  // return leg: from the innermost square back out, crossing each square via
+  // its two straight sides through the bulge-side corner (from + to - center)
+  const back = [...t]
+    .reverse()
+    .map(
+      (a) =>
+        ` L ${a.from.x + a.to.x - a.center.x} ${a.from.y + a.to.y - a.center.y} L ${a.from.x} ${a.from.y}`
+    )
+    .join("");
+
+  const size = orient === "horizontal" ? { w: W, h: H } : { w: H, h: W };
+  return {
+    viewBox: `-12 -12 ${size.w + 24} ${size.h + 24}`,
+    rect: size,
+    lines: lines.map(([a, b]) => [tf(a), tf(b)] as [Pt, Pt]),
+    spiral,
+    track: spiral + back,
+  };
+}
+
 const GEOMETRY = {
-  horizontal: {
-    viewBox: "-12 -12 1011 634",
-    rect: { width: 987, height: 610 },
-    lines: [
-      [377, 0, 377, 610],
-      [0, 377, 377, 377],
-      [233, 377, 233, 610],
-      [233, 466, 377, 466],
-      [288, 377, 288, 466],
-      [233, 432, 288, 432],
-      [267, 432, 267, 466],
-      [267, 445, 288, 445],
-      [275, 432, 275, 445],
-      [267, 440, 275, 440],
-      [272, 440, 272, 445],
-    ],
-    spiral:
-      "M 987 610 A 610 610 0 0 0 377 0 A 377 377 0 0 0 0 377 A 233 233 0 0 0 233 610 A 144 144 0 0 0 377 466 A 89 89 0 0 0 288 377 A 55 55 0 0 0 233 432 A 34 34 0 0 0 267 466 A 21 21 0 0 0 288 445 A 13 13 0 0 0 275 432 A 8 8 0 0 0 267 440 A 5 5 0 0 0 272 445",
-    trackReturn:
-      " L 267 445 L 267 440 L 275 440 L 275 432 L 288 432 L 288 445 L 267 445 L 267 466 L 233 466 L 233 432 L 288 432 L 288 377 L 377 377 L 377 466 L 377 610 L 233 610 L 0 610 L 0 377 L 0 0 L 377 0 L 987 0 L 987 610",
-    curveFraction: 0.44,
-  },
-  vertical: {
-    viewBox: "-12 -12 634 1011",
-    rect: { width: 610, height: 987 },
-    lines: [
-      [0, 610, 610, 610],
-      [233, 610, 233, 987],
-      [0, 754, 233, 754],
-      [144, 610, 144, 754],
-      [144, 699, 233, 699],
-      [178, 699, 178, 754],
-      [144, 720, 178, 720],
-      [165, 699, 165, 720],
-      [165, 712, 178, 712],
-      [170, 712, 170, 720],
-      [165, 715, 170, 715],
-    ],
-    spiral:
-      "M 0 0 A 610 610 0 0 1 610 610 A 377 377 0 0 1 233 987 A 233 233 0 0 1 0 754 A 144 144 0 0 1 144 610 A 89 89 0 0 1 233 699 A 55 55 0 0 1 178 754 A 34 34 0 0 1 144 720 A 21 21 0 0 1 165 699 A 13 13 0 0 1 178 712 A 8 8 0 0 1 170 720 A 5 5 0 0 1 165 715",
-    trackReturn:
-      " L 165 720 L 170 720 L 170 712 L 178 712 L 178 699 L 165 699 L 165 720 L 144 720 L 144 754 L 178 754 L 178 699 L 233 699 L 233 610 L 144 610 L 0 610 L 0 754 L 0 987 L 233 987 L 610 987 L 610 610 L 610 0 L 0 0",
-    curveFraction: 0.44,
-  },
-} as const;
+  horizontal: buildLayout("horizontal"),
+  vertical: buildLayout("vertical"),
+};
 
 interface GoldenLogoProps {
   layout?: "horizontal" | "vertical";
@@ -116,7 +173,6 @@ export default function GoldenLogo({
 }: GoldenLogoProps) {
   const geo = GEOMETRY[layout];
   const letters = LETTERS[layout];
-  const track = geo.spiral + geo.trackReturn;
 
   // draw-on props for one stroke: normalized dash + staggered delay
   const draw = (delay: number, dur = 0.9) =>
@@ -140,17 +196,31 @@ export default function GoldenLogo({
     style: { ...props.style, fontWeight: LETTER_WEIGHT },
   });
 
-  // one looping dot + its fading trail, offset along the shared track
+  // one looping dot with a comet tail: TRAIL_SEGMENTS followers smeared over
+  // TRAIL_SPAN seconds of track, tapering in size and fading out
   const dot = (begin: number) => (
     <g className="gl-dot" key={begin}>
-      <circle r="4.5" fill="currentColor">
-        <animateMotion dur={`${DOT_DUR}s`} repeatCount="indefinite" begin={`${begin}s`} path={track} />
+      <circle r={DOT_RADIUS} fill="currentColor">
+        <animateMotion dur={`${DOT_DUR}s`} repeatCount="indefinite" begin={`${begin}s`} path={geo.track} />
       </circle>
-      {TRAIL.map((t) => (
-        <circle key={t.lag} r={t.r} fill="currentColor" opacity={t.o}>
-          <animateMotion dur={`${DOT_DUR}s`} repeatCount="indefinite" begin={`${begin + t.lag}s`} path={track} />
-        </circle>
-      ))}
+      {Array.from({ length: TRAIL_SEGMENTS }, (_, i) => {
+        const f = (i + 1) / (TRAIL_SEGMENTS + 1); // 0 → head, 1 → tail tip
+        return (
+          <circle
+            key={i}
+            r={DOT_RADIUS * (1 - 0.7 * f)}
+            fill="currentColor"
+            opacity={0.5 * Math.pow(1 - f, 1.6)}
+          >
+            <animateMotion
+              dur={`${DOT_DUR}s`}
+              repeatCount="indefinite"
+              begin={`${begin + f * TRAIL_SPAN}s`}
+              path={geo.track}
+            />
+          </circle>
+        );
+      })}
     </g>
   );
 
@@ -160,7 +230,7 @@ export default function GoldenLogo({
       className={`golden-logo ${variant === "hero" ? "gl-hero" : "gl-mark"} ${className}`}
       style={
         {
-          "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
+          "--gl-stroke": STROKE_WIDTH[variant],
           "--gl-line-brightness": LINE_BRIGHTNESS,
         } as React.CSSProperties
       }
@@ -169,20 +239,12 @@ export default function GoldenLogo({
       role="img"
     >
       {/* construction: golden rectangle + square subdivisions */}
-      <rect x="0" y="0" width={geo.rect.width} height={geo.rect.height} vectorEffect="non-scaling-stroke" {...draw(0, 1.1)} />
-      {geo.lines.map(([x1, y1, x2, y2], i) => (
-        <line
-          key={i}
-          x1={x1}
-          y1={y1}
-          x2={x2}
-          y2={y2}
-          vectorEffect="non-scaling-stroke"
-          {...draw(0.4 + i * 0.1)}
-        />
+      <rect x="0" y="0" width={geo.rect.w} height={geo.rect.h} {...draw(0, 1.1)} />
+      {geo.lines.map(([a, b], i) => (
+        <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} {...draw(0.4 + i * 0.1)} />
       ))}
 
-      {/* letters — bold EB Garamond, positions from LETTERS above */}
+      {/* letters — EB Garamond, positions from LETTERS above */}
       <text x={letters.A.x} y={letters.A.y} textAnchor="middle" fontSize={letters.fontSize} {...withWeight(fade(1.2))}>
         A
       </text>
@@ -191,11 +253,11 @@ export default function GoldenLogo({
       </text>
 
       {/* the golden spiral — drawn last, the finale */}
-      <path d={geo.spiral} vectorEffect="non-scaling-stroke" {...draw(1.7, 1.8)} />
+      <path d={geo.spiral} {...draw(1.7, 1.8)} />
 
       {/* dot 1 starts at the curve start; dot 2 starts at the curve end */}
       {dot(0)}
-      {dot(-DOT_DUR * geo.curveFraction)}
+      {dot(-DOT_DUR * CURVE_FRACTION)}
     </svg>
   );
 }
