@@ -69,6 +69,53 @@ const TRAIL_ALPHAS = Array.from({ length: TRAIL_STEPS }, (_, i) => {
   return 1 - (1 - band(i + 1)) / (1 - band(i + 2));
 });
 
+// varying-speed cycle: each dot runs speed 1 at its own start, accelerates
+// CONTINUOUSLY (constant acceleration) to SPEED_RATIO × speed 1 by its phase
+// boundary, then decelerates continuously back to speed 1 by lap's end.
+// dot 1 (starts at curve start) peaks at the curve→squares handoff; dot 2
+// (starts at curve end) peaks at the squares→curve handoff — opposite
+// trajectories. speed 1 = the old constant speed (lap / DOT_DUR); both
+// phases share average speed (1+ratio)/2, so a lap takes DOT_DUR / avg.
+const SPEED_RATIO = 2;
+
+// share of the lap that is the curve — exact for any square count, since
+// each square contributes a quarter-arc (π/2)·s vs two return sides 2·s
+const CURVE_FRACTION = Math.PI / (Math.PI + 4);
+
+// a constant-acceleration distance profile is a quadratic in time, which a
+// cubic-bezier easing represents EXACTLY: x controls at 1/3, 2/3 make
+// bezier-x the identity, and the y controls below solve the quadratic.
+const ACCEL = `cubic-bezier(0.3333, ${(2 / (3 * (1 + SPEED_RATIO))).toFixed(4)}, 0.6667, ${(
+  (SPEED_RATIO + 3) /
+  (3 * (1 + SPEED_RATIO))
+).toFixed(4)})`;
+const DECEL = `cubic-bezier(0.3333, ${((2 * SPEED_RATIO) / (3 * (1 + SPEED_RATIO))).toFixed(4)}, 0.6667, ${(
+  (3 * SPEED_RATIO + 1) /
+  (3 * (1 + SPEED_RATIO))
+).toFixed(4)})`;
+
+// per-dot keyframes: because both phases have equal average speed, the time
+// fraction of the phase boundary equals its distance fraction `mid`. head
+// (offset-distance) and tail (dashoffset, via the per-layer --gl-tail-len
+// var) share the identical profile so they can never drift.
+function speedKeyframes(name: string, mid: number): string {
+  const pct = (mid * 100).toFixed(2);
+  return `
+@keyframes gl-ride-${name} {
+  0% { offset-distance: 0%; animation-timing-function: ${ACCEL}; }
+  ${pct}% { offset-distance: ${pct}%; animation-timing-function: ${DECEL}; }
+  100% { offset-distance: 100%; }
+}
+@keyframes gl-tail-${name} {
+  0% { stroke-dashoffset: calc(var(--gl-tail-len) * 1px); animation-timing-function: ${ACCEL}; }
+  ${pct}% { stroke-dashoffset: calc((var(--gl-tail-len) - ${mid.toFixed(4)}) * 1px); animation-timing-function: ${DECEL}; }
+  100% { stroke-dashoffset: calc((var(--gl-tail-len) - 1) * 1px); }
+}`;
+}
+
+const SPEED_KEYFRAMES =
+  speedKeyframes("from-start", CURVE_FRACTION) + speedKeyframes("from-end", 1 - CURVE_FRACTION);
+
 // the streak cycle may not start until the draw-on animation has finished:
 // the spiral is the last stroke to draw (delay 1.7s + duration 1.8s below)
 const DRAW_END = 1.7 + 1.8;
@@ -228,8 +275,8 @@ export default function GoldenLogo({
   // seconds of travel; nested layers composite into the linear fade. the
   // head rides the same path via css offset-path on the same clock, so head
   // and streak can never drift.
-  const dot = (track: string, key: string) => (
-    <g className="gl-dot" key={key}>
+  const dot = (track: string, phase: "from-start" | "from-end") => (
+    <g className="gl-dot" key={phase}>
       {TRAIL_ALPHAS.map((alpha, i) => {
         const len = (TRAIL_LENGTH / DOT_DUR) * ((i + 1) / TRAIL_STEPS); // fraction of the lap
         return (
@@ -240,7 +287,13 @@ export default function GoldenLogo({
             pathLength={1}
             opacity={alpha}
             strokeDasharray={`${len}px ${1 - len}px`}
-            style={{ "--gl-tail-len": len, animationDelay: `${dotDelay}s` } as React.CSSProperties}
+            style={
+              {
+                "--gl-tail-len": len,
+                animationName: `gl-tail-${phase}`,
+                animationDelay: `${dotDelay}s`,
+              } as React.CSSProperties
+            }
           />
         );
       })}
@@ -248,7 +301,13 @@ export default function GoldenLogo({
         className="gl-dot-head"
         r={STROKE_WIDTH[variant] / 2}
         fill="currentColor"
-        style={{ offsetPath: `path("${track}")`, animationDelay: `${dotDelay}s` } as React.CSSProperties}
+        style={
+          {
+            offsetPath: `path("${track}")`,
+            animationName: `gl-ride-${phase}`,
+            animationDelay: `${dotDelay}s`,
+          } as React.CSSProperties
+        }
       />
     </g>
   );
@@ -261,7 +320,7 @@ export default function GoldenLogo({
         {
           "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
           "--gl-line-brightness": LINE_BRIGHTNESS,
-          "--gl-dot-dur": `${DOT_DUR}s`,
+          "--gl-dot-dur": `${DOT_DUR / ((1 + SPEED_RATIO) / 2)}s`,
         } as React.CSSProperties
       }
       fill="none"
@@ -285,10 +344,13 @@ export default function GoldenLogo({
       {/* the golden spiral — drawn last, the finale */}
       <path d={geo.spiral} {...draw(1.7, 1.8)} />
 
+      {/* per-dot varying-speed keyframes (also used by the tails) */}
+      <style>{SPEED_KEYFRAMES}</style>
+
       {/* dot 1 starts at the curve start; dot 2 starts at the curve end —
           both launch together once the draw-on animation completes */}
-      {dot(geo.track, "start")}
-      {dot(geo.trackFromEnd, "end")}
+      {dot(geo.track, "from-start")}
+      {dot(geo.trackFromEnd, "from-end")}
     </svg>
   );
 }
