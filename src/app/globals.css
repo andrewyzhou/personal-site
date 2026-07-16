@@ -163,12 +163,14 @@ body {
   stroke-width: var(--gl-stroke, 1px);
   stroke-linecap: round;
   stroke-dashoffset: calc(var(--gl-tail-len) * 1px);
-  animation: gl-tail-slide var(--gl-dot-dur, 10s) linear infinite;
+  /* backwards fill parks the streak at its start post while the positive
+     animation-delay waits out the draw-on animation */
+  animation: gl-tail-slide var(--gl-dot-dur, 10s) linear infinite backwards;
 }
 
 .golden-logo .gl-dot-head {
   offset-rotate: 0deg;
-  animation: gl-dot-ride var(--gl-dot-dur, 10s) linear infinite;
+  animation: gl-dot-ride var(--gl-dot-dur, 10s) linear infinite backwards;
 }
 
 /* head position at time t is fraction t of the lap; the visible dash

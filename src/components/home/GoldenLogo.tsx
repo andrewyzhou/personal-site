@@ -69,9 +69,9 @@ const TRAIL_ALPHAS = Array.from({ length: TRAIL_STEPS }, (_, i) => {
   return 1 - (1 - band(i + 1)) / (1 - band(i + 2));
 });
 
-// share of the lap spent on the curve — exact for any square count, since
-// each square contributes a quarter-arc (π/2)·s vs two sides 2·s
-const CURVE_FRACTION = Math.PI / (Math.PI + 4);
+// the streak cycle may not start until the draw-on animation has finished:
+// the spiral is the last stroke to draw (delay 1.7s + duration 1.8s below)
+const DRAW_END = 1.7 + 1.8;
 
 // ═══════════════════════════════════════════════════════════════════
 // GEOMETRY — generated, not hand-plotted
@@ -158,12 +158,19 @@ function buildLayout(orient: "horizontal" | "vertical") {
     .join("");
 
   const size = orient === "horizontal" ? { w: W, h: H } : { w: H, h: W };
+  const arcCmds = t.map((a) => `A ${a.r} ${a.r} 0 0 ${sweep} ${a.to.x} ${a.to.y}`).join(" ");
+  const eye = t[t.length - 1].to;
   return {
     viewBox: `-20 -20 ${size.w + 40} ${size.h + 40}`,
     rect: size,
     lines: lines.map(([a, b]) => [tf(a), tf(b)] as [Pt, Pt]),
     spiral,
+    // same closed loop, two phase origins: dot 1 starts at the curve start,
+    // dot 2 starts at the curve end (the eye) — return leg first, then arcs.
+    // both are needed because css animation-delay must stay positive for the
+    // draw-gate, so start position has to live in the path itself.
     track: spiral + back,
+    trackFromEnd: `M ${eye.x} ${eye.y}` + back + " " + arcCmds,
   };
 }
 
@@ -210,26 +217,30 @@ export default function GoldenLogo({
     style: { ...props.style, fontWeight: LETTER_WEIGHT },
   });
 
+  // dots wait for the draw-on animation to finish, then launch from their
+  // posts (fill-mode: backwards parks them there during the delay)
+  const dotDelay = animate ? DRAW_END : 0;
+
   // one looping dot + streak. each tail layer is the track path itself,
   // dash-normalized (pathLength=1, px dash values — safari rejects unitless)
   // so only a segment ending at the head is visible, slid along the path by
   // the gl-tail-slide keyframes. layer k covers the last (k/N)·TRAIL_LENGTH
   // seconds of travel; nested layers composite into the linear fade. the
   // head rides the same path via css offset-path on the same clock, so head
-  // and streak can never drift. `delay` (negative) sets the start position.
-  const dot = (delay: number) => (
-    <g className="gl-dot" key={delay}>
+  // and streak can never drift.
+  const dot = (track: string, key: string) => (
+    <g className="gl-dot" key={key}>
       {TRAIL_ALPHAS.map((alpha, i) => {
         const len = (TRAIL_LENGTH / DOT_DUR) * ((i + 1) / TRAIL_STEPS); // fraction of the lap
         return (
           <path
             key={i}
             className="gl-tail"
-            d={geo.track}
+            d={track}
             pathLength={1}
             opacity={alpha}
             strokeDasharray={`${len}px ${1 - len}px`}
-            style={{ "--gl-tail-len": len, animationDelay: `${delay}s` } as React.CSSProperties}
+            style={{ "--gl-tail-len": len, animationDelay: `${dotDelay}s` } as React.CSSProperties}
           />
         );
       })}
@@ -237,7 +248,7 @@ export default function GoldenLogo({
         className="gl-dot-head"
         r={STROKE_WIDTH[variant] / 2}
         fill="currentColor"
-        style={{ offsetPath: `path("${geo.track}")`, animationDelay: `${delay}s` } as React.CSSProperties}
+        style={{ offsetPath: `path("${track}")`, animationDelay: `${dotDelay}s` } as React.CSSProperties}
       />
     </g>
   );
@@ -274,9 +285,10 @@ export default function GoldenLogo({
       {/* the golden spiral — drawn last, the finale */}
       <path d={geo.spiral} {...draw(1.7, 1.8)} />
 
-      {/* dot 1 starts at the curve start; dot 2 starts at the curve end */}
-      {dot(0)}
-      {dot(-DOT_DUR * CURVE_FRACTION)}
+      {/* dot 1 starts at the curve start; dot 2 starts at the curve end —
+          both launch together once the draw-on animation completes */}
+      {dot(geo.track, "start")}
+      {dot(geo.trackFromEnd, "end")}
     </svg>
   );
 }
