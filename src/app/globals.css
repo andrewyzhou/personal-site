@@ -130,14 +130,16 @@ body {
   to { opacity: 1; }
 }
 
+/* px units on all dash values: safari rejects unitless dash lengths in css,
+   and px == svg user units, so with pathLength=1 the math is unchanged */
 .golden-logo .gl-draw {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
+  stroke-dasharray: 1px 1px;
+  stroke-dashoffset: 1px;
   animation: gl-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }
 
 @keyframes gl-draw {
-  to { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 0px; }
 }
 
 .golden-logo .gl-dot {
@@ -150,13 +152,17 @@ body {
   opacity: 1;
 }
 
-/* comet streak: the track path dashed down to a short visible segment,
-   slid along the path on the same clock as the head dot */
+/* comet streak: the track path dashed down to one short visible segment
+   ending at the head, slid along the path on the same clock as the head
+   dot. same stroke width as the construction lines. --gl-tail-len is a
+   plain number (fraction of the lap); ×1px converts it to a length because
+   safari rejects unitless dash values (px == svg user units) */
 .golden-logo .gl-tail {
   fill: none;
   stroke: currentColor;
+  stroke-width: var(--gl-stroke, 1px);
   stroke-linecap: round;
-  stroke-dashoffset: var(--gl-tail-len);
+  stroke-dashoffset: calc(var(--gl-tail-len) * 1px);
   animation: gl-tail-slide var(--gl-dot-dur, 10s) linear infinite;
 }
 
@@ -169,10 +175,10 @@ body {
    segment [t - len, t] trails it. offset = len - t, wrapping each lap */
 @keyframes gl-tail-slide {
   from {
-    stroke-dashoffset: var(--gl-tail-len);
+    stroke-dashoffset: calc(var(--gl-tail-len) * 1px);
   }
   to {
-    stroke-dashoffset: calc(var(--gl-tail-len) - 1);
+    stroke-dashoffset: calc((var(--gl-tail-len) - 1) * 1px);
   }
 }
 
