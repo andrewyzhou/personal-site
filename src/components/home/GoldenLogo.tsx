@@ -69,14 +69,16 @@ const TRAIL_ALPHAS = Array.from({ length: TRAIL_STEPS }, (_, i) => {
   return 1 - (1 - band(i + 1)) / (1 - band(i + 2));
 });
 
-// varying-speed cycle: each dot runs speed 1 at its own start, accelerates
-// CONTINUOUSLY (constant acceleration) to SPEED_RATIO × speed 1 by its phase
-// boundary, then decelerates continuously back to speed 1 by lap's end.
-// dot 1 (starts at curve start) peaks at the curve→squares handoff; dot 2
-// (starts at curve end) peaks at the squares→curve handoff — opposite
-// trajectories. speed 1 = the old constant speed (lap / DOT_DUR); both
-// phases share average speed (1+ratio)/2, so a lap takes DOT_DUR / avg.
-const SPEED_RATIO = 2;
+// varying-speed cycle: each dot runs SPEED_MIN at its own start, accelerates
+// CONTINUOUSLY (constant acceleration) to SPEED_MAX by its phase boundary,
+// then decelerates continuously back to SPEED_MIN by lap's end. dot 1
+// (starts at curve start) peaks at the curve→squares handoff; dot 2 (starts
+// at curve end) peaks at the squares→curve handoff — opposite trajectories.
+// speeds are in units of the old constant speed (lap length / DOT_DUR);
+// both phases share average (min+max)/2, so a lap takes DOT_DUR / avg.
+const SPEED_MIN = 0.25;
+const SPEED_MAX = 4;
+const SPEED_RATIO = SPEED_MAX / SPEED_MIN;
 
 // share of the lap that is the curve — exact for any square count, since
 // each square contributes a quarter-arc (π/2)·s vs two return sides 2·s
@@ -320,7 +322,7 @@ export default function GoldenLogo({
         {
           "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
           "--gl-line-brightness": LINE_BRIGHTNESS,
-          "--gl-dot-dur": `${DOT_DUR / ((1 + SPEED_RATIO) / 2)}s`,
+          "--gl-dot-dur": `${DOT_DUR / ((SPEED_MIN + SPEED_MAX) / 2)}s`,
         } as React.CSSProperties
       }
       fill="none"
