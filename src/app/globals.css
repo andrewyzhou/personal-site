@@ -139,7 +139,8 @@ body {
   transition: opacity 0.3s ease;
 }
 
-.golden-logo:hover .gl-dot {
+.golden-logo:hover .gl-dot,
+.golden-logo.gl-show-dots .gl-dot {
   opacity: 1;
 }
 

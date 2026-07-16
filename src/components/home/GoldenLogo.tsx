@@ -1,20 +1,23 @@
 // hand-coded golden-ratio mark, two layouts:
-//   horizontal — 1000x618 golden rectangle, spiral starts bottom-right
-//   vertical   — 618x1000 golden rectangle, spiral starts top-left
+//   horizontal — 987x610 fibonacci rectangle, spiral starts bottom-right
+//   vertical   — 610x987 fibonacci rectangle, spiral starts top-left
+// square sides run the fibonacci chain 610, 377, 233, 144, 89, 55, 34, 21,
+// 13, 8, 5 (11 squares) so the progression stays exact all the way in.
 // squares and spiral share the same thin, full-brightness stroke; letters are
-// bold EB Garamond glyphs. draw-on animation is pure CSS (see globals.css);
-// hover dots ride the spiral via SMIL animateMotion.
+// bold EB Garamond glyphs. draw-on animation is pure CSS (see globals.css).
+// on hover, two dots with fading trails loop a closed track: down the spiral,
+// then back along the construction lines to the spiral's start.
 
 // ═══════════════════════════════════════════════════════════════════
 // LETTER CONTROLS — tweak these, preview live at /logo
 // x = horizontal center of the glyph, y = baseline, in svg units
-// (horizontal canvas is 1000x618, vertical canvas is 618x1000)
+// (horizontal canvas is 987x610, vertical canvas is 610x987)
 // ═══════════════════════════════════════════════════════════════════
 const LETTERS = {
   horizontal: {
-    fontSize: 350,
-    A: { x: 191, y: 313 }, // top-left 382 square (center 191,191)
-    Z: { x: 691, y: 431 }, // big right 618 square (center 691,309)
+    fontSize: 450,
+    A: { x: 410, y: 350 }, // top-left 382 square (center 191,191)
+    Z: { x: 650, y: 500 }, // big right 618 square (center 691,309)
   },
   vertical: {
     fontSize: 350,
@@ -23,41 +26,64 @@ const LETTERS = {
   },
 };
 
-// construction geometry: outer rect, square-division lines, spiral path
+// letter weight — eb garamond is variable 400-800:
+// 400 regular · 500 medium · 600 semibold · 700 bold · 800 extrabold
+const LETTER_WEIGHT = 700;
+
+// dot lap time in seconds (spiral + return leg)
+const DOT_DUR = 7;
+// trail followers: radius, opacity, seconds behind the lead dot
+const TRAIL = [
+  { r: 3.4, o: 0.45, lag: 0.12 },
+  { r: 2.6, o: 0.3, lag: 0.24 },
+  { r: 1.9, o: 0.18, lag: 0.36 },
+];
+
+// construction geometry: outer rect, square-division lines, spiral path,
+// closed dot track (spiral + return along construction lines), and the
+// fraction of the track the spiral occupies (dot 2 starts at the spiral end)
 const GEOMETRY = {
   horizontal: {
-    viewBox: "-12 -12 1024 642",
-    rect: { width: 1000, height: 618 },
+    viewBox: "-12 -12 1011 634",
+    rect: { width: 987, height: 610 },
     lines: [
-      [382, 0, 382, 618],
-      [0, 382, 382, 382],
-      [236, 382, 236, 618],
-      [236, 472, 382, 472],
-      [292, 382, 292, 472],
-      [236, 438, 292, 438],
-      [270, 438, 270, 472],
-      [270, 450, 292, 450],
-      [280, 438, 280, 450],
+      [377, 0, 377, 610],
+      [0, 377, 377, 377],
+      [233, 377, 233, 610],
+      [233, 466, 377, 466],
+      [288, 377, 288, 466],
+      [233, 432, 288, 432],
+      [267, 432, 267, 466],
+      [267, 445, 288, 445],
+      [275, 432, 275, 445],
+      [267, 440, 275, 440],
+      [272, 440, 272, 445],
     ],
     spiral:
-      "M 1000 618 A 618 618 0 0 0 382 0 A 382 382 0 0 0 0 382 A 236 236 0 0 0 236 618 A 146 146 0 0 0 382 472 A 90 90 0 0 0 292 382 A 56 56 0 0 0 236 438 A 34 34 0 0 0 270 472 A 22 22 0 0 0 292 450 A 12 12 0 0 0 280 438",
+      "M 987 610 A 610 610 0 0 0 377 0 A 377 377 0 0 0 0 377 A 233 233 0 0 0 233 610 A 144 144 0 0 0 377 466 A 89 89 0 0 0 288 377 A 55 55 0 0 0 233 432 A 34 34 0 0 0 267 466 A 21 21 0 0 0 288 445 A 13 13 0 0 0 275 432 A 8 8 0 0 0 267 440 A 5 5 0 0 0 272 445",
+    trackReturn: " L 267 445 L 267 466 L 233 466 L 233 610 L 987 610",
+    curveFraction: 0.723,
   },
   vertical: {
-    viewBox: "-12 -12 642 1024",
-    rect: { width: 618, height: 1000 },
+    viewBox: "-12 -12 634 1011",
+    rect: { width: 610, height: 987 },
     lines: [
-      [0, 618, 618, 618],
-      [236, 618, 236, 1000],
-      [0, 764, 236, 764],
-      [146, 618, 146, 764],
-      [146, 708, 236, 708],
-      [180, 708, 180, 764],
-      [146, 730, 180, 730],
-      [168, 708, 168, 730],
-      [168, 720, 180, 720],
+      [0, 610, 610, 610],
+      [233, 610, 233, 987],
+      [0, 754, 233, 754],
+      [144, 610, 144, 754],
+      [144, 699, 233, 699],
+      [178, 699, 178, 754],
+      [144, 720, 178, 720],
+      [165, 699, 165, 720],
+      [165, 712, 178, 712],
+      [170, 712, 170, 720],
+      [165, 715, 170, 715],
     ],
     spiral:
-      "M 0 0 A 618 618 0 0 1 618 618 A 382 382 0 0 1 236 1000 A 236 236 0 0 1 0 764 A 146 146 0 0 1 146 618 A 90 90 0 0 1 236 708 A 56 56 0 0 1 180 764 A 34 34 0 0 1 146 730 A 22 22 0 0 1 168 708 A 12 12 0 0 1 180 720",
+      "M 0 0 A 610 610 0 0 1 610 610 A 377 377 0 0 1 233 987 A 233 233 0 0 1 0 754 A 144 144 0 0 1 144 610 A 89 89 0 0 1 233 699 A 55 55 0 0 1 178 754 A 34 34 0 0 1 144 720 A 21 21 0 0 1 165 699 A 13 13 0 0 1 178 712 A 8 8 0 0 1 170 720 A 5 5 0 0 1 165 715",
+    trackReturn: " L 165 720 L 144 720 L 144 610 L 0 610 L 0 0",
+    curveFraction: 0.737,
   },
 } as const;
 
@@ -76,6 +102,7 @@ export default function GoldenLogo({
 }: GoldenLogoProps) {
   const geo = GEOMETRY[layout];
   const letters = LETTERS[layout];
+  const track = geo.spiral + geo.trackReturn;
 
   // draw-on props for one stroke: normalized dash + staggered delay
   const draw = (delay: number, dur = 0.9) =>
@@ -92,6 +119,26 @@ export default function GoldenLogo({
     animate
       ? { className: "gl-letterform gl-fade", style: { animationDelay: `${delay}s` } }
       : { className: "gl-letterform" };
+
+  // merge LETTER_WEIGHT into the letter props (inline style wins over css)
+  const withWeight = (props: { className: string; style?: React.CSSProperties }) => ({
+    ...props,
+    style: { ...props.style, fontWeight: LETTER_WEIGHT },
+  });
+
+  // one looping dot + its fading trail, offset along the shared track
+  const dot = (begin: number) => (
+    <g className="gl-dot" key={begin}>
+      <circle r="4.5" fill="currentColor">
+        <animateMotion dur={`${DOT_DUR}s`} repeatCount="indefinite" begin={`${begin}s`} path={track} />
+      </circle>
+      {TRAIL.map((t) => (
+        <circle key={t.lag} r={t.r} fill="currentColor" opacity={t.o}>
+          <animateMotion dur={`${DOT_DUR}s`} repeatCount="indefinite" begin={`${begin + t.lag}s`} path={track} />
+        </circle>
+      ))}
+    </g>
+  );
 
   return (
     <svg
@@ -111,28 +158,24 @@ export default function GoldenLogo({
           x2={x2}
           y2={y2}
           vectorEffect="non-scaling-stroke"
-          {...draw(0.45 + i * 0.15)}
+          {...draw(0.4 + i * 0.1)}
         />
       ))}
 
       {/* letters — bold EB Garamond, positions from LETTERS above */}
-      <text x={letters.A.x} y={letters.A.y} textAnchor="middle" fontSize={letters.fontSize} {...fade(1.2)}>
+      <text x={letters.A.x} y={letters.A.y} textAnchor="middle" fontSize={letters.fontSize} {...withWeight(fade(1.2))}>
         A
       </text>
-      <text x={letters.Z.x} y={letters.Z.y} textAnchor="middle" fontSize={letters.fontSize} {...fade(1.4)}>
+      <text x={letters.Z.x} y={letters.Z.y} textAnchor="middle" fontSize={letters.fontSize} {...withWeight(fade(1.4))}>
         Z
       </text>
 
       {/* the golden spiral — drawn last, the finale */}
       <path d={geo.spiral} vectorEffect="non-scaling-stroke" {...draw(1.7, 1.8)} />
 
-      {/* hover: two dots race the spiral, half a lap apart */}
-      <circle className="gl-dot" r="9" fill="currentColor">
-        <animateMotion dur="4s" repeatCount="indefinite" path={geo.spiral} />
-      </circle>
-      <circle className="gl-dot" r="9" fill="currentColor">
-        <animateMotion dur="4s" repeatCount="indefinite" begin="-2s" path={geo.spiral} />
-      </circle>
+      {/* dot 1 starts at the curve start; dot 2 starts at the curve end */}
+      {dot(0)}
+      {dot(-DOT_DUR * geo.curveFraction)}
     </svg>
   );
 }

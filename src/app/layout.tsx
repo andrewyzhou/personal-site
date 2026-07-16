@@ -10,10 +10,10 @@ const funnelSans = Funnel_Sans({
   display: "swap",
 });
 
-// bold serif for the golden-logo letterforms
+// serif for the golden-logo letterforms — variable font, full 400-800 weight
+// range available (400 regular, 500 medium, 600 semibold, 700 bold, 800 extrabold)
 const ebGaramond = EB_Garamond({
   subsets: ["latin"],
-  weight: "700",
   variable: "--font-garamond",
   display: "swap",
 });
