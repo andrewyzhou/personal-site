@@ -89,6 +89,79 @@ body {
 }
 
 /* ============================================
+   GOLDEN LOGO (redesign)
+   draw-on strokes are pathLength-normalized to 1,
+   so dasharray/dashoffset are always 0..1
+   ============================================ */
+
+.golden-logo {
+  color: var(--theme-text-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.golden-logo .gl-frame {
+  stroke: var(--theme-text-muted);
+  opacity: 0.4;
+}
+
+.golden-logo .gl-letter,
+.golden-logo .gl-spiral {
+  stroke: currentColor;
+}
+
+.gl-hero .gl-frame { stroke-width: 1px; }
+.gl-hero .gl-letter { stroke-width: 2px; }
+.gl-hero .gl-spiral { stroke-width: 2.25px; }
+
+.gl-mark .gl-frame { stroke-width: 0.75px; }
+.gl-mark .gl-letter,
+.gl-mark .gl-spiral { stroke-width: 1.25px; }
+
+.golden-logo .gl-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: gl-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes gl-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+.golden-logo .gl-dot {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.golden-logo:hover .gl-dot {
+  opacity: 1;
+}
+
+/* ============================================
+   EQUALIZER (currently: music card)
+   ============================================ */
+
+.eq-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .golden-logo .gl-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .eq-bar {
+    animation: none !important;
+  }
+}
+
+/* ============================================
    LINK HIGHLIGHT STYLES
    ============================================ */
 
