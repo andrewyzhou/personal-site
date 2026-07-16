@@ -100,13 +100,13 @@ body {
   stroke-linejoin: round;
 }
 
-/* squares + spiral: same thin width, same full brightness */
+/* squares + spiral: same width and brightness, driven by the component's
+   STROKE_WIDTH / LINE_OPACITY knobs (css vars set on the svg root) */
 .golden-logo .gl-line {
   stroke: currentColor;
+  stroke-width: var(--gl-stroke, 1px);
+  opacity: var(--gl-line-opacity, 1);
 }
-
-.gl-hero .gl-line { stroke-width: 1px; }
-.gl-mark .gl-line { stroke-width: 0.75px; }
 
 /* letters: bold EB Garamond glyphs, filled not stroked */
 .golden-logo .gl-letterform {
