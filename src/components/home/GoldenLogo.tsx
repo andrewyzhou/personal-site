@@ -1,10 +1,10 @@
 // hand-coded golden-ratio mark, two layouts:
-//   horizontal — 987x610 fibonacci rectangle, spiral starts bottom-right
-//   vertical   — 610x987 fibonacci rectangle, spiral starts top-left
+//   horizontal — 1597x987 fibonacci rectangle, spiral starts bottom-right
+//   vertical   — 987x1597 fibonacci rectangle, spiral starts top-left
 // ALL geometry (squares, division lines, spiral, dot track) is generated
 // algorithmically in generateCanonical()/buildLayout() below from the
-// fibonacci chain 610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5 — no
-// hand-plotted coordinates. letters are EB Garamond glyphs; draw-on
+// fibonacci chain 987, 610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5, 3, 2,
+// 1, 1 (16 squares) — no hand-plotted coordinates. letters are EB Garamond glyphs; draw-on
 // animation is pure CSS (see globals.css). on hover, two dots trailing
 // continuous comet streaks loop a closed track: down the spiral, then back
 // out through every square via its bulge-side corner (3 corners per square).
@@ -12,18 +12,18 @@
 // ═══════════════════════════════════════════════════════════════════
 // LETTER CONTROLS — tweak these, preview live at /logo
 // x = horizontal center of the glyph, y = baseline, in svg units
-// (horizontal canvas is 987x610, vertical canvas is 610x987)
+// (horizontal canvas is 1597x987, vertical canvas is 987x1597)
 // ═══════════════════════════════════════════════════════════════════
 const LETTERS = {
   horizontal: {
-    fontSize: 450,
-    A: { x: 405, y: 360 },
-    Z: { x: 655, y: 520 },
+    fontSize: 728,
+    A: { x: 655, y: 583 },
+    Z: { x: 1060, y: 841 },
   },
   vertical: {
-    fontSize: 450,
-    A: { x: 190, y: 550 },
-    Z: { x: 440, y: 710 },
+    fontSize: 728,
+    A: { x: 307, y: 890 },
+    Z: { x: 712, y: 1149 },
   },
 };
 
@@ -35,33 +35,39 @@ const LETTER_WEIGHT = 700;
 // LINE CONTROLS
 // stroke width is in SVG USER UNITS, so it scales with the logo — zooming
 // keeps line/dot/letter proportions locked. rough px equivalents: at the
-// 576px-wide hero render 1 unit ≈ 0.58px (so 3.4 ≈ 2px); at the 48px
-// sidebar mark 1 unit ≈ 0.049px (so 10 ≈ 0.5px).
+// 576px-wide hero render 1 unit ≈ 0.36px (so 5.5 ≈ 2px); at the 48px
+// sidebar mark 1 unit ≈ 0.03px (so 16 ≈ 0.5px).
 // brightness: 0 = background color (invisible) → 1 = full theme color.
 // mixes the line COLOR toward the background (not opacity), so overlapping
 // lines never darken. applies to squares AND curve.
 // ═══════════════════════════════════════════════════════════════════
-const STROKE_WIDTH = { hero: 3.4, mark: 10 };
+const STROKE_WIDTH = { hero: 5.5, mark: 16 };
 const LINE_BRIGHTNESS = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════
 // DOT CONTROLS
 // ═══════════════════════════════════════════════════════════════════
-const DOT_RADIUS = 4.5;
 // seconds per lap (spiral + return leg through every square)
 const DOT_DUR = 10;
-// comet tail: a continuous streak — the track path itself, dashed so only a
-// short segment is visible, slid along the path in sync with the head dot.
-// TRAIL_SPAN = seconds of travel the tail covers (tail length).
-// layers stack to taper the streak: longer = thinner + fainter.
-// len is relative to TRAIL_SPAN, width relative to DOT_RADIUS.
-const TRAIL_SPAN = 0.6;
-const TAIL_LAYERS = [
-  { len: 1, width: 0.8, opacity: 0.1 },
-  { len: 0.7, width: 1.15, opacity: 0.14 },
-  { len: 0.45, width: 1.5, opacity: 0.18 },
-  { len: 0.25, width: 1.8, opacity: 0.24 },
-];
+// the trail: ONE unbroken segment of the track path, stroked at the same
+// width as the construction lines, sliding in lockstep with the head dot
+// (which is also exactly line-width). the fade along the streak is built
+// from TRAIL_STEPS nested sub-segments (each contains the next, all ending
+// at the head — geometrically one continuous line), with per-layer alphas
+// solved below so the CUMULATIVE fade is a smooth linear ramp
+// TRAIL_MAX_ALPHA (at the head) → 0 (at the tip).
+const TRAIL_LENGTH = 0.6; // tail length, in seconds of travel
+const TRAIL_STEPS = 16; // fade smoothness (raise if you can see banding)
+const TRAIL_MAX_ALPHA = 0.9; // streak brightness at the head
+
+// per-layer alphas: band k (of N) sits under layers k..N, so solve
+// 1 - a_k = (1 - A_k) / (1 - A_{k+1}) with target band alpha
+// A_k = MAX * (N - k + 1) / N — a linear ramp after compositing
+const TRAIL_ALPHAS = Array.from({ length: TRAIL_STEPS }, (_, i) => {
+  const band = (k: number) =>
+    k > TRAIL_STEPS ? 0 : (TRAIL_MAX_ALPHA * (TRAIL_STEPS - k + 1)) / TRAIL_STEPS;
+  return 1 - (1 - band(i + 1)) / (1 - band(i + 2));
+});
 
 // share of the lap spent on the curve — exact for any square count, since
 // each square contributes a quarter-arc (π/2)·s vs two sides 2·s
@@ -70,9 +76,9 @@ const CURVE_FRACTION = Math.PI / (Math.PI + 4);
 // ═══════════════════════════════════════════════════════════════════
 // GEOMETRY — generated, not hand-plotted
 // ═══════════════════════════════════════════════════════════════════
-const FIB = [610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5];
-const W = 987;
-const H = 610;
+const FIB = [987, 610, 377, 233, 144, 89, 55, 34, 21, 13, 8, 5, 3, 2, 1, 1];
+const W = 1597;
+const H = 987;
 
 interface Pt {
   x: number;
@@ -153,7 +159,7 @@ function buildLayout(orient: "horizontal" | "vertical") {
 
   const size = orient === "horizontal" ? { w: W, h: H } : { w: H, h: W };
   return {
-    viewBox: `-12 -12 ${size.w + 24} ${size.h + 24}`,
+    viewBox: `-20 -20 ${size.w + 40} ${size.h + 40}`,
     rect: size,
     lines: lines.map(([a, b]) => [tf(a), tf(b)] as [Pt, Pt]),
     spiral,
@@ -204,31 +210,32 @@ export default function GoldenLogo({
     style: { ...props.style, fontWeight: LETTER_WEIGHT },
   });
 
-  // one looping dot with a continuous comet streak. the tail is the track
-  // path itself, dash-normalized (pathLength=1) so only a `len`-long segment
-  // is visible, slid along the path by the gl-tail-slide keyframes. the head
-  // rides the same path via css offset-path on the same clock, so head and
-  // tail can never drift apart. `delay` (negative) sets the start position.
+  // one looping dot + streak. each tail layer is the track path itself,
+  // dash-normalized (pathLength=1, px dash values — safari rejects unitless)
+  // so only a segment ending at the head is visible, slid along the path by
+  // the gl-tail-slide keyframes. layer k covers the last (k/N)·TRAIL_LENGTH
+  // seconds of travel; nested layers composite into the linear fade. the
+  // head rides the same path via css offset-path on the same clock, so head
+  // and streak can never drift. `delay` (negative) sets the start position.
   const dot = (delay: number) => (
     <g className="gl-dot" key={delay}>
-      {TAIL_LAYERS.map((l, i) => {
-        const len = (TRAIL_SPAN / DOT_DUR) * l.len; // fraction of the lap
+      {TRAIL_ALPHAS.map((alpha, i) => {
+        const len = (TRAIL_LENGTH / DOT_DUR) * ((i + 1) / TRAIL_STEPS); // fraction of the lap
         return (
           <path
             key={i}
             className="gl-tail"
             d={geo.track}
             pathLength={1}
-            strokeWidth={DOT_RADIUS * l.width}
-            opacity={l.opacity}
-            strokeDasharray={`${len} ${1 - len}`}
+            opacity={alpha}
+            strokeDasharray={`${len}px ${1 - len}px`}
             style={{ "--gl-tail-len": len, animationDelay: `${delay}s` } as React.CSSProperties}
           />
         );
       })}
       <circle
         className="gl-dot-head"
-        r={DOT_RADIUS}
+        r={STROKE_WIDTH[variant] / 2}
         fill="currentColor"
         style={{ offsetPath: `path("${geo.track}")`, animationDelay: `${delay}s` } as React.CSSProperties}
       />
@@ -241,7 +248,7 @@ export default function GoldenLogo({
       className={`golden-logo ${variant === "hero" ? "gl-hero" : "gl-mark"} ${className}`}
       style={
         {
-          "--gl-stroke": STROKE_WIDTH[variant],
+          "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
           "--gl-line-brightness": LINE_BRIGHTNESS,
           "--gl-dot-dur": `${DOT_DUR}s`,
         } as React.CSSProperties
