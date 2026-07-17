@@ -152,6 +152,17 @@ body {
   opacity: 1;
 }
 
+/* comets stay invisible until the draw-on animation finishes (applied per
+   dot group with the draw-gate delay; visibility flips discretely) */
+@keyframes gl-gate {
+  from {
+    visibility: hidden;
+  }
+  to {
+    visibility: visible;
+  }
+}
+
 /* comet streak: the track path dashed down to one short visible segment
    ending at the head, slid along the path on the same clock as the head
    dot. same stroke width as the construction lines. --gl-tail-len is a
