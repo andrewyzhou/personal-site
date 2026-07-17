@@ -236,7 +236,7 @@ interface GoldenLogoProps {
 }
 
 export default function GoldenLogo({
-  layout = "horizontal",
+  layout = "vertical",
   variant = "hero",
   animate = true,
   className = "",
