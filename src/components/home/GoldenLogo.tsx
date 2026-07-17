@@ -236,7 +236,7 @@ interface GoldenLogoProps {
 }
 
 export default function GoldenLogo({
-  layout = "vertical",
+  layout = "horizontal",
   variant = "hero",
   animate = true,
   className = "",
@@ -278,7 +278,13 @@ export default function GoldenLogo({
   // head rides the same path via css offset-path on the same clock, so head
   // and streak can never drift.
   const dot = (track: string, phase: "from-start" | "from-end") => (
-    <g className="gl-dot" key={phase}>
+    <g
+      className="gl-dot"
+      key={phase}
+      // gl-gate keeps the comet invisible until the draw-on animation ends,
+      // so the parked from-state never shows on load
+      style={animate ? { animation: `gl-gate 1ms linear ${dotDelay}s both` } : undefined}
+    >
       {TRAIL_ALPHAS.map((alpha, i) => {
         const len = (TRAIL_LENGTH / DOT_DUR) * ((i + 1) / TRAIL_STEPS); // fraction of the lap
         return (
