@@ -62,7 +62,7 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
           className="flex items-center gap-3 cursor-pointer"
           aria-label="scroll to top"
         >
-          <GoldenLogo variant="mark" animate={false} className="w-12 shrink-0" />
+          <GoldenLogo variant="mark" animate={false} className="w-9 shrink-0" />
           <span className="font-sans font-bold text-off-white text-base">andrew zhou</span>
         </button>
 
@@ -95,7 +95,9 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
           className="h-full snap-start flex flex-col items-center justify-center"
           style={{ padding: "0 clamp(1.5rem, 4vw, 3rem)" }}
         >
-          <GoldenLogo variant="hero" className="w-full max-w-md" />
+          {/* vertical logo: height ≈ 1.618 × width, so size by width with the
+              whole hero stack (name, bio, cards) in mind */}
+          <GoldenLogo variant="hero" className="w-full max-w-60" />
           <h1
             className="font-sans font-bold text-off-white text-4xl md:text-5xl"
             style={{ marginTop: "2.5rem" }}

@@ -80,20 +80,6 @@ const SPEED_MIN = 0.1;
 const SPEED_MAX = 4;
 const SPEED_RATIO = SPEED_MAX / SPEED_MIN;
 
-// ═══════════════════════════════════════════════════════════════════
-// DOT COLOR CONTROLS — speed-synced color with trail memory
-// the dot's color tracks its speed: COLOR_SLOW at SPEED_MIN, COLOR_FAST at
-// SPEED_MAX. speed is linear in time (constant acceleration), so the color
-// keyframes interpolate LINEARLY between the same boundaries the motion
-// uses — color is exactly a function of current speed. each trail layer
-// replays the same color animation lagged by how far behind the head its
-// band sits (average-speed approximation), so the streak shows the color
-// HISTORY of the ride. oklch mid-lightness hues stay vibrant on both themes.
-// ═══════════════════════════════════════════════════════════════════
-const COLOR_SLOW = "oklch(0.6 0.23 265)"; // vivid blue at the crawl
-const COLOR_FAST = "oklch(0.83 0.16 80)"; // hot gold at peak speed
-const AVG_SPEED = (SPEED_MIN + SPEED_MAX) / 2;
-
 // share of the lap that is the curve — exact for any square count, since
 // each square contributes a quarter-arc (π/2)·s vs two return sides 2·s
 const CURVE_FRACTION = Math.PI / (Math.PI + 4);
@@ -126,11 +112,6 @@ function speedKeyframes(name: string, mid: number): string {
   0% { stroke-dashoffset: calc(var(--gl-tail-len) * 1px); animation-timing-function: ${ACCEL}; }
   ${pct}% { stroke-dashoffset: calc((var(--gl-tail-len) - ${mid.toFixed(4)}) * 1px); animation-timing-function: ${DECEL}; }
   100% { stroke-dashoffset: calc((var(--gl-tail-len) - 1) * 1px); }
-}
-@keyframes gl-heat-${name} {
-  0% { color: ${COLOR_SLOW}; }
-  ${pct}% { color: ${COLOR_FAST}; }
-  100% { color: ${COLOR_SLOW}; }
 }`;
 }
 
@@ -255,7 +236,7 @@ interface GoldenLogoProps {
 }
 
 export default function GoldenLogo({
-  layout = "horizontal",
+  layout = "vertical",
   variant = "hero",
   animate = true,
   className = "",
@@ -311,13 +292,8 @@ export default function GoldenLogo({
             style={
               {
                 "--gl-tail-len": len,
-                // second animation is the color; its extra negative lag is
-                // this band's age — how long ago the head was here
-                animationName: `gl-tail-${phase}, gl-heat-${phase}`,
-                animationDelay: `${dotDelay}s, ${(
-                  dotDelay -
-                  ((i + 0.5) / TRAIL_STEPS) * (TRAIL_LENGTH / AVG_SPEED)
-                ).toFixed(3)}s`,
+                animationName: `gl-tail-${phase}`,
+                animationDelay: `${dotDelay}s`,
               } as React.CSSProperties
             }
           />
@@ -330,8 +306,8 @@ export default function GoldenLogo({
         style={
           {
             offsetPath: `path("${track}")`,
-            animationName: `gl-ride-${phase}, gl-heat-${phase}`,
-            animationDelay: `${dotDelay}s, ${dotDelay}s`,
+            animationName: `gl-ride-${phase}`,
+            animationDelay: `${dotDelay}s`,
           } as React.CSSProperties
         }
       />
@@ -346,7 +322,7 @@ export default function GoldenLogo({
         {
           "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
           "--gl-line-brightness": LINE_BRIGHTNESS,
-          "--gl-dot-dur": `${DOT_DUR / AVG_SPEED}s`,
+          "--gl-dot-dur": `${DOT_DUR / ((SPEED_MIN + SPEED_MAX) / 2)}s`,
         } as React.CSSProperties
       }
       fill="none"
