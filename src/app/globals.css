@@ -152,20 +152,9 @@ body {
   transition: opacity 0.15s ease;
 }
 
-.golden-logo:hover .gl-dot-head,
-.golden-logo.gl-show-dots .gl-dot-head {
+.golden-logo.gl-armed:hover .gl-dot-head,
+.golden-logo.gl-armed.gl-show-dots .gl-dot-head {
   opacity: 1;
-}
-
-/* comets stay invisible until the draw-on animation finishes (applied per
-   dot group with the draw-gate delay; visibility flips discretely) */
-@keyframes gl-gate {
-  from {
-    visibility: hidden;
-  }
-  to {
-    visibility: visible;
-  }
 }
 
 /* comet streak: the track path dashed down to one short visible segment
@@ -186,8 +175,10 @@ body {
   transition: opacity 0.18s ease;
 }
 
-.golden-logo:hover .gl-tail,
-.golden-logo.gl-show-dots .gl-tail {
+/* reveal requires gl-armed (set by the component when the draw-on ends) so
+   a cursor parked on the logo during the draw still gets the grow-in */
+.golden-logo.gl-armed:hover .gl-tail,
+.golden-logo.gl-armed.gl-show-dots .gl-tail {
   opacity: var(--gl-tail-alpha, 1);
   transition-delay: var(--gl-tail-reveal, 0s);
 }

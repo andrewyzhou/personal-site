@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 // hand-coded golden-ratio mark, two layouts:
 //   horizontal — 1597x987 fibonacci rectangle, spiral starts bottom-right
 //   vertical   — 987x1597 fibonacci rectangle, spiral starts top-left
@@ -244,6 +248,18 @@ export default function GoldenLogo({
   const geo = GEOMETRY[layout];
   const letters = LETTERS[layout];
 
+  // the hover reveal is disarmed until the draw-on finishes. arming via a
+  // class change (rather than relying on :hover alone) matters when the
+  // cursor is already parked over the logo during the draw: the class flip
+  // is what kicks off the staggered trail transitions, so the grow-in plays
+  // in that case too instead of popping in fully formed.
+  const [armed, setArmed] = useState(!animate);
+  useEffect(() => {
+    if (!animate) return;
+    const t = setTimeout(() => setArmed(true), DRAW_END * 1000);
+    return () => clearTimeout(t);
+  }, [animate]);
+
   // draw-on props for one stroke: normalized dash + staggered delay
   const draw = (delay: number, dur = 0.9) =>
     animate
@@ -278,13 +294,7 @@ export default function GoldenLogo({
   // head rides the same path via css offset-path on the same clock, so head
   // and streak can never drift.
   const dot = (track: string, phase: "from-start" | "from-end") => (
-    <g
-      className="gl-dot"
-      key={phase}
-      // gl-gate keeps the comet invisible until the draw-on animation ends,
-      // so the parked from-state never shows on load
-      style={animate ? { animation: `gl-gate 1ms linear ${dotDelay}s both` } : undefined}
-    >
+    <g className="gl-dot" key={phase}>
       {TRAIL_ALPHAS.map((alpha, i) => {
         const len = (TRAIL_LENGTH / DOT_DUR) * ((i + 1) / TRAIL_STEPS); // fraction of the lap
         return (
@@ -327,7 +337,7 @@ export default function GoldenLogo({
   return (
     <svg
       viewBox={geo.viewBox}
-      className={`golden-logo ${variant === "hero" ? "gl-hero" : "gl-mark"} ${className}`}
+      className={`golden-logo ${variant === "hero" ? "gl-hero" : "gl-mark"} ${armed ? "gl-armed" : ""} ${className}`}
       style={
         {
           "--gl-stroke": `${STROKE_WIDTH[variant]}px`,
