@@ -209,6 +209,48 @@ body {
 }
 
 /* ============================================
+   SIDEBAR STATUS MINIS
+   transit-billboard marquee for overflowing
+   text + live pulse for active items
+   ============================================ */
+
+.cc-marquee {
+  display: inline-flex;
+  gap: 1.5rem;
+  animation: cc-marquee 8s linear infinite;
+}
+
+.cc-marquee > span {
+  flex-shrink: 0;
+}
+
+/* two copies of the text; shifting one copy + one gap loops seamlessly */
+@keyframes cc-marquee {
+  to {
+    transform: translateX(calc(-50% - 0.75rem));
+  }
+}
+
+.cc-live {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--theme-text-primary);
+  animation: cc-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cc-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* ============================================
    EQUALIZER (currently: music card)
    ============================================ */
 

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import GoldenLogo from "./GoldenLogo";
 import CurrentlyCards from "./CurrentlyCards";
 import SocialLinks from "@/components/SocialLinks";
+import Currently from "@/components/Currently";
+import ActivityCalendar from "@/components/ActivityCalendar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const SECTIONS = [
   { id: "home", label: "home" },
@@ -22,9 +25,10 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 
 interface HomeShellProps {
   descriptions: Partial<Record<string, string>>;
+  bio: React.ReactNode;
 }
 
-export default function HomeShell({ descriptions }: HomeShellProps) {
+export default function HomeShell({ descriptions, bio }: HomeShellProps) {
   const [active, setActive] = useState<SectionId>("home");
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -52,11 +56,6 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
 
   return (
     <div className="relative flex h-dvh overflow-hidden">
-      {/* persistent status minis, floating top right over the content pane */}
-      <div className="hidden md:block" style={{ position: "absolute", top: "1.25rem", right: "1.5rem", zIndex: 10 }}>
-        <CurrentlyCards variant="mini" />
-      </div>
-
       {/* left sidebar — simple dividing line for now (dynamic progress line later) */}
       <aside
         className="hidden md:flex shrink-0 flex-col h-full"
@@ -93,6 +92,9 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
           ))}
         </nav>
 
+        <div className="w-full" style={{ marginBottom: "0.25rem" }}>
+          <CurrentlyCards variant="mini" />
+        </div>
         <SocialLinks className="justify-end flex-wrap" />
       </aside>
 
@@ -101,23 +103,35 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
         {/* home */}
         <section
           id="section-home"
-          className="h-full snap-start flex flex-col items-center justify-center"
-          style={{ padding: "0 clamp(1.5rem, 4vw, 3rem)" }}
+          className="h-full snap-start flex flex-col"
+          style={{ padding: "1.75rem clamp(2rem, 5vw, 4rem)" }}
         >
-          {/* vertical logo: height ≈ 1.618 × width, so size by width with the
-              whole hero stack (name, bio, cards) in mind */}
-          <GoldenLogo variant="hero" className="w-full max-w-60" />
-          <h1
-            className="font-sans font-bold text-off-white text-4xl md:text-5xl"
-            style={{ marginTop: "2.5rem" }}
-          >
-            andrew zhou
-          </h1>
-          <p className="text-gray text-base md:text-lg" style={{ marginTop: "0.75rem" }}>
-            electrical engineering &amp; computer science @ uc berkeley
-          </p>
-          <div style={{ marginTop: "2.25rem" }}>
-            <CurrentlyCards variant="full" />
+          {/* logo — top left, small (vertical: height ≈ 1.618 × width) */}
+          <div className="shrink-0" style={{ width: "clamp(84px, 9vw, 120px)" }}>
+            <GoldenLogo variant="hero" className="w-full" />
+          </div>
+
+          {/* identity + bio + currently typewriter, calendar alongside */}
+          <div className="flex-1 min-h-0 flex items-center justify-center" style={{ gap: "clamp(3rem, 6vw, 5rem)" }}>
+            <div className="min-w-0" style={{ maxWidth: "36rem" }}>
+              <h1 className="font-sans font-bold text-off-white text-4xl md:text-5xl">andrew zhou</h1>
+              <p className="text-gray text-base md:text-lg" style={{ marginTop: "0.5rem" }}>
+                electrical engineering &amp; computer science @ uc berkeley
+              </p>
+              <div className="text-secondary" style={{ marginTop: "1.5rem" }}>{bio}</div>
+              <div style={{ marginTop: "2rem" }}>
+                <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load this section.</p>}>
+                  <Currently />
+                </ErrorBoundary>
+              </div>
+            </div>
+            <div className="hidden xl:flex justify-center shrink-0">
+              <ErrorBoundary
+                fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load the activity calendar.</p>}
+              >
+                <ActivityCalendar />
+              </ErrorBoundary>
+            </div>
           </div>
         </section>
 
