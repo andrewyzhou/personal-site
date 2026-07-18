@@ -7,6 +7,7 @@ import SocialLinks from "@/components/SocialLinks";
 import Currently from "@/components/Currently";
 import ActivityCalendar from "@/components/ActivityCalendar";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import Hero from "@/components/Hero";
 
 const SECTIONS = [
   { id: "home", label: "home" },
@@ -26,9 +27,10 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 interface HomeShellProps {
   descriptions: Partial<Record<string, string>>;
   bio: React.ReactNode;
+  quotes: string[];
 }
 
-export default function HomeShell({ descriptions, bio }: HomeShellProps) {
+export default function HomeShell({ descriptions, bio, quotes }: HomeShellProps) {
   const [active, setActive] = useState<SectionId>("home");
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -61,23 +63,17 @@ export default function HomeShell({ descriptions, bio }: HomeShellProps) {
         className="hidden md:flex shrink-0 flex-col h-full"
         style={{ width: 150, borderRight: "1px solid var(--theme-divider)", padding: "2rem 1.25rem" }}
       >
+        {/* the logo lives here now — always visible, doubles as "home" */}
+        <button
+          onClick={() => goTo("home")}
+          aria-label="home"
+          className="cursor-pointer w-full flex justify-end shrink-0"
+          style={{ marginBottom: "1.75rem" }}
+        >
+          <GoldenLogo variant="hero" className="w-full" />
+        </button>
+
         <nav className="flex flex-col items-end gap-0.5 flex-1 min-h-0 overflow-y-auto">
-          {/* the mark IS "home": hidden while on the home section, fades in
-              as its stand-in everywhere else */}
-          <button
-            onClick={() => goTo("home")}
-            aria-label="home"
-            className="cursor-pointer"
-            style={{
-              opacity: active === "home" ? 0 : 1,
-              transform: active === "home" ? "translateY(-6px)" : "none",
-              pointerEvents: active === "home" ? "none" : "auto",
-              transition: "opacity 0.35s ease, transform 0.35s ease",
-              marginBottom: "0.5rem",
-            }}
-          >
-            <GoldenLogo variant="mark" animate={false} className="w-7" />
-          </button>
           {SECTIONS.slice(1).map((s) => (
             <button
               key={s.id}
@@ -100,25 +96,19 @@ export default function HomeShell({ descriptions, bio }: HomeShellProps) {
 
       {/* right: one section on screen at a time, scroll locked per page */}
       <div ref={containerRef} className="flex-1 h-full overflow-y-auto snap-y snap-mandatory">
-        {/* home */}
+        {/* home — the old homepage, minus the section tabs (nav lives left) */}
         <section
           id="section-home"
-          className="h-full snap-start flex flex-col"
-          style={{ padding: "1.75rem clamp(2rem, 5vw, 4rem)" }}
+          className="h-full snap-start flex flex-col justify-center"
+          style={{ padding: "1.5rem clamp(2rem, 5vw, 4rem)", gap: "1.5rem" }}
         >
-          {/* logo — top left, small (vertical: height ≈ 1.618 × width) */}
-          <div className="shrink-0" style={{ width: "clamp(84px, 9vw, 120px)" }}>
-            <GoldenLogo variant="hero" className="w-full" />
-          </div>
+          {/* old hero: headshot + "hi, i'm andrew" + socials, school + quotes right */}
+          <Hero quotes={quotes} />
 
-          {/* identity + bio + currently typewriter, calendar alongside */}
-          <div className="flex-1 min-h-0 flex items-center justify-center" style={{ gap: "clamp(3rem, 6vw, 5rem)" }}>
+          {/* bio + currently typewriter, calendar alongside */}
+          <div className="min-h-0 flex items-start justify-between" style={{ gap: "clamp(3rem, 6vw, 5rem)" }}>
             <div className="min-w-0" style={{ maxWidth: "36rem" }}>
-              <h1 className="font-sans font-bold text-off-white text-4xl md:text-5xl">andrew zhou</h1>
-              <p className="text-gray text-base md:text-lg" style={{ marginTop: "0.5rem" }}>
-                electrical engineering &amp; computer science @ uc berkeley
-              </p>
-              <div className="text-secondary" style={{ marginTop: "1.5rem" }}>{bio}</div>
+              <div className="text-secondary">{bio}</div>
               <div style={{ marginTop: "2rem" }}>
                 <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load this section.</p>}>
                   <Currently />
