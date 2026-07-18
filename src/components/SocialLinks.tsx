@@ -18,15 +18,13 @@ const socialLinks: SocialLink[] = [
   { name: "x", url: "https://x.com/andrewyzhou", icon: "/icons/x.svg" },
   { name: "strava", url: "https://www.strava.com/athletes/161887324", icon: "/icons/strava.svg" },
   { name: "spotify", url: "https://open.spotify.com/user/andrewfanbois", icon: "/icons/spotify.svg" },
-  { name: "resume", url: "/resume.pdf", isText: true },
-  { name: "cv", url: "/cv.pdf", isText: true },
 ];
 
-export default function SocialLinks() {
+export default function SocialLinks({ className = "" }: { className?: string }) {
   const { theme, cycleTheme } = useTheme();
 
   return (
-    <div className="flex items-center gap-2" style={{ marginTop: '1.5rem' }}>
+    <div className={`flex items-center gap-2 ${className}`} style={{ marginTop: '1.5rem' }}>
       {socialLinks.map((link) => {
         const content = link.icon ? (
           <Image

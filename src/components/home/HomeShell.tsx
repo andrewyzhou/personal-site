@@ -51,27 +51,39 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
   };
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="relative flex h-dvh overflow-hidden">
+      {/* persistent status minis, floating top right over the content pane */}
+      <div className="hidden md:block" style={{ position: "absolute", top: "1.25rem", right: "1.5rem", zIndex: 10 }}>
+        <CurrentlyCards variant="mini" />
+      </div>
+
       {/* left sidebar — simple dividing line for now (dynamic progress line later) */}
       <aside
-        className="hidden md:flex w-64 shrink-0 flex-col h-full"
-        style={{ borderRight: "1px solid var(--theme-divider)", padding: "2rem 1.75rem" }}
+        className="hidden md:flex shrink-0 flex-col h-full"
+        style={{ width: 150, borderRight: "1px solid var(--theme-divider)", padding: "2rem 1.25rem" }}
       >
-        <button
-          onClick={() => goTo("home")}
-          className="flex items-center gap-3 cursor-pointer"
-          aria-label="scroll to top"
-        >
-          <GoldenLogo variant="mark" animate={false} className="w-9 shrink-0" />
-          <span className="font-sans font-bold text-off-white text-base">andrew zhou</span>
-        </button>
-
-        <nav className="flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto" style={{ marginTop: "2.5rem" }}>
-          {SECTIONS.map((s) => (
+        <nav className="flex flex-col items-end gap-0.5 flex-1 min-h-0 overflow-y-auto">
+          {/* the mark IS "home": hidden while on the home section, fades in
+              as its stand-in everywhere else */}
+          <button
+            onClick={() => goTo("home")}
+            aria-label="home"
+            className="cursor-pointer"
+            style={{
+              opacity: active === "home" ? 0 : 1,
+              transform: active === "home" ? "translateY(-6px)" : "none",
+              pointerEvents: active === "home" ? "none" : "auto",
+              transition: "opacity 0.35s ease, transform 0.35s ease",
+              marginBottom: "0.5rem",
+            }}
+          >
+            <GoldenLogo variant="mark" animate={false} className="w-7" />
+          </button>
+          {SECTIONS.slice(1).map((s) => (
             <button
               key={s.id}
               onClick={() => goTo(s.id)}
-              className={`text-left text-sm cursor-pointer transition-colors ${
+              className={`text-right text-sm cursor-pointer transition-colors ${
                 active === s.id ? "text-off-white font-medium" : "text-gray hover:text-secondary"
               }`}
               style={{ padding: "0.25rem 0" }}
@@ -81,10 +93,7 @@ export default function HomeShell({ descriptions }: HomeShellProps) {
           ))}
         </nav>
 
-        <div style={{ marginBottom: "0.5rem" }}>
-          <CurrentlyCards variant="mini" />
-        </div>
-        <SocialLinks />
+        <SocialLinks className="justify-end flex-wrap" />
       </aside>
 
       {/* right: one section on screen at a time, scroll locked per page */}
