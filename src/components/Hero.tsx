@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import SocialLinks from "./SocialLinks";
 
 const TYPING_SPEED = 35;
 
@@ -111,9 +110,10 @@ export default function Hero({ quotes }: HeroProps) {
         {/* left side - headshot, name, and social links */}
         <div>
           <div className="flex items-center gap-6">
-            {/* headshot / logo */}
+            {/* headshot / logo — golden-rectangle proportions, matching the
+                sidebar logo's rendered size (110 x 178) */}
             <div
-              className={`w-[112px] h-[150px] flex-shrink-0 cursor-pointer ${
+              className={`w-[110px] h-[178px] flex-shrink-0 cursor-pointer ${
                 showLogo ? "" : "headshot-border bg-off-white p-1"
               }`}
               onClick={() => setShowLogo(!showLogo)}
@@ -146,8 +146,6 @@ export default function Hero({ quotes }: HeroProps) {
             </div>
           </div>
 
-          {/* social links */}
-          <SocialLinks />
         </div>
 
         {/* right side - info */}
