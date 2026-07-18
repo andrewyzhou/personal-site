@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { isSpotifyTrack, isStravaActivity, isLiteralBook } from "@/lib/validate";
@@ -30,7 +30,7 @@ interface CurrentlyData {
   book: LiteralBook | null;
 }
 
-// one fetch shared between the sidebar minis and the home cards
+// one fetch shared between every instance on the page
 let currentlyPromise: Promise<CurrentlyData> | null = null;
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -61,11 +61,11 @@ function loadCurrently(): Promise<CurrentlyData> {
 function timeAgo(iso?: string): string {
   if (!iso) return "";
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 // the bar-graph sound icon: animated when playing, frozen mid-song when stale.
@@ -97,21 +97,63 @@ function Equalizer({ playing, size = 16 }: { playing: boolean; size?: number }) 
   );
 }
 
-interface CardProps {
-  icon: React.ReactNode;
-  line1: string;
-  line2?: string;
-  href?: string;
-  mini?: boolean;
+// single-line text that scrolls like a transit billboard when it overflows
+function ScrollText({ text }: { text: string }) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    const inner = measureRef.current;
+    if (outer && inner) setOverflows(inner.scrollWidth > outer.clientWidth + 1);
+  }, [text]);
+
+  return (
+    <div ref={outerRef} className="flex-1 min-w-0 overflow-hidden whitespace-nowrap text-gray text-xs">
+      {overflows ? (
+        <div className="cc-marquee" style={{ animationDuration: `${Math.max(6, text.length * 0.3)}s` }}>
+          <span>{text}</span>
+          <span aria-hidden>{text}</span>
+        </div>
+      ) : (
+        <span ref={measureRef}>{text}</span>
+      )}
+    </div>
+  );
 }
 
-function Card({ icon, line1, line2, href, mini }: CardProps) {
-  const inner = mini ? (
-    <div className="flex items-center justify-end gap-2 min-w-0">
-      {icon}
-      <span className="text-gray text-xs truncate">{line1}</span>
+// sidebar row: icon left, billboard text middle, time / live pulse right
+function MiniRow({
+  icon,
+  text,
+  right,
+  href,
+}: {
+  icon: React.ReactNode;
+  text: string;
+  right?: React.ReactNode;
+  href?: string;
+}) {
+  const row = (
+    <div className="flex items-center gap-2 w-full min-w-0">
+      <span className="shrink-0 flex items-center text-off-white">{icon}</span>
+      <ScrollText text={text} />
+      {right != null && <span className="shrink-0 flex items-center text-gray text-xs">{right}</span>}
     </div>
+  );
+  return href ? (
+    <Link href={href} className="block w-full min-w-0">
+      {row}
+    </Link>
   ) : (
+    row
+  );
+}
+
+// full-size card, kept for future use on content sections
+function Card({ icon, line1, line2, href }: { icon: React.ReactNode; line1: string; line2?: string; href?: string }) {
+  const inner = (
     <div className="flex items-center gap-3 card-bg rounded-lg min-w-0" style={{ padding: "0.625rem 0.875rem" }}>
       {icon}
       <div className="min-w-0">
@@ -122,7 +164,7 @@ function Card({ icon, line1, line2, href, mini }: CardProps) {
   );
   if (href) {
     return (
-      <Link href={href} className={mini ? "block min-w-0" : "block min-w-0 card-bg-hover rounded-lg"}>
+      <Link href={href} className="block min-w-0 card-bg-hover rounded-lg">
         {inner}
       </Link>
     );
@@ -145,63 +187,81 @@ export default function CurrentlyCards({ variant = "full" }: { variant?: "full" 
 
   if (!data || (!data.track && !data.activity && !data.book)) return null;
 
-  const mini = variant === "mini";
-  const iconSize = mini ? 14 : 18;
   const { track, activity, book } = data;
 
-  const cards = (
-    <>
+  if (variant === "mini") {
+    return (
+      <div className="flex flex-col gap-1.5 w-full animate-content-enter">
+        {track && (
+          <MiniRow
+            icon={<Equalizer playing={track.isPlaying} size={12} />}
+            text={`${track.title} · ${track.artist}`}
+            right={track.isPlaying ? <span className="cc-live" /> : timeAgo(track.playedAt)}
+          />
+        )}
+        {activity && (
+          <MiniRow
+            href={`/activities/${activity.id}`}
+            icon={
+              <Image
+                src={`/icons/activities/${sportIcon(activity.type)}.svg`}
+                alt=""
+                width={12}
+                height={12}
+                className="shrink-0 opacity-80"
+              />
+            }
+            text={sportLabel(activity.type)}
+            right={timeAgo(activity.startDate)}
+          />
+        )}
+        {book && (
+          <MiniRow
+            icon={<Image src="/icons/library.svg" alt="" width={12} height={12} className="shrink-0 opacity-80" />}
+            text={`${book.title}${book.authors?.[0]?.name ? ` · ${book.authors[0].name}` : ""}`}
+            right={<span className="cc-live" />}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-stretch justify-center gap-3 animate-content-enter">
       {track && (
         <Card
-          mini={mini}
           icon={
             <span className="text-off-white shrink-0">
-              <Equalizer playing={track.isPlaying} size={iconSize} />
+              <Equalizer playing={track.isPlaying} size={18} />
             </span>
           }
-          line1={mini ? track.title : track.title}
-          line2={track.isPlaying ? `${track.artist} · now` : `${track.artist} · ${timeAgo(track.playedAt)}`}
+          line1={track.title}
+          line2={track.isPlaying ? `${track.artist} · now` : `${track.artist} · ${timeAgo(track.playedAt)} ago`}
         />
       )}
       {activity && (
         <Card
-          mini={mini}
           href={`/activities/${activity.id}`}
           icon={
             <Image
               src={`/icons/activities/${sportIcon(activity.type)}.svg`}
               alt=""
-              width={iconSize}
-              height={iconSize}
+              width={18}
+              height={18}
               className="shrink-0 opacity-80"
             />
           }
-          line1={mini ? `${sportLabel(activity.type)} · ${timeAgo(activity.startDate)}` : sportLabel(activity.type)}
-          line2={timeAgo(activity.startDate)}
+          line1={sportLabel(activity.type)}
+          line2={`${timeAgo(activity.startDate)} ago`}
         />
       )}
       {book && (
         <Card
-          mini={mini}
-          icon={
-            <Image
-              src="/icons/library.svg"
-              alt=""
-              width={iconSize}
-              height={iconSize}
-              className="shrink-0 opacity-80"
-            />
-          }
+          icon={<Image src="/icons/library.svg" alt="" width={18} height={18} className="shrink-0 opacity-80" />}
           line1={book.title}
           line2={book.authors?.[0]?.name ?? "reading"}
         />
       )}
-    </>
-  );
-
-  return mini ? (
-    <div className="flex flex-col gap-2 animate-content-enter">{cards}</div>
-  ) : (
-    <div className="flex flex-wrap items-stretch justify-center gap-3 animate-content-enter">{cards}</div>
+    </div>
   );
 }
