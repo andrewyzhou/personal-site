@@ -68,21 +68,23 @@ function timeAgo(iso?: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-// the bar-graph sound icon: animated when playing, frozen mid-song when stale
+// the bar-graph sound icon: animated when playing, frozen mid-song when stale.
+// 5 bars, staggered non-monotonically so the wave feels organic; opacity-80
+// matches the stroked svg icon set so all card icons share the palette.
 function Equalizer({ playing, size = 16 }: { playing: boolean; size?: number }) {
-  const delays = [0, 0.22, 0.44];
-  const staticScale = [0.55, 0.9, 0.4];
+  const delays = [0, 0.35, 0.15, 0.45, 0.25];
+  const staticScale = [0.45, 0.8, 0.6, 0.95, 0.5];
   return (
-    <svg viewBox="0 0 16 16" width={size} height={size} className="shrink-0" aria-hidden>
-      {[2, 6.5, 11].map((x, i) => (
+    <svg viewBox="0 0 16 16" width={size} height={size} className="shrink-0 opacity-80" aria-hidden>
+      {[1, 4, 7, 10, 13].map((x, i) => (
         <rect
           key={x}
           className="eq-bar"
           x={x}
           y="2"
-          width="3"
+          width="2"
           height="12"
-          rx="1.5"
+          rx="1"
           fill="currentColor"
           style={
             playing
@@ -105,7 +107,7 @@ interface CardProps {
 
 function Card({ icon, line1, line2, href, mini }: CardProps) {
   const inner = mini ? (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex items-center justify-end gap-2 min-w-0">
       {icon}
       <span className="text-gray text-xs truncate">{line1}</span>
     </div>
