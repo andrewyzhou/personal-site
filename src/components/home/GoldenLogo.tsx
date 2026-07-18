@@ -16,14 +16,14 @@
 // ═══════════════════════════════════════════════════════════════════
 const LETTERS = {
   horizontal: {
-    fontSize: 728,
+    fontSize: 720,
     A: { x: 655, y: 583 },
     Z: { x: 1060, y: 841 },
   },
   vertical: {
-    fontSize: 728,
-    A: { x: 307, y: 890 },
-    Z: { x: 712, y: 1149 },
+    fontSize: 688,
+    A: { x: 310, y: 910 },
+    Z: { x: 700, y: 1150 },
   },
 };
 
@@ -41,7 +41,7 @@ const LETTER_WEIGHT = 700;
 // mixes the line COLOR toward the background (not opacity), so overlapping
 // lines never darken. applies to squares AND curve.
 // ═══════════════════════════════════════════════════════════════════
-const STROKE_WIDTH = { hero: 5.5, mark: 16 };
+const STROKE_WIDTH = { hero: 8, mark: 16 };
 const LINE_BRIGHTNESS = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -56,7 +56,7 @@ const DOT_DUR = 10;
 // at the head — geometrically one continuous line), with per-layer alphas
 // solved below so the CUMULATIVE fade is a smooth linear ramp
 // TRAIL_MAX_ALPHA (at the head) → 0 (at the tip).
-const TRAIL_LENGTH = 0.6; // tail length, in seconds of travel
+const TRAIL_LENGTH = 1; // tail length, in seconds of travel
 const TRAIL_STEPS = 16; // fade smoothness (raise if you can see banding)
 const TRAIL_MAX_ALPHA = 0.9; // streak brightness at the head
 
@@ -76,7 +76,7 @@ const TRAIL_ALPHAS = Array.from({ length: TRAIL_STEPS }, (_, i) => {
 // at curve end) peaks at the squares→curve handoff — opposite trajectories.
 // speeds are in units of the old constant speed (lap length / DOT_DUR);
 // both phases share average (min+max)/2, so a lap takes DOT_DUR / avg.
-const SPEED_MIN = 0.1;
+const SPEED_MIN = 0.0001;
 const SPEED_MAX = 4;
 const SPEED_RATIO = SPEED_MAX / SPEED_MIN;
 
@@ -293,11 +293,15 @@ export default function GoldenLogo({
             className="gl-tail"
             d={track}
             pathLength={1}
-            opacity={alpha}
             strokeDasharray={`${len}px ${1 - len}px`}
             style={
               {
                 "--gl-tail-len": len,
+                // target opacity + staggered hover reveal: layer i shows only
+                // once the head has traveled this layer's length, so the trail
+                // grows out of the moving dot instead of appearing whole
+                "--gl-tail-alpha": alpha,
+                "--gl-tail-reveal": `${(TRAIL_LENGTH * (i + 1)) / TRAIL_STEPS}s`,
                 animationName: `gl-tail-${phase}`,
                 animationDelay: `${dotDelay}s`,
               } as React.CSSProperties
