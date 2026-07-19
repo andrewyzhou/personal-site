@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1697 1697">
+  <style>
+    .l { stroke: #101010; stroke-width: 14; fill: none; stroke-linecap: round; }
+    .t { fill: #101010; font-family: "EB Garamond", Garamond, Georgia, "Times New Roman", serif; font-weight: 700; }
+    @media (prefers-color-scheme: dark) {
+      .l { stroke: #EEEEEE; }
+      .t { fill: #EEEEEE; }
+    }
+  </style>
+  <rect class="l" x="355" y="50" width="987" height="1597"/>
+  <line class="l" x1="1342" y1="1037" x2="355" y2="1037"/>
+  <line class="l" x1="732" y1="1037" x2="732" y2="1647"/>
+  <line class="l" x1="732" y1="1270" x2="355" y2="1270"/>
+  <line class="l" x1="588" y1="1037" x2="588" y2="1270"/>
+  <line class="l" x1="732" y1="1181" x2="588" y2="1181"/>
+  <line class="l" x1="643" y1="1181" x2="643" y2="1270"/>
+  <line class="l" x1="643" y1="1215" x2="588" y2="1215"/>
+  <line class="l" x1="622" y1="1181" x2="622" y2="1215"/>
+  <line class="l" x1="643" y1="1202" x2="622" y2="1202"/>
+  <line class="l" x1="630" y1="1202" x2="630" y2="1215"/>
+  <line class="l" x1="630" y1="1207" x2="622" y2="1207"/>
+  <line class="l" x1="627" y1="1202" x2="627" y2="1207"/>
+  <line class="l" x1="630" y1="1205" x2="627" y2="1205"/>
+  <line class="l" x1="628" y1="1205" x2="628" y2="1207"/>
+  <line class="l" x1="628" y1="1206" x2="627" y2="1206"/>
+  <line class="l" x1="628" y1="1205" x2="628" y2="1206"/>
+  <text class="t" x="662" y="940" text-anchor="middle" font-size="728">A</text>
+  <text class="t" x="1067" y="1199" text-anchor="middle" font-size="728">Z</text>
+  <path class="l" d="M 355 50 A 987 987 0 0 1 1342 1037 A 610 610 0 0 1 732 1647 A 377 377 0 0 1 355 1270 A 233 233 0 0 1 588 1037 A 144 144 0 0 1 732 1181 A 89 89 0 0 1 643 1270 A 55 55 0 0 1 588 1215 A 34 34 0 0 1 622 1181 A 21 21 0 0 1 643 1202 A 13 13 0 0 1 630 1215 A 8 8 0 0 1 622 1207 A 5 5 0 0 1 627 1202 A 3 3 0 0 1 630 1205 A 2 2 0 0 1 628 1207 A 1 1 0 0 1 627 1206 A 1 1 0 0 1 628 1205"/>
+</svg>

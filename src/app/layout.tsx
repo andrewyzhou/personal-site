@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Funnel_Sans } from "next/font/google";
+import { EB_Garamond, Funnel_Sans } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Analytics } from "@vercel/analytics/next";
+import CursorHalo from "@/components/CursorHalo";
 import "./globals.css";
 
 const funnelSans = Funnel_Sans({
@@ -10,13 +11,20 @@ const funnelSans = Funnel_Sans({
   display: "swap",
 });
 
+// serif for the golden-logo letterforms — variable font, 400-800 range
+const ebGaramond = EB_Garamond({
+  subsets: ["latin"],
+  variable: "--font-garamond",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "andrew zhou",
   description: "electrical engineering & computer science @ uc berkeley",
   icons: {
     icon: [
-      { url: "/images/favicon.png", sizes: "48x48", type: "image/png" },
-      { url: "/images/logo.svg", type: "image/svg+xml" },
+      { url: "/images/az-favicon.png", sizes: "512x512", type: "image/png" },
+      { url: "/images/az-logo.svg", type: "image/svg+xml" },
     ],
   },
 };
@@ -27,11 +35,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${funnelSans.variable} theme-dark`}>
+    <html lang="en" className={`${funnelSans.variable} ${ebGaramond.variable} theme-dark`}>
       <body className="antialiased">
         <ThemeProvider>
           {children}
         </ThemeProvider>
+        <CursorHalo />
         <Analytics />
       </body>
     </html>

@@ -38,6 +38,10 @@ body {
    ============================================ */
 
 :root {
+  /* ── ui knobs (theme-independent) ─────────────────────────── */
+  /* roundness of the link-highlight pill */
+  --ui-highlight-radius: 4px;
+
   /* semantic colors - dark mode defaults */
   --theme-bg: #101010;
   --theme-text: #CCCCCC;
@@ -88,6 +92,183 @@ body {
   color: var(--theme-text);
 }
 
+
+/* ============================================
+   CURSOR HALO
+   ipad-pointer-style translucent circle that
+   replaces the native cursor on fine pointers.
+   knobs: size, active size, opacity below.
+   ============================================ */
+
+@media (pointer: fine) {
+  body.cursor-halo,
+  body.cursor-halo * {
+    cursor: none;
+  }
+
+  /* keep the text caret affordance in editable fields */
+  body.cursor-halo input,
+  body.cursor-halo textarea,
+  body.cursor-halo select {
+    cursor: auto;
+  }
+}
+
+.cursor-halo-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: 26px; /* knob: resting halo size */
+  height: 26px;
+  border-radius: 50%;
+  background: var(--theme-text-primary);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform;
+  transition: width 0.18s ease, height 0.18s ease, opacity 0.18s ease;
+}
+
+.cursor-halo-dot.cursor-halo--visible {
+  opacity: 0.14; /* knob: halo strength */
+}
+
+.cursor-halo-dot.cursor-halo--active {
+  width: 40px; /* knob: size over links/buttons */
+  height: 40px;
+}
+
+.cursor-halo-dot.cursor-halo--visible.cursor-halo--active {
+  opacity: 0.2; /* knob: strength over links/buttons */
+}
+
+@media (pointer: coarse) {
+  .cursor-halo-dot {
+    display: none;
+  }
+}
+
+/* ============================================
+   GOLDEN LOGO (redesign)
+   draw-on strokes are pathLength-normalized to 1,
+   so dasharray/dashoffset are always 0..1
+   ============================================ */
+
+.golden-logo {
+  color: var(--theme-text-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* squares + spiral: same width and brightness, driven by the component's
+   STROKE_WIDTH / LINE_BRIGHTNESS knobs (css vars set on the svg root).
+   brightness mixes the stroke color toward the theme background instead of
+   using opacity, so overlapping lines don't compound darker. */
+.golden-logo .gl-line {
+  stroke: color-mix(
+    in oklab,
+    currentColor calc(var(--gl-line-brightness, 1) * 100%),
+    var(--theme-bg)
+  );
+  /* user units (scales with the logo), not px — keeps zoom proportions */
+  stroke-width: var(--gl-stroke, 1);
+}
+
+/* letters: bold EB Garamond glyphs, filled not stroked */
+.golden-logo .gl-letterform {
+  fill: currentColor;
+  font-family: var(--font-garamond), "EB Garamond", Garamond, serif;
+  font-weight: 700;
+}
+
+.golden-logo .gl-fade {
+  opacity: 0;
+  animation: gl-fade 0.8s ease forwards;
+}
+
+@keyframes gl-fade {
+  to { opacity: 1; }
+}
+
+/* px units on all dash values: safari rejects unitless dash lengths in css,
+   and px == svg user units, so with pathLength=1 the math is unchanged */
+.golden-logo .gl-draw {
+  stroke-dasharray: 1px 1px;
+  stroke-dashoffset: 1px;
+  animation: gl-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes gl-draw {
+  to { stroke-dashoffset: 0px; }
+}
+
+/* hover reveal is per-element so the trail can grow out of the dot: the
+   head appears immediately; each tail layer waits --gl-tail-reveal (the
+   time the head needs to travel that layer's length), so the streak
+   lengthens behind the moving dot until it hits full trail length.
+   un-hover drops the delays, so everything fades together. */
+.golden-logo .gl-dot-head {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.golden-logo.gl-armed:hover .gl-dot-head,
+.golden-logo.gl-armed.gl-show-dots .gl-dot-head {
+  opacity: 1;
+}
+
+/* comet streak: the track path dashed down to one short visible segment
+   ending at the head, slid along the path on the same clock as the head
+   dot. same stroke width as the construction lines. --gl-tail-len is a
+   plain number (fraction of the lap); ×1px converts it to a length because
+   safari rejects unitless dash values (px == svg user units) */
+.golden-logo .gl-tail {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: var(--gl-stroke, 1px);
+  stroke-linecap: round;
+  stroke-dashoffset: calc(var(--gl-tail-len) * 1px);
+  /* backwards fill parks the streak at its start post while the positive
+     animation-delay waits out the draw-on animation */
+  animation: gl-tail-slide var(--gl-dot-dur, 10s) linear infinite backwards;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+/* reveal requires gl-armed (set by the component when the draw-on ends) so
+   a cursor parked on the logo during the draw still gets the grow-in */
+.golden-logo.gl-armed:hover .gl-tail,
+.golden-logo.gl-armed.gl-show-dots .gl-tail {
+  opacity: var(--gl-tail-alpha, 1);
+  transition-delay: var(--gl-tail-reveal, 0s);
+}
+
+.golden-logo .gl-dot-head {
+  offset-rotate: 0deg;
+  animation: gl-dot-ride var(--gl-dot-dur, 10s) linear infinite backwards;
+}
+
+/* head position at time t is fraction t of the lap; the visible dash
+   segment [t - len, t] trails it. offset = len - t, wrapping each lap */
+@keyframes gl-tail-slide {
+  from {
+    stroke-dashoffset: calc(var(--gl-tail-len) * 1px);
+  }
+  to {
+    stroke-dashoffset: calc((var(--gl-tail-len) - 1) * 1px);
+  }
+}
+
+@keyframes gl-dot-ride {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+
 /* ============================================
    LINK HIGHLIGHT STYLES
    ============================================ */
@@ -99,7 +280,7 @@ body {
   padding: 0px 2px 0.5px 2px;
   margin-left: 1px;
   margin-right: 1px;
-  border-radius: 4px;
+  border-radius: var(--ui-highlight-radius);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -116,7 +297,7 @@ body {
   padding: 0px 4px 1px 4px;
   margin-left: 1px;
   margin-right: 1px;
-  border-radius: 4px;
+  border-radius: var(--ui-highlight-radius);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -303,7 +484,7 @@ body {
   height: 100%;
   font-size: 0.75rem;
   color: var(--theme-text-muted);
-  border-radius: 4px;
+  border-radius: var(--ui-highlight-radius);
   border: 1px solid var(--theme-highlight-bg);
 }
 
@@ -313,7 +494,7 @@ body {
   justify-content: center;
   width: 100%;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--ui-highlight-radius);
   background-color: var(--theme-highlight-bg);
   transition: background-color 0.15s ease;
 }
