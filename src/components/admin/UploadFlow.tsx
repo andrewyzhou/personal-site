@@ -434,7 +434,7 @@ export default function UploadFlow() {
                   onClick={() => setPhotos((prev) => prev.filter((x) => x.key !== p.key))}
                   aria-label="remove photo"
                   className="font-sans text-off-white text-xs"
-                  style={{ position: "absolute", top: 2, right: 2, background: "rgba(16,16,16,0.7)", borderRadius: 4, padding: "0 4px" }}
+                  style={{ position: "absolute", top: 2, right: 2, background: "oklch(17.3% 0 0 / 0.7)", borderRadius: 4, padding: "0 4px" }}
                 >
                   ×
                 </button>

@@ -43,9 +43,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.classList.add(`theme-${theme}`);
 
       if (theme === "dark") {
-        body.style.backgroundColor = "#101010";
+        body.style.backgroundColor = "oklch(17.3% 0 0)";
       } else {
-        body.style.backgroundColor = "#EEEEEE";
+        body.style.backgroundColor = "oklch(94.9% 0 0)";
       }
       body.style.backgroundImage = "none";
     });
