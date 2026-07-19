@@ -37,19 +37,19 @@ So `text-gray` etc. never carry a literal color — change the value once in the
 - `--ui-highlight-radius` → roundness of link-highlight pills AND calendar day/activity cells → `4px`
 
 ### Color tokens ([`@theme`, lines 3-16](../src/app/globals.css#L3))
-- [`4-8`](../src/app/globals.css#L4) → brand colors → off-black `#101010`, off-white `#EEEEEE`, secondary `#CCCCCC`, gray `#AAAAAA`, divider `#303030`
+- [`4-8`](../src/app/globals.css#L4) → brand colors → off-black `oklch(17.3% 0 0)`, off-white `oklch(94.9% 0 0)`, secondary `oklch(84.5% 0 0)`, gray `oklch(73.8% 0 0)`, divider `oklch(30.9% 0 0)`
 - [`10-11`](../src/app/globals.css#L10) → `--font-sans` / `--font-serif` → Funnel Sans stack
 - [`14-15`](../src/app/globals.css#L14) → custom breakpoints → `activity` 1152px, `activity-stack` 768px
 
 ### Dark theme vars ([`:root`, ~40-66](../src/app/globals.css#L40)) / Light theme vars ([`.theme-light`, ~68-88](../src/app/globals.css#L68))
-- page background `--theme-bg` → `#101010` / `#EEEEEE`
-- body text `--theme-text` → `#CCCCCC` / `#333333`
-- bright text `--theme-text-primary` → `#EEEEEE` / `#101010`
-- muted text `--theme-text-muted` → `#AAAAAA` / `#555555`
-- divider `--theme-divider` → `#303030` / `#CFCFCF`
+- page background `--theme-bg` → `oklch(17.3% 0 0)` / `oklch(94.9% 0 0)`
+- body text `--theme-text` → `oklch(84.5% 0 0)` / `oklch(32.1% 0 0)`
+- bright text `--theme-text-primary` → `oklch(94.9% 0 0)` / `oklch(17.3% 0 0)`
+- muted text `--theme-text-muted` → `oklch(73.8% 0 0)` / `oklch(45.0% 0 0)`
+- divider `--theme-divider` → `oklch(30.9% 0 0)` / `oklch(85.5% 0 0)`
 - link-chip backgrounds (`--theme-highlight-bg`, `-hover`, `-active`) → rgba white 0.08/0.15/0.18 (dark) vs rgba black 0.08/0.15/0.18 (light)
 - card fills (`--theme-card-bg`, `--theme-card-bg-hover`) → rgba white 0.10/0.05 vs rgba black 0.08/0.05
-- headshot frame `--theme-headshot-bg` → `#DCDCDC`
+- headshot frame `--theme-headshot-bg` → `oklch(89.4% 0 0)`
 - scrollbar track/thumb/thumb-hover colors
 - GitHub contribution levels `--contrib-0..4` (empty→max)
 
@@ -96,7 +96,7 @@ So `text-gray` etc. never carry a literal color — change the value once in the
 - padding → `48px 20px` mobile, `64px 64px` ≥768px
 
 ### Photos hover overlay / caption / nav buttons ([~538-600](../src/app/globals.css#L538))
-- cover hover darken → `rgba(16,16,16,0.35)` (mirrored for light)
+- cover hover darken → `oklch(17.3% 0 0 / 0.35)` (mirrored for light)
 - caption padding `0.5rem 0.75rem` + gradient scrim
 - nav buttons `44px` circles, font-size `1.75rem`, opacity `0.6` idle → `1` hover
 

@@ -49,7 +49,7 @@ export default function MetaSidebar({
   return (
     <>
       {mobile && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(16,16,16,0.5)", zIndex: 39 }} onClick={onClose} />
+        <div style={{ position: "fixed", inset: 0, background: "oklch(17.3% 0 0 / 0.5)", zIndex: 39 }} onClick={onClose} />
       )}
       <div style={panelStyle} className="animate-content-enter">
         <div className="flex items-center justify-between" style={{ marginBottom: "0.75rem" }}>
