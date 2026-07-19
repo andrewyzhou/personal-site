@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import SocialLinks from "./SocialLinks";
+import GoldenLogo from "./GoldenLogo";
 
 const TYPING_SPEED = 35;
 
@@ -111,21 +112,27 @@ export default function Hero({ quotes }: HeroProps) {
         {/* left side - headshot, name, and social links */}
         <div>
           <div className="flex items-center gap-6">
-            {/* headshot / logo */}
+            {/* headshot / logo — golden-rectangle box so the AZ mark fits exactly */}
             <div
-              className={`w-[112px] h-[150px] flex-shrink-0 cursor-pointer ${
+              className={`w-[110px] h-[178px] flex-shrink-0 cursor-pointer ${
                 showLogo ? "" : "headshot-border bg-off-white p-1"
               }`}
               onClick={() => setShowLogo(!showLogo)}
             >
               <div className={`relative w-full h-full overflow-hidden ${showLogo ? "" : "headshot-image-container"}`}>
-                <Image
-                  src={showLogo ? "/images/logo.svg" : "/images/headshot.png"}
-                  alt="Andrew Zhou"
-                  fill
-                  className={showLogo ? "object-contain" : "object-cover object-top"}
-                  priority
-                />
+                {showLogo ? (
+                  // the golden-ratio AZ mark — same golden rectangle as this
+                  // container, draws itself in on each flip
+                  <GoldenLogo layout="vertical" className="w-full h-full" />
+                ) : (
+                  <Image
+                    src="/images/headshot.png"
+                    alt="Andrew Zhou"
+                    fill
+                    className="object-cover object-top"
+                    priority
+                  />
+                )}
               </div>
             </div>
 
