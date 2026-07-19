@@ -12,8 +12,8 @@ export default function GlobalError({
     <html lang="en">
       <body
         style={{
-          backgroundColor: "#101010",
-          color: "#AAAAAA",
+          backgroundColor: "oklch(17.3% 0 0)",
+          color: "oklch(73.8% 0 0)",
           fontFamily: "ui-sans-serif, system-ui, sans-serif",
           display: "flex",
           minHeight: "100vh",
@@ -22,7 +22,7 @@ export default function GlobalError({
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <h1 style={{ color: "#EEEEEE", fontSize: "1.5rem", marginBottom: "0.5rem" }}>
+          <h1 style={{ color: "oklch(94.9% 0 0)", fontSize: "1.5rem", marginBottom: "0.5rem" }}>
             something went wrong
           </h1>
           <button
@@ -30,7 +30,7 @@ export default function GlobalError({
             style={{
               background: "none",
               border: "none",
-              color: "#AAAAAA",
+              color: "oklch(73.8% 0 0)",
               cursor: "pointer",
               fontSize: "1rem",
               textDecoration: "underline",
