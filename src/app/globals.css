@@ -135,16 +135,18 @@ body {
 }
 
 .cursor-halo-dot.cursor-halo--visible {
-  opacity: 0.14; /* knob: halo strength */
+  opacity: 0.25; /* knob: halo strength */
 }
 
-.cursor-halo-dot.cursor-halo--active {
-  width: 40px; /* knob: size over links/buttons */
+/* the emphasized state — bigger and darker. used when hovering anything
+   interactive AND for shake-to-find (motion/shake logic in CursorHalo.tsx) */
+.cursor-halo-dot.cursor-halo--big {
+  width: 40px; /* knob: emphasized size */
   height: 40px;
 }
 
-.cursor-halo-dot.cursor-halo--visible.cursor-halo--active {
-  opacity: 0.2; /* knob: strength over links/buttons */
+.cursor-halo-dot.cursor-halo--visible.cursor-halo--big {
+  opacity: 0.5; /* knob: emphasized strength */
 }
 
 @media (pointer: coarse) {
