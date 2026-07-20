@@ -11,7 +11,7 @@ Colors are driven by CSS custom properties, not hardcoded per component. Two the
 
 To recolor the whole site, edit those two blocks. The variables you'll most often touch: `--theme-bg` (page background), `--theme-text` (default body text), `--theme-text-primary` (bright/emphasis text), `--theme-text-muted` (dim text), `--theme-divider`, the `--theme-highlight-*` set (link chips), the `--theme-card-bg` set (cards), and `--contrib-0..4` (GitHub graph cells).
 
-Components reference these via Tailwind-looking utility classes that are actually remapped to the CSS vars in [`src/app/globals.css`](../src/app/globals.css) (block starting at [~403](../src/app/globals.css#L403)):
+Components reference these via Tailwind utility classes generated from the `@theme inline` block at the top of [`src/app/globals.css`](../src/app/globals.css#L3), whose color tokens point directly at the theme vars — so the two theme blocks are the single source of truth for every color utility:
 
 | class | resolves to var | meaning |
 |---|---|---|
@@ -36,10 +36,10 @@ So `text-gray` etc. never carry a literal color — change the value once in the
 ### UI knobs ([`:root`, line 43](../src/app/globals.css#L43))
 - `--ui-highlight-radius` → roundness of link-highlight pills AND calendar day/activity cells → `4px`
 
-### Color tokens ([`@theme`, lines 3-16](../src/app/globals.css#L3))
-- [`4-8`](../src/app/globals.css#L4) → brand colors → off-black `oklch(17.3% 0 0)`, off-white `oklch(94.9% 0 0)`, secondary `oklch(84.5% 0 0)`, gray `oklch(73.8% 0 0)`, divider `oklch(30.9% 0 0)`
-- [`10-11`](../src/app/globals.css#L10) → `--font-sans` / `--font-serif` → Funnel Sans stack
-- [`14-15`](../src/app/globals.css#L14) → custom breakpoints → `activity` 1152px, `activity-stack` 768px
+### Tailwind tokens ([`@theme inline`](../src/app/globals.css#L3))
+- color tokens → all reference the `--theme-*` vars (edit colors in the two theme blocks, never here): `off-black`→bg, `off-white`→text-primary, `secondary`→text, `gray`→text-muted, `divider`→divider
+- `--font-sans` / `--font-serif` → Funnel Sans stack
+- custom breakpoints → `activity` 1152px, `activity-stack` 768px
 
 ### Dark theme vars ([`:root`, ~40-66](../src/app/globals.css#L40)) / Light theme vars ([`.theme-light`, ~68-88](../src/app/globals.css#L68))
 - page background `--theme-bg` → `oklch(17.3% 0 0)` / `oklch(94.9% 0 0)`
