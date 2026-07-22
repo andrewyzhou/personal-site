@@ -12,7 +12,7 @@ import { useEffect, useRef } from "react";
 const SHAKE_REVERSALS = 4; // horizontal direction flips that count as a shake
 const SHAKE_WINDOW = 800; // ms window the flips must land in
 const SHAKE_MIN_SEG = 24; // px each swing must travel to count
-const SHAKE_HOLD = 900; // ms the emphasized state lingers after a shake
+const SHAKE_HOLD = 450; // ms the emphasized state lingers after a shake
 
 const INTERACTIVE = "a, button, [role='button'], input, textarea, select, label, summary";
 
