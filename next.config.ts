@@ -4,9 +4,19 @@ import createMDX from "@next/mdx";
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   // cs180 portfolio lives in its own repo (andrewyzhou/cs180) on github pages;
-  // proxy it under /cs180 so it shares this domain. asset paths there are relative.
+  // proxy it under /cs180 so it shares this domain. next strips trailing
+  // slashes before rewrites run, so extensionless page urls must map to their
+  // index.html explicitly or github responds with an off-domain 301.
   async rewrites() {
     return [
+      {
+        source: "/cs180",
+        destination: "https://andrewyzhou.github.io/cs180/index.html",
+      },
+      {
+        source: "/cs180/:page([^.]+)",
+        destination: "https://andrewyzhou.github.io/cs180/:page/index.html",
+      },
       {
         source: "/cs180/:path*",
         destination: "https://andrewyzhou.github.io/cs180/:path*",
