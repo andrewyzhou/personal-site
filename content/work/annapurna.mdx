@@ -1,11 +1,14 @@
 ---
 order: 1
-title: "[incoming] ml engineer"
+title: ml engineer intern
 company: annapurna labs
+companyUrl: https://www.amazon.jobs/content/en/teams/amazon-web-services/annapurna-labs
 location: seattle
 period: may 2026 – aug 2026
 year: "2026"
 ---
 
-- incoming summer 2026
-- distributed training team: machine learning training optimization on AWS Trainium
+- neuron distributed training team: ported flux flow-matching diffusion models to aws trainium via neuron sdk extensions, reaching numerical parity with the cuda baseline
+- lifted mfu from 3.4% to 26% and cut per-step latency 87% with roofline analysis, profiling, and custom fused kernels for mm-dit & parallel dit
+- rewrote op dispatch & mlir lowering in torch-neuronx to remove cpu bounces on gradient reductions; 7× faster eager-mode backward pass
+- built an agentic fused-kernel generation loop (roofline, profiling, writer, verifier agents); 12 fused dit kernels cut compute latency 1.86× vs. torch.compile

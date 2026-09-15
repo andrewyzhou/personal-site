@@ -5,6 +5,21 @@
 # trailing "*" on a title flags accredited courses taken outside of berkeley
 # (the asterisk gets a footnote rendered at the bottom of the section).
 
+- name: fall 2026
+  courses:
+    - code: cs 180
+      title: intro to computer vision and computational photography
+      cheatsheets:
+        - { label: portfolio, url: /cs180 }
+    - code: cs 182
+      title: designing, visualizing and understanding deep neural networks
+    - code: cs 194
+      title: special topics
+    - code: cs 375
+      title: teaching techniques for computer science
+    - code: cs 399
+      title: "professional preparation: supervised teaching of computer science"
+
 - name: spring 2026
   courses:
     - code: cs 162
