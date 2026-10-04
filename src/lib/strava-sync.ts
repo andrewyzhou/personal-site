@@ -10,6 +10,7 @@ import {
   buildActivityValues,
   computePublished,
   dedupeKey,
+  findSameActivity,
   insertActivity,
   localDateTime,
   DEFAULT_PRIVACY_TRIM_M,
@@ -196,6 +197,7 @@ async function buildRow(token: string, detail: StravaDetail): Promise<NewActivit
 
 export interface SyncResult {
   inserted: number;
+  merged: number; // same workout already present from another source; strava metadata applied
   skipped: number;
   failures: { id: number; error: string }[];
   more: boolean; // hit the per-run cap; run again to continue
@@ -227,10 +229,18 @@ export async function syncStravaActivities({ dryRun = false } = {}): Promise<Syn
   const knownIds = new Set(known.map((r) => r.externalId));
   const todo = listed.filter((a) => !knownIds.has(String(a.id)));
 
-  const result: SyncResult = { inserted: 0, skipped: 0, failures: [], more: todo.length > MAX_NEW_PER_RUN };
+  const result: SyncResult = { inserted: 0, merged: 0, skipped: 0, failures: [], more: todo.length > MAX_NEW_PER_RUN };
   for (const { id } of todo.slice(0, MAX_NEW_PER_RUN)) {
     try {
       const detail = await stravaGet<StravaDetail>(token, `/activities/${id}`);
+      // same workout already in from garmin (intervals.icu / upload): keep its
+      // original-file route and stats, take the name etc. from strava
+      const same = await findSameActivity(new Date(detail.start_date));
+      if (same) {
+        if (!dryRun) await setStravaMetadata(same.id, detail);
+        result.merged++;
+        continue;
+      }
       const row = await buildRow(token, detail);
       if (dryRun) {
         (result.preview ??= []).push(row);
@@ -246,34 +256,45 @@ export async function syncStravaActivities({ dryRun = false } = {}): Promise<Syn
     }
   }
 
-  if (result.inserted > 0) {
+  if (result.inserted + result.merged > 0 && !dryRun) {
     await invalidateCache("activities_list", "activities_latest");
   }
   return result;
 }
 
-// mirror owner edits made on strava (rename, description, type) onto an
-// already-synced row. stats and route are left alone.
-export async function applyStravaUpdate(stravaId: number): Promise<boolean> {
-  const token = await getAccessToken();
-  const detail = await stravaGet<StravaDetail>(token, `/activities/${stravaId}`);
-  const rows = await getDb()
+// strava is where activities get named: its metadata wins over other sources.
+// stats and route are left alone.
+async function setStravaMetadata(rowId: number, detail: StravaDetail): Promise<void> {
+  await getDb()
     .update(activities)
     .set({
       name: detail.name || "workout",
       description: detail.description || null,
       sportType: detail.sport_type,
       gear: detail.gear?.name || null,
+      sufferScore: detail.suffer_score ?? null,
       // made private on strava → hide; never auto-unhide (site-side hides stick)
       ...(detail.private ? { hidden: true } : {}),
       updatedAt: new Date(),
     })
+    .where(eq(activities.id, rowId));
+}
+
+// mirror owner edits made on strava (rename, description, type) onto the row,
+// whether it was synced from strava or merged into a garmin-sourced one
+export async function applyStravaUpdate(stravaId: number): Promise<boolean> {
+  const token = await getAccessToken();
+  const detail = await stravaGet<StravaDetail>(token, `/activities/${stravaId}`);
+  const byId = await getDb()
+    .select({ id: activities.id })
+    .from(activities)
     .where(eq(activities.externalId, String(stravaId)))
-    .returning({ id: activities.id });
-  if (rows.length > 0) {
-    await invalidateCache("activities_list", "activities_latest");
-  }
-  return rows.length > 0;
+    .limit(1);
+  const rowId = byId[0]?.id ?? (await findSameActivity(new Date(detail.start_date)))?.id;
+  if (rowId === undefined) return false;
+  await setStravaMetadata(rowId, detail);
+  await invalidateCache("activities_list", "activities_latest");
+  return true;
 }
 
 // strava-side delete → hide, never delete (history is only ever soft-removed).
