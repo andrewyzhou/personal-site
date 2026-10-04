@@ -17,7 +17,7 @@ const ACTIVITIES_ENDPOINT = "https://www.strava.com/api/v3/athlete/activities";
 
 const FETCH_TIMEOUT_MS = 10000;
 
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   const response = await fetch(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
