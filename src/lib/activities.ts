@@ -3,7 +3,7 @@
 // script, and the future intervals.icu pull. server-only (node crypto).
 
 import { createHash } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { getDb, activities, type ActivityRow, type NewActivityRow, type RouteBounds } from "./db";
 import { encodePolyline } from "./polyline";
 import {
@@ -185,6 +185,26 @@ export async function findByDedupeKey(key: string): Promise<{ id: number; name: 
     .select({ id: activities.id, name: activities.name, localDate: activities.localDate })
     .from(activities)
     .where(eq(activities.dedupeKey, key))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+// one person can't start two activities within this window: the same workout
+// arriving from different sources (strava api, intervals.icu, upload) collides
+// here even when the sources disagree on elapsed time (so dedupe_key differs)
+export const SAME_ACTIVITY_WINDOW_S = 120;
+
+export async function findSameActivity(startDateUtc: Date): Promise<ActivityRow | null> {
+  const ms = SAME_ACTIVITY_WINDOW_S * 1000;
+  const rows = await getDb()
+    .select()
+    .from(activities)
+    .where(
+      and(
+        gte(activities.startDateUtc, new Date(startDateUtc.getTime() - ms)),
+        lte(activities.startDateUtc, new Date(startDateUtc.getTime() + ms))
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
