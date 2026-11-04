@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
-import { parseTrackFile } from "@/lib/fit";
-import { buildActivityValues, computePublished } from "@/lib/activities";
+import { addActivityEdit, revertActivityEdit } from "@/lib/activity-sources";
+import { republish } from "@/lib/republish";
 import { getDb, activities, activityPhotos } from "@/lib/db";
 import { invalidateCache } from "@/lib/cache";
-import { r2Delete, r2Get } from "@/lib/r2";
+import { r2Delete } from "@/lib/r2";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -58,44 +58,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.gear !== undefined) updates.gear = body.gear?.trim() || null;
     if (typeof body.hidden === "boolean") updates.hidden = body.hidden;
 
-    // trim changes re-run the same computation path as publish, from the original
+    // a trim change is a recorded edit; republish rebuilds the published columns
+    // from the stored track. nothing to rebuild from → the edit is reverted.
     const trimChanged =
       (body.trimStartM !== undefined && body.trimStartM !== row.trimStartM) ||
       (body.trimEndM !== undefined && body.trimEndM !== row.trimEndM);
     if (trimChanged) {
-      if (!row.fitBlobPathname) {
+      const editId = await addActivityEdit(id, "trim", {
+        startM: Math.max(0, Number(body.trimStartM ?? row.trimStartM) || 0),
+        endM: Math.max(0, Number(body.trimEndM ?? row.trimEndM) || 0),
+      });
+      const result = await republish(id).catch(async (error) => {
+        // never leave an edit active that the published columns don't reflect
+        await revertActivityEdit(editId);
+        throw error;
+      });
+      if (result.status === "no-source" || result.status === "not-found") {
+        await revertActivityEdit(editId);
         return NextResponse.json(
           { ok: false, error: "no original file stored — trim is not editable" },
           { status: 422 }
         );
       }
-      const bytes = await r2Get(row.fitBlobPathname);
-      const parsed = parseTrackFile(bytes, row.fitBlobPathname);
-      const published = computePublished(
-        parsed,
-        body.trimStartM ?? row.trimStartM,
-        body.trimEndM ?? row.trimEndM
-      );
-      const recomputed = buildActivityValues(parsed, published, {
-        name: (updates.name as string) ?? row.name,
-        utcOffsetMinFallback: row.utcOffsetMin,
-      });
-      updates.distanceM = recomputed.distanceM;
-      updates.movingTimeS = recomputed.movingTimeS;
-      updates.elapsedTimeS = recomputed.elapsedTimeS;
-      updates.elevGainM = recomputed.elevGainM;
-      updates.avgSpeedMs = recomputed.avgSpeedMs;
-      updates.maxSpeedMs = recomputed.maxSpeedMs;
-      updates.avgHr = recomputed.avgHr;
-      updates.maxHr = recomputed.maxHr;
-      updates.avgCadence = recomputed.avgCadence;
-      updates.avgWatts = recomputed.avgWatts;
-      updates.maxWatts = recomputed.maxWatts;
-      updates.polyline = recomputed.polyline;
-      updates.cardPolyline = recomputed.cardPolyline;
-      updates.bounds = recomputed.bounds;
-      updates.trimStartM = recomputed.trimStartM;
-      updates.trimEndM = recomputed.trimEndM;
     }
 
     const db = getDb();
