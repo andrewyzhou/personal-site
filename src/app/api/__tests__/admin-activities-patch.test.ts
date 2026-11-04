@@ -123,6 +123,30 @@ describe("PATCH /api/admin/activities/[id]", () => {
     expect(updates[0]).toMatchObject({ name: "renamed", hidden: true });
   });
 
+  it("a sport change marks the row stale in the same update, then republishes", async () => {
+    row.value = { ...row.value!, sportType: "Run" };
+    const res = await patch({ sportType: "Hike" });
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ sportType: "Hike", needsRepublish: true, staleMarkedAt: expect.any(Date) });
+    expect(republish).toHaveBeenCalledWith(5);
+    expect(edits).toHaveLength(0);
+  });
+
+  it("the same sport sent again marks nothing", async () => {
+    row.value = { ...row.value!, sportType: "Run" };
+    await patch({ sportType: "Run", name: "x" });
+    expect(updates[0]).not.toHaveProperty("needsRepublish");
+    expect(republish).not.toHaveBeenCalled();
+  });
+
+  it("a republish failure after a sport change still saves it (stale stays set)", async () => {
+    row.value = { ...row.value!, sportType: "Run" };
+    republish.mockRejectedValue(new Error("boom"));
+    const res = await patch({ sportType: "Ride" });
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ sportType: "Ride", needsRepublish: true });
+  });
+
   it("404s an unknown activity", async () => {
     row.value = null;
     expect((await patch({ trimStartM: 1 })).status).toBe(404);

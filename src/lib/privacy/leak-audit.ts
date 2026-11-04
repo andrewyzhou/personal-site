@@ -20,6 +20,10 @@ export interface Finding {
 export const PRIVATE_KEYS = [
   "trackBbox",
   "track_bbox",
+  "legacyRoute",
+  "legacy_route",
+  "rawStats",
+  "raw_stats",
   "fitBlobUrl",
   "fit_blob_url",
   "fitBlobPathname",

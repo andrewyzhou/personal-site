@@ -8,6 +8,7 @@ import { getDb, activities, activityPhotos } from "@/lib/db";
 import { invalidateCache } from "@/lib/cache";
 import { r2Delete } from "@/lib/r2";
 import { visibilityColumns, type Visibility } from "@/lib/public-activity";
+import { staleMark } from "@/lib/privacy/stale";
 import { parsePhotoList, type PhotoInput } from "@/app/api/admin/photos/photo-input";
 import { log } from "@/lib/log";
 
@@ -75,7 +76,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (typeof body.name === "string" && body.name.trim()) updates.name = body.name.trim();
     if (body.description !== undefined) updates.description = body.description?.trim() || null;
+    // cleaned stats and detection depend on the sport: a change needs a rebuild
+    const sportChanged = typeof body.sportType === "string" && !!body.sportType && body.sportType !== row.sportType;
     if (typeof body.sportType === "string" && body.sportType) updates.sportType = body.sportType;
+    if (sportChanged) Object.assign(updates, staleMark());
     if (body.gear !== undefined) updates.gear = body.gear?.trim() || null;
     if (typeof body.hidden === "boolean") updates.hidden = body.hidden;
     // visibility is plain columns the public serializer applies; nothing to rebuild
@@ -118,6 +122,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // photo list replacement (rows only; blobs are removed by hard delete)
     let pinStatus: string | null = null;
+    // stale is already marked, so a failure here is retried by the rebuild job
+    let sportStatus: string | null = null;
+    if (sportChanged && !photos) {
+      try {
+        sportStatus = (await republish(id)).status;
+      } catch (error) {
+        sportStatus = "failed";
+        log.error("admin:edit", `republish after sport change failed for ${id}`, error);
+      }
+    }
     if (photos) {
       // the private fields (original link, capture time, precise gps) of a photo
       // already on the activity survive the row replacement unless new ones are sent
@@ -178,7 +192,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     revalidatePath(`/activities/${id}`);
     log.info(
       "admin:edit",
-      `patched activity ${id}${trimChanged ? " (trim recomputed)" : ""}${pinStatus ? ` (photos, republish ${pinStatus})` : ""}`
+      `patched activity ${id}${trimChanged ? " (trim recomputed)" : ""}${sportStatus ? ` (sport, republish ${sportStatus})` : ""}${pinStatus ? ` (photos, republish ${pinStatus})` : ""}`
     );
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -90,7 +90,7 @@ const hasArchived = zoneCols.has("archived_at");
 const hasPhotoExif = ["taken_at", "gps_lat", "gps_lng"].every((c) => photoCols.has(c));
 const fullyMigrated =
   missingCols.length === 0 &&
-  ["activity_sources", "activity_edits", "privacy_zones", "privacy_settings", "raw_objects"].every((t) => tables.has(t)) &&
+  ["activity_sources", "activity_edits", "privacy_zones", "privacy_settings", "raw_objects", "activity_suggestions", "activity_settings"].every((t) => tables.has(t)) &&
   hasArchived &&
   ["taken_at", "gps_lat", "gps_lng", "pin_lat", "pin_lng"].every((c) => photoCols.has(c));
 
@@ -98,7 +98,7 @@ if (apply && (legacyMode || !fullyMigrated)) {
   console.error(
     forceLegacy
       ? "--apply can't be combined with --legacy"
-      : "--apply needs the fully migrated schema (through 0005). run `npm run db:migrate` first."
+      : "--apply needs the fully migrated schema (through 0007). run `npm run db:migrate` first."
   );
   process.exit(1);
 }
@@ -311,7 +311,7 @@ if (apply) {
 } else {
   const flags = [onlyIds ? `--ids ${onlyIds.join(",")}` : "", force ? "--force" : ""].filter(Boolean).join(" ");
   console.log(
-    `\ndry run: nothing written.${fullyMigrated ? "" : " apply requires the fully migrated schema (through 0005) first."}\n` +
+    `\ndry run: nothing written.${fullyMigrated ? "" : " apply requires the fully migrated schema (through 0007) first."}\n` +
       `apply with:\n  npx tsx --env-file=.env.local scripts/republish-all.mts ${flags ? `${flags} ` : ""}--apply`
   );
 }

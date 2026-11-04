@@ -110,7 +110,7 @@ function row(over: Partial<ActivityRow> = {}): ActivityRow {
     needsRepublish: false,
     republishAttemptedAt: null,
     staleMarkedAt: null,
-    legacyRoute: null,
+    legacyRoute: null, rawStats: null, hrZonesS: null, splitFromId: null,
     createdAt: new Date("2026-07-06T15:00:00Z"),
     updatedAt: new Date("2026-07-06T15:00:00Z"),
     ...over,
