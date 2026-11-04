@@ -68,7 +68,7 @@ const tables = new Set(
     await sql`
       select table_name from information_schema.tables
       where table_schema = 'public'
-        and table_name in ('activity_sources', 'activity_edits', 'privacy_zones', 'privacy_settings', 'raw_objects', 'activity_photos')`
+        and table_name in ('activity_sources', 'activity_edits', 'privacy_zones', 'privacy_settings', 'raw_objects', 'activity_photos', 'activity_suggestions', 'activity_settings')`
   ).map((r) => r.table_name as string)
 );
 const columnsOf = async (table: string) =>
