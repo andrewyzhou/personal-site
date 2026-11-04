@@ -43,6 +43,13 @@
       "when": 1793792317918,
       "tag": "0005_privacy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793793266033,
+      "tag": "0006_lift_mvp",
+      "breakpoints": true
     }
   ]
 }
