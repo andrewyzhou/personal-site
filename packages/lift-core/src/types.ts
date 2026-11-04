@@ -180,7 +180,8 @@ export interface LinkCandidate {
   elapsedS: number;
 }
 
-export type LinkRole = "primary" | "duplicate" | "continuation";
+/** overrun: the workout started inside a recording that began well before it (watch left running) */
+export type LinkRole = "primary" | "duplicate" | "continuation" | "overrun";
 
 export interface ActivityLink {
   activityId: number;
