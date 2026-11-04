@@ -155,8 +155,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
           </p>
         )}
 
-        {lifts.map((w) => (
-          <LiftWorkoutCard key={w.id} workout={w} />
+        {lifts.map((w, i) => (
+          <LiftWorkoutCard key={`${w.date}:${i}`} workout={w} />
         ))}
 
         <ActivityPhotoCarousel photos={a.photos} />

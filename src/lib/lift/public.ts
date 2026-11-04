@@ -2,11 +2,12 @@
 //   - deleted, discarded or unfinished workouts are never served
 //   - a workout linked to a recording is shown only on that recording's page,
 //     and only while that recording is public (the page 404s otherwise)
-//   - lift-only workouts (no links) get /lifts/[id] and a calendar entry
+//   - lift-only workouts (no links) get /lifts/[publicId] and a calendar entry.
+//     urls carry an hmac of the id, never the id itself (see public-id.ts)
 //   - workout notes and set notes never leave the db
 //   - start times are floored to the privacy coarsening step, like activities
 
-import { and, asc, desc, eq, inArray, isNull, notExists } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, notExists, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import {
   LB_PER_KG,
@@ -40,6 +41,8 @@ import { isPublic } from "@/lib/public-activity";
 import { coarsenStart, loadPrivacySettings } from "@/lib/privacy/settings";
 import type { CalendarActivity } from "@/lib/strava";
 import { log } from "@/lib/log";
+import { isPublicLiftId, publicLiftId, publicLiftIdsEnabled } from "./public-id";
+import { LIFT_PUBLIC_TAG } from "./revalidate";
 
 // ---------------------------------------------------------------------------
 // inputs: only the columns the serializer may read (no notes anywhere)
@@ -94,8 +97,8 @@ export interface PublicLiftExercise {
   prs: PublicPr[];
 }
 
+// no internal id here: it would leak the share link or the exact start minute
 export interface PublicLiftWorkout {
-  id: string;
   title: string;
   /** 'YYYY-MM-DD' local */
   date: string;
@@ -104,7 +107,10 @@ export interface PublicLiftWorkout {
   durationS: number | null;
   exercises: PublicLiftExercise[];
   workingSets: number;
-  volumeLb: number;
+  /** total volume in `volumeUnit`, rounded */
+  volume: number;
+  /** the unit most working sets were logged in */
+  volumeUnit: WeightUnit;
   /** region -> 0..1, most-loaded region = 1 */
   muscleLoad: Partial<Record<MuscleRegion, number>>;
   /** most-loaded regions first */
@@ -291,6 +297,7 @@ export function serializeLiftWorkout(
 
   let workingSets = 0;
   let volumeKg = 0;
+  const unitCounts = { lb: 0, kg: 0 };
   const loadItems: { exerciseId: string; workingSets: number }[] = [];
   const seenPrExercises = new Set<string>();
 
@@ -309,7 +316,10 @@ export function serializeLiftWorkout(
         if (s.weight === null || !(s.weight > 0) || s.reps === null || !(s.reps > 0)) continue;
         const kg = toKg(s.weight, unit ?? "lb");
         // same rule as lift-core's setVolumeKg: without a unit we can't convert
-        if (unit) volumeKg += kg * s.reps;
+        if (unit) {
+          volumeKg += kg * s.reps;
+          unitCounts[unit]++;
+        }
         if (!top || kg > top.kg + 1e-9 || (Math.abs(kg - top.kg) <= 1e-9 && s.reps > top.reps)) top = { s, kg, reps: s.reps };
         const est = e1rm(kg, s.reps);
         if (est !== null && (bestKg === null || est > bestKg)) bestKg = est;
@@ -348,15 +358,18 @@ export function serializeLiftWorkout(
   const rawTime = workout.startedLocal.slice(11, 16);
   const showTime = options.showTime ?? true;
 
+  // ties go to lb, the default everywhere else
+  const volumeUnit: WeightUnit = unitCounts.kg > unitCounts.lb ? "kg" : "lb";
+
   return {
-    id: workout.id,
     title: workout.title,
     date,
     startTime: showTime && /^\d{2}:\d{2}$/.test(rawTime) ? coarsenLocalTime(rawTime, options.coarsenStartMin ?? 0) : null,
     durationS: workout.durationS !== null && workout.durationS > 0 ? workout.durationS : null,
     exercises: out,
     workingSets,
-    volumeLb: Math.round(volumeKg * LB_PER_KG),
+    volume: Math.round(volumeUnit === "lb" ? volumeKg * LB_PER_KG : volumeKg),
+    volumeUnit,
     muscleLoad,
     topRegions: topRegions(muscleLoad),
     prs: out.flatMap((e) => e.prs),
@@ -366,27 +379,42 @@ export function serializeLiftWorkout(
 // ---------------------------------------------------------------------------
 // calendar
 
-/** stable negative id per workout: never collides with recording ids (positive) */
-export function liftCalendarId(workoutId: string): number {
+/** stable negative id from the public id: never collides with recording ids (positive), reveals nothing more */
+export function liftCalendarId(publicId: string): number {
   let h = 0x811c9dc5;
-  for (let i = 0; i < workoutId.length; i++) {
-    h ^= workoutId.charCodeAt(i);
+  for (let i = 0; i < publicId.length; i++) {
+    h ^= publicId.charCodeAt(i);
     h = Math.imul(h, 0x01000193) >>> 0;
   }
   return -((h % 0x7fffffff) + 1);
 }
 
-export function liftHref(workoutId: string): string {
-  return `/lifts/${encodeURIComponent(workoutId)}`;
+export function liftHref(publicId: string): string {
+  return `/lifts/${encodeURIComponent(publicId)}`;
 }
 
-export function publicLiftCalendarEntry(
-  w: Pick<LiftWorkoutRow, "id" | "title" | "startedLocal" | "durationS">,
-  coarsenStartMin: number,
-): CalendarActivity {
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/** "3 exercises · 6 sets" */
+export function liftSummaryLine(exerciseCount: number, workingSets: number): string {
+  return `${plural(exerciseCount, "exercise")} · ${plural(workingSets, "set")}`;
+}
+
+/** a lift-only workout as the calendar loader sees it (server side only: carries the internal id) */
+export type LiftOnlyRow = Pick<LiftWorkoutRow, "id" | "title" | "startedLocal" | "durationS"> & {
+  workingSets: number;
+  exerciseCount: number;
+};
+
+/** null without a public id secret: no entry beats one that leaks the id */
+export function publicLiftCalendarEntry(w: LiftOnlyRow, coarsenStartMin: number): CalendarActivity | null {
+  const publicId = publicLiftId(w.id);
+  if (!publicId) return null;
   const d = w.durationS !== null && w.durationS > 0 ? w.durationS : 0;
   return {
-    id: liftCalendarId(w.id),
+    id: liftCalendarId(publicId),
     name: w.title,
     type: "WeightTraining",
     date: w.startedLocal.slice(0, 10),
@@ -405,7 +433,8 @@ export function publicLiftCalendarEntry(
     kilojoules: null,
     description: null,
     sufferScore: null,
-    href: liftHref(w.id),
+    href: liftHref(publicId),
+    liftSummary: liftSummaryLine(w.exerciseCount, w.workingSets),
   };
 }
 
@@ -543,33 +572,11 @@ export async function loadActivityLiftWorkouts(activity: Pick<ActivityRow, "id" 
   }
 }
 
-/** a lift-only workout for /lifts/[id]; null for unknown, linked, deleted or discarded */
-export async function loadLiftOnlyWorkout(id: string): Promise<PublicLiftWorkout | null> {
-  if (!isValidLiftId(id)) return null;
-  const rows = await getDb()
-    .select(workoutCols())
-    .from(liftWorkouts)
-    .where(and(eq(liftWorkouts.id, id), isNull(liftWorkouts.deletedAt), eq(liftWorkouts.status, "finished"), noLinks()))
-    .limit(1);
-  if (!rows[0]) return null;
-  const { coarsenStartMin } = await loadPrivacySettings();
-  const [w] = await serializeMany([rows[0]], { coarsenStartMin });
-  return w ?? null;
-}
+// the public index is bounded: older lift-only workouts drop off the calendar and their pages
+export const LIFT_INDEX_LIMIT = 1000;
 
-/** title-only lookup for metadata (same filters, no detail queries) */
-export async function loadLiftOnlyTitle(id: string): Promise<string | null> {
-  if (!isValidLiftId(id)) return null;
-  const rows = await getDb()
-    .select({ title: liftWorkouts.title })
-    .from(liftWorkouts)
-    .where(and(eq(liftWorkouts.id, id), isNull(liftWorkouts.deletedAt), eq(liftWorkouts.status, "finished"), noLinks()))
-    .limit(1);
-  return rows[0]?.title ?? null;
-}
-
-/** lift-only workouts as calendar entries, newest first */
-export async function loadLiftCalendar(): Promise<CalendarActivity[]> {
+/** lift-only workouts, newest first (internal ids: never serialize this directly) */
+export async function loadLiftOnlyIndex(): Promise<LiftOnlyRow[]> {
   const rows = await getDb()
     .select({
       id: liftWorkouts.id,
@@ -578,22 +585,75 @@ export async function loadLiftCalendar(): Promise<CalendarActivity[]> {
       durationS: liftWorkouts.durationS,
       status: liftWorkouts.status,
       deletedAt: liftWorkouts.deletedAt,
+      workingSets: liftWorkouts.workingSets,
+      exerciseCount: sql<number>`(select count(*) from "lift_workout_exercises" e where e."workout_id" = "lift_workouts"."id")`.mapWith(Number),
     })
     .from(liftWorkouts)
     .where(and(isNull(liftWorkouts.deletedAt), eq(liftWorkouts.status, "finished"), noLinks()))
-    .orderBy(desc(liftWorkouts.startedLocal));
-  const { coarsenStartMin } = await loadPrivacySettings();
+    .orderBy(desc(liftWorkouts.startedLocal))
+    .limit(LIFT_INDEX_LIMIT);
   // filtered again so a query change can never publish a hidden workout
-  return rows.filter((r) => isLiftOnlyPublic(r, 0)).map((r) => publicLiftCalendarEntry(r, coarsenStartMin));
+  return rows
+    .filter((r) => isLiftOnlyPublic(r, 0))
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      startedLocal: r.startedLocal,
+      durationS: r.durationS,
+      workingSets: Number(r.workingSets) || 0,
+      exerciseCount: Number(r.exerciseCount) || 0,
+    }));
 }
 
-// lift ingests don't invalidate the activities cache, so these get their own short ttl
-const cachedLiftCalendar = unstable_cache(loadLiftCalendar, ["lift-calendar-v1"], { revalidate: 300 });
+// lift ingests don't invalidate the activities cache, so this gets its own tag and a short ttl
+const cachedLiftIndex = unstable_cache(loadLiftOnlyIndex, ["lift-only-index-v2"], {
+  revalidate: 300,
+  tags: [LIFT_PUBLIC_TAG],
+});
+
+/** public id -> index row, only for lift-only workouts; raw internal ids never resolve */
+export async function resolvePublicLiftId(
+  publicId: string,
+  index: () => Promise<LiftOnlyRow[]> = cachedLiftIndex,
+): Promise<LiftOnlyRow | null> {
+  if (!isPublicLiftId(publicId) || !publicLiftIdsEnabled()) return null;
+  const rows = await index();
+  return rows.find((r) => publicLiftId(r.id) === publicId) ?? null;
+}
+
+/** a lift-only workout for /lifts/[publicId]; null for unknown, linked, deleted, discarded or disabled */
+export async function loadLiftOnlyWorkout(publicId: string): Promise<PublicLiftWorkout | null> {
+  const hit = await resolvePublicLiftId(publicId);
+  if (!hit) return null;
+  // the index can be up to a ttl old, so the row is re-checked live
+  const rows = await getDb()
+    .select(workoutCols())
+    .from(liftWorkouts)
+    .where(and(eq(liftWorkouts.id, hit.id), isNull(liftWorkouts.deletedAt), eq(liftWorkouts.status, "finished"), noLinks()))
+    .limit(1);
+  if (!rows[0]) return null;
+  const { coarsenStartMin } = await loadPrivacySettings();
+  const [w] = await serializeMany([rows[0]], { coarsenStartMin });
+  return w ?? null;
+}
+
+/** title-only lookup for metadata (from the index, no detail queries) */
+export async function loadLiftOnlyTitle(publicId: string): Promise<string | null> {
+  return (await resolvePublicLiftId(publicId))?.title ?? null;
+}
+
+/** lift-only workouts as calendar entries, newest first; none without a public id secret */
+export async function loadLiftCalendar(index: () => Promise<LiftOnlyRow[]> = cachedLiftIndex): Promise<CalendarActivity[]> {
+  if (!publicLiftIdsEnabled()) return [];
+  const rows = await index();
+  const { coarsenStartMin } = await loadPrivacySettings();
+  return rows.map((r) => publicLiftCalendarEntry(r, coarsenStartMin)).filter((e): e is CalendarActivity => e !== null);
+}
 
 /** calendar entries for /api/activities; any failure is an empty list, never a broken calendar */
 export async function liftCalendarEntries(): Promise<CalendarActivity[]> {
   try {
-    const entries = await cachedLiftCalendar();
+    const entries = await loadLiftCalendar();
     return Array.isArray(entries) ? entries : [];
   } catch (error) {
     log.warn("lift:public", "lift calendar load failed", error);
