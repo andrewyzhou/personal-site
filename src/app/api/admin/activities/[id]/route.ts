@@ -80,6 +80,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           { status: 422 }
         );
       }
+      if (result.status === "source-unavailable") {
+        await revertActivityEdit(editId);
+        return NextResponse.json(
+          { ok: false, error: "original file is unreadable right now — trim not applied" },
+          { status: 503 }
+        );
+      }
     }
 
     const db = getDb();
@@ -87,6 +94,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // photo list replacement (rows only; blobs are removed by hard delete)
     if (body.photos) {
+      // keep each photo's private original link across the row replacement
+      const previous = await db
+        .select({ pathname: activityPhotos.blobPathname, originalSha256: activityPhotos.originalSha256 })
+        .from(activityPhotos)
+        .where(eq(activityPhotos.activityId, id));
+      const originals = new Map(previous.map((p) => [p.pathname, p.originalSha256]));
       await db.delete(activityPhotos).where(eq(activityPhotos.activityId, id));
       if (body.photos.length > 0) {
         await db.insert(activityPhotos).values(
@@ -98,6 +111,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             height: p.height ?? null,
             position: i,
             caption: p.caption ?? null,
+            originalSha256: originals.get(p.pathname) ?? null,
           }))
         );
       }

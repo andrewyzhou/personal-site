@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { row, updates, edits, reverted, republish, revalidate, invalidate } = vi.hoisted(() => ({
+const { row, photoRows, inserted, updates, edits, reverted, republish, revalidate, invalidate } = vi.hoisted(() => ({
   row: { value: null as Record<string, unknown> | null },
+  photoRows: { value: [] as Record<string, unknown>[] },
+  inserted: [] as Record<string, unknown>[],
   updates: [] as Record<string, unknown>[],
   edits: [] as unknown[][],
   reverted: [] as number[],
@@ -19,8 +21,15 @@ vi.mock("@/lib/db", () => ({
   activities: {},
   activityPhotos: {},
   getDb: () => ({
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => (row.value ? [row.value] : []) }) }) }),
+    // awaited directly → existing photo rows; .limit() → the activity row
+    select: () => ({
+      from: () => ({
+        where: () => Object.assign(Promise.resolve(photoRows.value), { limit: async () => (row.value ? [row.value] : []) }),
+      }),
+    }),
     update: () => ({ set: (v: Record<string, unknown>) => ({ where: async () => updates.push(v) }) }),
+    delete: () => ({ where: async () => undefined }),
+    insert: () => ({ values: async (v: Record<string, unknown>[]) => void inserted.push(...v) }),
   }),
 }));
 
@@ -47,6 +56,8 @@ beforeEach(() => {
   updates.length = 0;
   edits.length = 0;
   reverted.length = 0;
+  inserted.length = 0;
+  photoRows.value = [];
   row.value = { id: 5, name: "run", trimStartM: 200, trimEndM: 200, fitBlobPathname: null };
   republish.mockResolvedValue({ status: "published" });
 });
@@ -72,6 +83,29 @@ describe("PATCH /api/admin/activities/[id]", () => {
     expect(await res.json()).toEqual({ ok: false, error: "no original file stored — trim is not editable" });
     expect(reverted).toEqual([31]);
     expect(updates).toHaveLength(0);
+  });
+
+  it("reverts the edit and returns 503 when the original can't be read", async () => {
+    republish.mockResolvedValue({ status: "source-unavailable", id: 5, hash: "h", track: {} });
+    const res = await patch({ trimStartM: 10 });
+    expect(res.status).toBe(503);
+    expect(reverted).toEqual([31]);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("photo replacement keeps each photo's private original link", async () => {
+    photoRows.value = [{ pathname: "activities/photos/a.jpg", originalSha256: "f".repeat(64) }];
+    const res = await patch({
+      photos: [
+        { pathname: "activities/photos/new.jpg", url: "u2" },
+        { pathname: "activities/photos/a.jpg", url: "u1" },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(inserted.map((p) => [p.blobPathname, p.position, p.originalSha256])).toEqual([
+      ["activities/photos/new.jpg", 0, null],
+      ["activities/photos/a.jpg", 1, "f".repeat(64)],
+    ]);
   });
 
   it("reverts the edit when republish throws", async () => {

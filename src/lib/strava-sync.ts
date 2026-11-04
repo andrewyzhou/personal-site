@@ -19,7 +19,7 @@ import { cumulativeDistances, type TrackRecord } from "./geo";
 import type { ParsedTrackFile } from "./fit";
 import { getAccessToken, isStravaApiEnabled } from "./strava";
 import { invalidateCache } from "./cache";
-import { addActivitySource, findActivityIdBySource, storeRawPayload } from "./activity-sources";
+import { addActivitySource, findActivityIdBySource, knownExternalIds, storeRawPayload } from "./activity-sources";
 import { republish } from "./republish";
 
 const API = "https://www.strava.com/api/v3";
@@ -247,7 +247,11 @@ export async function syncStravaActivities({ dryRun = false } = {}): Promise<Syn
         .from(activities)
         .where(inArray(activities.externalId, listed.map((a) => String(a.id))))
     : [];
-  const knownIds = new Set(known.map((r) => r.externalId));
+  // merged into a row from another source: known through its source link
+  const knownIds = new Set([
+    ...known.map((r) => r.externalId),
+    ...(await knownExternalIds("strava", listed.map((a) => String(a.id)))),
+  ]);
   const todo = listed.filter((a) => !knownIds.has(String(a.id)));
 
   const result: SyncResult = { inserted: 0, merged: 0, skipped: 0, failures: [], more: todo.length > MAX_NEW_PER_RUN };
