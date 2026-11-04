@@ -12,8 +12,10 @@ import {
 } from "../../db/workouts";
 import { flushPendingWrites } from "../../lib/pending";
 import { REST_STEP_S, formatRest } from "../../lib/rest";
+import type { SetPrKind } from "../../lib/prs";
 import { formatPrevious, setLabels, type GroupEdge } from "../../lib/sets";
 import { Button } from "../Button";
+import { PrBadge } from "../pr/PrBadge";
 import { SetRowEditor } from "../SetRowEditor";
 import { useColors } from "../theme";
 
@@ -31,6 +33,10 @@ interface Props {
   linkedToNext: boolean;
   defaultRestS: number;
   onSetCompleted: (set: SetRow) => void;
+  /** set id -> records it beats this session */
+  prFlags?: Record<string, SetPrKind[]>;
+  /** the set that just became a pr, to animate once */
+  celebrate?: { setId: string; n: number } | null;
 }
 
 export function ExerciseCard(p: Props) {
@@ -112,14 +118,17 @@ export function ExerciseCard(p: Props) {
       {p.sets.map((s, i) => {
         // ghost text compares like for like: same position only
         const prev = p.previous[i];
+        const kinds = p.prFlags?.[s.id];
         return (
-          <SetRowEditor
-            key={s.id}
-            set={s}
-            label={labels[i]!}
-            previous={prev ? formatPrevious(prev) : null}
-            onCompleted={p.onSetCompleted}
-          />
+          <View key={s.id}>
+            <SetRowEditor
+              set={s}
+              label={labels[i]!}
+              previous={prev ? formatPrevious(prev) : null}
+              onCompleted={p.onSetCompleted}
+            />
+            {kinds ? <PrBadge kinds={kinds} celebrate={p.celebrate?.setId === s.id ? p.celebrate.n : 0} /> : null}
+          </View>
         );
       })}
       <Button label="add set" variant="plain" onPress={act(() => addSet(p.row.id))} style={styles.addSet} />

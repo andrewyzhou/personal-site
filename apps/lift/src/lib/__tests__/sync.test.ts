@@ -83,13 +83,13 @@ describe("planAck", () => {
     rejected,
   });
   it("marks through appliedThrough", () => {
-    expect(planAck([4, 5, 6], res(5))).toEqual({ syncedThrough: 5, rejected: [], progressed: true });
+    expect(planAck([4, 5, 6], res(5))).toEqual({ syncedThrough: 5, seqs: [4, 5], rejected: [], progressed: true });
   });
   it("never marks past what was sent", () => {
     expect(planAck([4, 5, 6], res(99)).syncedThrough).toBe(6);
   });
   it("reports no progress when the server is behind the batch", () => {
-    expect(planAck([4, 5], res(3))).toEqual({ syncedThrough: null, rejected: [], progressed: false });
+    expect(planAck([4, 5], res(3))).toEqual({ syncedThrough: null, seqs: [], rejected: [], progressed: false });
     expect(planAck([], res(3)).progressed).toBe(false);
   });
   it("keeps only rejections inside the acked range", () => {
@@ -130,9 +130,10 @@ function store(n: number) {
   return {
     rows,
     readBatch: (limit: number) => rows.filter((r) => r.syncedAt === null).slice(0, limit),
-    ack: (plan: { syncedThrough: number | null; rejected: { seq: number; reason: string }[] }) => {
+    ack: (plan: { seqs: number[]; rejected: { seq: number; reason: string }[] }) => {
       for (const r of plan.rejected) rows.find((x) => x.id === r.seq)!.rejected = r.reason;
-      for (const r of rows) if (r.syncedAt === null && r.id <= (plan.syncedThrough ?? -1)) r.syncedAt = 1;
+      const acked = new Set(plan.seqs);
+      for (const r of rows) if (r.syncedAt === null && acked.has(r.id)) r.syncedAt = 1;
     },
   };
 }

@@ -63,8 +63,13 @@ export function parsePushResponse(body: unknown): SyncPushResponse | null {
 }
 
 export interface AckPlan {
-  /** mark unsynced outbox rows with id <= this as synced; null = nothing */
+  /** highest acked seq; null = nothing */
   syncedThrough: number | null;
+  /**
+   * exactly the sent seqs to mark synced. marking by id range instead would
+   * also hit rows this request never carried (requeued or written meanwhile)
+   */
+  seqs: number[];
   /** reasons to store on rows the server refused (all within syncedThrough) */
   rejected: { seq: number; reason: string }[];
   /** false when the server acked none of the batch: stop instead of resending forever */
@@ -72,15 +77,16 @@ export interface AckPlan {
 }
 
 export function planAck(sentSeqs: readonly number[], res: SyncPushResponse): AckPlan {
-  if (sentSeqs.length === 0) return { syncedThrough: null, rejected: [], progressed: false };
+  if (sentSeqs.length === 0) return { syncedThrough: null, seqs: [], rejected: [], progressed: false };
   const first = Math.min(...sentSeqs);
   const last = Math.max(...sentSeqs);
   // never past what we sent: a row the server never saw must stay unsynced
   const through = Math.min(res.appliedThrough, last);
-  if (through < first) return { syncedThrough: null, rejected: [], progressed: false };
+  if (through < first) return { syncedThrough: null, seqs: [], rejected: [], progressed: false };
   const sent = new Set(sentSeqs);
   const rejected = res.rejected.filter((r) => sent.has(r.seq) && r.seq <= through);
-  return { syncedThrough: through, rejected, progressed: true };
+  const seqs = [...sent].filter((s) => s <= through).sort((x, y) => x - y);
+  return { syncedThrough: through, seqs, rejected, progressed: true };
 }
 
 /**

@@ -4,6 +4,7 @@ import { db, type Tx } from "./client";
 import { notify } from "./events";
 import { writeOutbox } from "./outbox";
 import { customExercises, sets, templateExercises, workoutExercises, workouts, type CustomExerciseRow } from "./schema";
+import { bumpedAt } from "../lib/clock";
 import { customToExercise, isCustomInUse, type CustomUsage } from "../lib/custom";
 import { buildExerciseLookup, catalogCollision, isSearchable, searchCatalog, type ExerciseLookup } from "../lib/library";
 import { mergeLinkMap, planMerge, type MergeCheck } from "../lib/merge";
@@ -168,7 +169,7 @@ export function takenCustomNames(exceptId?: string): string[] {
 
 /** rename keeps the id: it was fixed from the original name at creation */
 export function updateCustomExercise(id: string, patch: CustomExercisePatch, now = Date.now()): CustomExerciseRow | undefined {
-  const values: Partial<typeof customExercises.$inferInsert> = { updatedAt: now };
+  const values: Partial<typeof customExercises.$inferInsert> = {};
   if (patch.name !== undefined) {
     const v = validateName(patch.name, { taken: takenCustomNames(id) });
     if (!v.ok) throw new Error(v.error);
@@ -180,7 +181,7 @@ export function updateCustomExercise(id: string, patch: CustomExercisePatch, now
   if (patch.secondary !== undefined) values.secondary = JSON.stringify(patch.secondary);
   if (patch.archived !== undefined) values.archived = patch.archived ? 1 : 0;
   return write((tx) => {
-    const row = tx.update(customExercises).set(values).where(eq(customExercises.id, id)).returning().get();
+    const row = tx.update(customExercises).set({ ...values, updatedAt: bumpedAt(customExercises.updatedAt, now) }).where(eq(customExercises.id, id)).returning().get();
     if (row) writeOutbox(tx, "custom_exercise", row.id, "update", row);
     return row;
   });
@@ -236,7 +237,7 @@ export function mergeCustomExercise(sourceId: string, targetId: string, now = Da
     for (const id of plan.workoutExercises) {
       const row = tx
         .update(workoutExercises)
-        .set({ exerciseId: plan.targetId, updatedAt: now })
+        .set({ exerciseId: plan.targetId, updatedAt: bumpedAt(workoutExercises.updatedAt, now) })
         .where(eq(workoutExercises.id, id))
         .returning()
         .get();
@@ -245,7 +246,7 @@ export function mergeCustomExercise(sourceId: string, targetId: string, now = Da
     for (const id of plan.templateExercises) {
       const row = tx
         .update(templateExercises)
-        .set({ exerciseId: plan.targetId, updatedAt: now })
+        .set({ exerciseId: plan.targetId, updatedAt: bumpedAt(templateExercises.updatedAt, now) })
         .where(eq(templateExercises.id, id))
         .returning()
         .get();
@@ -253,7 +254,7 @@ export function mergeCustomExercise(sourceId: string, targetId: string, now = Da
     }
     const src = tx
       .update(customExercises)
-      .set({ mergedInto: plan.targetId, archived: 1, updatedAt: now })
+      .set({ mergedInto: plan.targetId, archived: 1, updatedAt: bumpedAt(customExercises.updatedAt, now) })
       .where(eq(customExercises.id, sourceId))
       .returning()
       .get();

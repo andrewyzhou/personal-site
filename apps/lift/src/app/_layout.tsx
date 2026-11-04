@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, AppState, StyleSheet, Text, View, useColorScheme } from "react-native";
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import { sqlite } from "../db/client";
 import { migrate } from "../db/migrate";
-import { useColors } from "../components/theme";
+import { useColors, type Palette } from "../components/theme";
 import { REST_NOTIFICATION_KIND, initRestTimer } from "../components/workout/restTimer";
 import { flushOnAppState } from "../lib/pending";
 import { useAutoSync } from "../db/sync";
@@ -19,12 +19,22 @@ Notifications.setNotificationHandler({
   },
 });
 
+// headers, tab bars and screen backgrounds use the same grays as the app
+function navTheme(dark: boolean, c: Palette): Theme {
+  const base = dark ? DarkTheme : DefaultTheme;
+  return {
+    ...base,
+    colors: { primary: c.accent, background: c.bg, card: c.bg, text: c.strong, border: c.border, notification: c.danger },
+  };
+}
+
 // migrations run once per js runtime, before any screen touches the db
 let ready: Promise<void> | null = null;
 
 export default function RootLayout() {
   const scheme = useColorScheme();
   const c = useColors();
+  const theme = useMemo(() => navTheme(scheme === "dark", c), [scheme, c]);
   const [state, setState] = useState<"loading" | "ready" | Error>("loading");
 
   useEffect(() => {
@@ -57,7 +67,7 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={scheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={theme}>
       <StatusBar style="auto" />
       <AutoSync />
       <Stack>
@@ -68,6 +78,7 @@ export default function RootLayout() {
         <Stack.Screen name="add-exercise" options={{ title: "add exercise", presentation: "modal" }} />
         <Stack.Screen name="history/index" options={{ title: "history" }} />
         <Stack.Screen name="history/[id]" options={{ title: "" }} />
+        <Stack.Screen name="summary/[id]" options={{ title: "summary" }} />
         <Stack.Screen name="templates/index" options={{ title: "templates" }} />
         <Stack.Screen name="templates/[id]" options={{ title: "template" }} />
         <Stack.Screen name="custom-exercise/new" options={{ title: "new exercise" }} />
