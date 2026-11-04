@@ -1,12 +1,16 @@
 // republish(activityId): the only writer of an activity's published route/stat
 // columns. deterministic from (canonical track, active edits, privacy zones,
-// processing version); the inputs hash makes staleness checks cheap and lets
-// bulk rebuilds skip anything already current. raw inputs are never touched.
+// privacy settings, photos, processing version); the inputs hash makes
+// staleness checks cheap and lets bulk rebuilds skip anything already current.
+// raw inputs are never touched.
 //
-// a0 scope: trim (default 200 m for gps tracks without a trim edit, the legacy
-// behavior) + whitelisted stat overrides. zones are hashed now so a zone edit
-// marks activities stale; applying them is a1. identity/metadata columns (name,
-// sport, start/local time, hidden) are not written here. server-only.
+// pipeline: trim (trim edit, else the settings default for gps tracks) → fog
+// (zones: in-zone points dropped, route broken at zones, fog events) → stats
+// (+ distance policy when fogged) → overrides → polylines/bounds from visible
+// points only → photo pins → coarsened published start. identity/metadata
+// columns (name, sport, raw start/local time, hidden) are not written here.
+// visibility (hide map / hide hr) is applied by the public serializer.
+// server-only.
 
 import { createHash } from "crypto";
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -15,11 +19,35 @@ import {
   activities,
   activitySources,
   activityEdits,
+  activityPhotos,
   privacyZones,
   type ActivityRow,
+  type FogEvent,
+  type PrivacySettings,
   type RouteBounds,
 } from "./db";
-import { computePublished, DEFAULT_PRIVACY_TRIM_M } from "./activities";
+import {
+  CARD_POLYLINE_MAX_POINTS,
+  DEFAULT_PRIVACY_TRIM_M,
+  DETAIL_POLYLINE_MAX_POINTS,
+  localDateTime,
+} from "./activities";
+import { boundsOf, computeStats, haversineM, rdpReduce, trimByDistance } from "./geo";
+import { encodeMultiPolyline } from "./polyline";
+import {
+  applyFog,
+  publicZoneShape,
+  relevantZones,
+  zonesContaining,
+  type FogSample,
+  type ZoneInput,
+} from "./privacy/fog";
+import {
+  DEFAULT_PRIVACY_SETTINGS,
+  coarsenStart,
+  loadPrivacySettings,
+  publishedDistance,
+} from "./privacy/settings";
 import {
   CANONICAL_FORMAT_VERSION,
   TRACK_SOURCE_PRECEDENCE,
@@ -38,7 +66,10 @@ import { getRawStore, isRawStoreConfigured, sha256Hex } from "./raw-store";
 import { r2Get } from "./r2";
 
 // bump when the publish math changes; every activity becomes stale
-export const PROCESSING_VERSION = 1;
+// v2: privacy zones, distance policy, published start, photo pins
+export const PROCESSING_VERSION = 2;
+
+export type { ZoneInput } from "./privacy/fog";
 
 // ---------------------------------------------------------------------------
 // pure core
@@ -57,9 +88,18 @@ export interface EditInput {
   params: Record<string, unknown>;
 }
 
-export interface ZoneInput {
+// private photo inputs (from the original's exif)
+export interface PhotoInput {
   id: number;
-  polygon: number[][][];
+  takenAt: Date | null;
+  gpsLat: number | null;
+  gpsLng: number | null;
+}
+
+export interface PhotoPin {
+  id: number;
+  pinLat: number | null;
+  pinLng: number | null;
 }
 
 // which raw objects a track would be built from
@@ -114,6 +154,8 @@ export function inputsHash(input: {
   track: TrackRef | null;
   edits: EditInput[];
   zones: ZoneInput[];
+  settings?: PrivacySettings;
+  photos?: PhotoInput[];
   processingVersion?: number;
 }): string {
   const payload = {
@@ -121,13 +163,21 @@ export function inputsHash(input: {
     canonicalFormat: CANONICAL_FORMAT_VERSION,
     track: input.track,
     edits: [...input.edits].sort((a, b) => a.id - b.id),
-    zones: [...input.zones].sort((a, b) => a.id - b.id),
+    zones: [...input.zones].sort((a, b) => a.id - b.id).map((z) => ({ id: z.id, polygon: z.polygon })),
+    settings: input.settings ?? DEFAULT_PRIVACY_SETTINGS,
+    photos: [...(input.photos ?? [])]
+      .sort((a, b) => a.id - b.id)
+      .map((p) => ({ id: p.id, takenAt: p.takenAt ? p.takenAt.toISOString() : null, gpsLat: p.gpsLat, gpsLng: p.gpsLng })),
   };
   return createHash("sha256").update(stableStringify(payload)).digest("hex");
 }
 
 // latest active trim edit wins; otherwise the legacy default for gps tracks
-export function resolveTrim(edits: EditInput[], gps: boolean): { startM: number; endM: number } {
+export function resolveTrim(
+  edits: EditInput[],
+  gps: boolean,
+  defaultTrimM: number = DEFAULT_PRIVACY_TRIM_M
+): { startM: number; endM: number } {
   const trims = edits.filter((e) => e.kind === "trim");
   const last = trims[trims.length - 1];
   if (last) {
@@ -138,7 +188,7 @@ export function resolveTrim(edits: EditInput[], gps: boolean): { startM: number;
       endM: Number.isFinite(endM) && endM > 0 ? endM : 0,
     };
   }
-  return gps ? { startM: DEFAULT_PRIVACY_TRIM_M, endM: DEFAULT_PRIVACY_TRIM_M } : { startM: 0, endM: 0 };
+  return gps ? { startM: defaultTrimM, endM: defaultTrimM } : { startM: 0, endM: 0 };
 }
 
 // rows written by the legacy pipeline (never republished) with no trim edit —
@@ -205,31 +255,150 @@ export interface PublicColumns {
   bounds: RouteBounds | null;
   trimStartM: number;
   trimEndM: number;
+  fogEvents: FogEvent[] | null;
+  fogShapes: number[][][][] | null;
 }
 
 export const PUBLIC_COLUMN_NAMES: readonly (keyof PublicColumns)[] = [
   "distanceM", "movingTimeS", "elapsedTimeS", "elevGainM", "avgSpeedMs", "maxSpeedMs",
   "avgHr", "maxHr", "avgCadence", "avgWatts", "maxWatts", "kilojoules",
-  "polyline", "cardPolyline", "bounds", "trimStartM", "trimEndM",
+  "polyline", "cardPolyline", "bounds", "trimStartM", "trimEndM", "fogEvents", "fogShapes",
 ];
 
-// deterministic: same track + edits → identical columns
-export function computePublicColumns(track: CanonicalTrack, edits: EditInput[]): PublicColumns {
-  const trim = resolveTrim(edits, hasGps(track));
-  const pub = computePublished(canonicalToParsed(track), trim.startM, trim.endM);
-  // a polyline-only track has made-up timestamps: its route can be trimmed, but
-  // the stats stay the provider's summary
-  const stats = track.syntheticTime && track.session ? track.session : pub.stats;
-  const cols: PublicColumns = {
+export interface PublishContext {
+  zones: ZoneInput[];
+  settings: PrivacySettings;
+}
+
+export interface PublishedTrack {
+  columns: PublicColumns;
+  // published (post-trim, post-fog) samples, in segments; pins snap to these
+  visible: FogSample[][];
+}
+
+// reduce each visible run to a share of the point budget. one run reduces
+// exactly like the pre-fog pipeline did (identical output without zones).
+function reduceSegments(runs: [number, number][][], maxPoints: number): [number, number][][] {
+  const usable = runs.filter((r) => r.length >= 2);
+  if (usable.length === 1) return [rdpReduce(usable[0], maxPoints)];
+  const total = usable.reduce((n, r) => n + r.length, 0);
+  return usable.map((r) => rdpReduce(r, Math.max(2, Math.floor((maxPoints * r.length) / total))));
+}
+
+// deterministic: same track + edits + zones + settings → identical output
+export function publishTrack(
+  track: CanonicalTrack,
+  edits: EditInput[],
+  ctx: PublishContext = { zones: [], settings: DEFAULT_PRIVACY_SETTINGS }
+): PublishedTrack {
+  const parsed = canonicalToParsed(track);
+  const trim = resolveTrim(edits, hasGps(track), ctx.settings.defaultTrimM);
+  const zeroTrim = trim.startM === 0 && trim.endM === 0;
+  const { kept, keptCum } = zeroTrim
+    ? { kept: parsed.records, keptCum: parsed.cumDist }
+    : trimByDistance(parsed.records, parsed.cumDist, trim.startM, trim.endM);
+
+  // zero trim uses the device session totals verbatim (no recompute drift); a
+  // polyline-only track has made-up timestamps, so its stats stay the summary
+  let stats =
+    (track.syntheticTime && track.session) || (zeroTrim && parsed.sessionStats)
+      ? parsed.sessionStats!
+      : computeStats(kept, keptCum);
+
+  const samples: FogSample[] = [];
+  for (const r of kept) if (r.lat !== null && r.lng !== null) samples.push({ lat: r.lat, lng: r.lng, t: r.t });
+  const fog = applyFog(samples, ctx.zones);
+  const fogged = fog.events.length > 0;
+  if (fogged) {
+    stats = { ...stats, distanceM: publishedDistance(stats.distanceM, fog.visibleDistanceM, true, ctx.settings.distance) };
+  }
+
+  const runs = fog.segments.map((seg) => seg.map((s) => [s.lat, s.lng] as [number, number]));
+  const visiblePoints = runs.reduce((n, r) => n + (r.length >= 2 ? r.length : 0), 0);
+  let polyline: string | null = null;
+  let cardPolyline: string | null = null;
+  let bounds: RouteBounds | null = null;
+  if (visiblePoints >= 2) {
+    const detail = reduceSegments(runs, DETAIL_POLYLINE_MAX_POINTS);
+    polyline = encodeMultiPolyline(detail);
+    cardPolyline = encodeMultiPolyline(reduceSegments(runs, CARD_POLYLINE_MAX_POINTS));
+    bounds = boundsOf(detail.flat());
+  }
+
+  const touched = ctx.zones.filter((z) => fog.touchedZoneIds.includes(z.id));
+  const columns = {
     ...stats,
     kilojoules: track.kilojoules,
-    polyline: pub.polyline,
-    cardPolyline: pub.cardPolyline,
-    bounds: pub.bounds,
-    trimStartM: pub.trimStartM,
-    trimEndM: pub.trimEndM,
-  };
-  return { ...cols, ...resolveOverrides(edits) } as PublicColumns;
+    polyline,
+    cardPolyline,
+    bounds,
+    trimStartM: Math.max(0, trim.startM),
+    trimEndM: Math.max(0, trim.endM),
+    fogEvents: fogged ? fog.events : null,
+    fogShapes: touched.length ? touched.map((z) => publicZoneShape(z.polygon)) : null,
+    ...resolveOverrides(edits),
+  } as PublicColumns;
+  return { columns, visible: fog.segments };
+}
+
+export function computePublicColumns(track: CanonicalTrack, edits: EditInput[], ctx?: PublishContext): PublicColumns {
+  return publishTrack(track, edits, ctx).columns;
+}
+
+// bounds of every gps point of the full (untrimmed, unfogged) track. PRIVATE:
+// only used to find the zones that can touch the activity.
+export function trackBounds(track: CanonicalTrack): RouteBounds | null {
+  const pts: [number, number][] = [];
+  const c = track.columns;
+  for (let i = 0; i < c.t.length; i++) if (c.lat[i] !== null && c.lng[i] !== null) pts.push([c.lat[i]!, c.lng[i]!]);
+  return boundsOf(pts);
+}
+
+const PIN_SNAP_M = 75;
+const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
+// a photo gets a public pin only where the published route is: next to a
+// visible (post-trim, post-fog) point and outside every zone. position from
+// its own gps, else interpolated along the visible track at the time taken.
+export function computePhotoPins(
+  photos: PhotoInput[],
+  track: CanonicalTrack | null,
+  visible: FogSample[][],
+  zones: ZoneInput[]
+): PhotoPin[] {
+  const none = (id: number): PhotoPin => ({ id, pinLat: null, pinLng: null });
+  if (!track) return photos.map((p) => none(p.id));
+  return photos.map((p) => {
+    let pos: [number, number] | null = null;
+    if (p.gpsLat !== null && p.gpsLng !== null) {
+      pos = [p.gpsLat, p.gpsLng];
+    } else if (p.takenAt) {
+      const t = (p.takenAt.getTime() - track.startEpochMs) / 1000;
+      for (const seg of visible) {
+        for (let i = 1; i < seg.length && !pos; i++) {
+          const a = seg[i - 1];
+          const b = seg[i];
+          if (t >= a.t && t <= b.t) {
+            const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 0;
+            pos = [a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f];
+          }
+        }
+        if (pos) break;
+      }
+    }
+    if (!pos) return none(p.id);
+    const near = visible.some((seg) => seg.some((s) => haversineM(s.lat, s.lng, pos![0], pos![1]) <= PIN_SNAP_M));
+    if (!near) return none(p.id);
+    const pin: [number, number] = [round4(pos[0]), round4(pos[1])];
+    if (zonesContaining(pos[0], pos[1], zones).length || zonesContaining(pin[0], pin[1], zones).length) return none(p.id);
+    return { id: p.id, pinLat: pin[0], pinLng: pin[1] };
+  });
+}
+
+// published start: floored to the coarsening step; local time from the row's offset
+export function publishedStart(row: Pick<ActivityRow, "startDateUtc" | "utcOffsetMin">, settings: PrivacySettings) {
+  const publishedStartUtc = coarsenStart(row.startDateUtc, settings.coarsenStartMin);
+  return { publishedStartUtc, publishedLocalTime: localDateTime(publishedStartUtc, row.utcOffsetMin).localTime };
 }
 
 export function diffColumns(row: Partial<ActivityRow>, cols: PublicColumns): (keyof PublicColumns)[] {
@@ -253,11 +422,15 @@ export interface RepublishDeps {
   loadActivity(id: number): Promise<ActivityRow | null>;
   loadSources(id: number): Promise<SourceInput[]>;
   loadEdits(id: number): Promise<EditInput[]>; // active only
-  loadZones(): Promise<ZoneInput[]>; // enabled only
+  loadZones(): Promise<ZoneInput[]>; // enabled, not archived
   loadRaw(sha256: string, row: ActivityRow): Promise<Uint8Array | null>;
   storeDerived(key: string, bytes: Uint8Array): Promise<boolean>; // false when no private store
   writeColumns(id: number, values: Record<string, unknown>): Promise<void>;
   recordEdit?(id: number, kind: string, params: Record<string, unknown>, note: string): Promise<number>;
+  // optional so read-only/legacy deps keep working: defaults, no photos
+  loadSettings?(): Promise<PrivacySettings>;
+  loadPhotos?(id: number): Promise<PhotoInput[]>;
+  writePhotoPins?(id: number, pins: PhotoPin[]): Promise<void>;
 }
 
 export type RepublishResult =
@@ -273,6 +446,7 @@ export type RepublishResult =
       changed: (keyof PublicColumns)[];
       columns: PublicColumns;
       canonicalTrackKey: string | null;
+      pins: PhotoPin[];
     };
 
 export interface RepublishOptions {
@@ -317,10 +491,12 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
   const row = await deps.loadActivity(activityId);
   if (!row) return { status: "not-found", id: activityId };
 
-  const [sources, storedEdits, zones] = await Promise.all([
+  const [sources, storedEdits, allZones, settings, photos] = await Promise.all([
     deps.loadSources(activityId),
     deps.loadEdits(activityId),
     deps.loadZones(),
+    deps.loadSettings ? deps.loadSettings() : Promise.resolve(DEFAULT_PRIVACY_SETTINGS),
+    deps.loadPhotos ? deps.loadPhotos(activityId) : Promise.resolve([] as PhotoInput[]),
   ]);
   let edits = withLegacyTrim(row, storedEdits);
   const candidates = trackCandidates(sources);
@@ -333,10 +509,16 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
   }
 
   const best = candidates[0] ?? null;
-  const bestHash = inputsHash({ track: best, edits, zones });
+  // only zones that can touch the track count (trackless: none), so a zone
+  // edit elsewhere never marks this activity stale
+  const hashFor = (track: TrackRef | null, bbox: RouteBounds | null) =>
+    inputsHash({ track, edits, zones: track ? relevantZones(allZones, bbox) : [], settings, photos });
+  const bestHash = hashFor(best, row.trackBbox ?? null);
   if (!opts.force && row.publishedInputsHash === bestHash && row.processingVersion === PROCESSING_VERSION) {
+    if (row.needsRepublish && !opts.dryRun) await deps.writeColumns(activityId, { needsRepublish: false });
     return { status: "fresh", id: activityId, hash: bestHash };
   }
+  const start = publishedStart(row, settings);
 
   // best source first; skip sources that hold no track, but stop (write
   // nothing) when a better source's bytes can't be read — publishing a worse
@@ -347,27 +529,47 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       return { status: "source-unavailable", id: activityId, hash: bestHash, track: ref };
     }
     if (!track) continue;
-    const hash = inputsHash({ track: ref, edits, zones });
-    const columns = computePublicColumns(track, edits);
+    const bbox = trackBounds(track);
+    const zones = relevantZones(allZones, bbox);
+    const hash = hashFor(ref, bbox);
+    const { columns, visible } = publishTrack(track, edits, { zones, settings });
+    const pins = computePhotoPins(photos, track, visible, zones);
     const changed = diffColumns(row, columns);
     const serialized = serializeCanonical(track);
     const key = canonicalTrackKey(serialized);
     if (opts.dryRun) {
-      return { status: "would-publish", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: key };
+      return { status: "would-publish", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: key, pins };
     }
     const stored = await deps.storeDerived(key, serialized);
+    if (deps.writePhotoPins && pins.length) await deps.writePhotoPins(activityId, pins);
     await deps.writeColumns(activityId, {
       ...columns,
+      ...start,
+      trackBbox: bbox,
+      needsRepublish: false,
       processingVersion: PROCESSING_VERSION,
       publishedInputsHash: hash,
       canonicalTrackKey: stored ? key : null,
       updatedAt: new Date(),
     });
-    return { status: "published", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: stored ? key : null };
+    return { status: "published", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: stored ? key : null, pins };
   }
 
   // trackless (manual entries, gym sessions, file-less api rows not yet
-  // snapshotted): published columns are left exactly as they are
+  // snapshotted): route/stat columns are left exactly as they are; only the
+  // published start and bookkeeping are written, and no photo gets a pin
+  if (!opts.dryRun) {
+    if (deps.writePhotoPins && photos.length) {
+      await deps.writePhotoPins(activityId, computePhotoPins(photos, null, [], []));
+    }
+    await deps.writeColumns(activityId, {
+      ...start,
+      needsRepublish: false,
+      processingVersion: PROCESSING_VERSION,
+      publishedInputsHash: bestHash,
+      updatedAt: new Date(),
+    });
+  }
   return { status: "no-source", id: activityId, hash: bestHash };
 }
 
@@ -418,7 +620,25 @@ export function defaultDeps(): RepublishDeps {
       return db
         .select({ id: privacyZones.id, polygon: privacyZones.polygon })
         .from(privacyZones)
-        .where(eq(privacyZones.enabled, true));
+        .where(and(eq(privacyZones.enabled, true), isNull(privacyZones.archivedAt)))
+        .orderBy(asc(privacyZones.id));
+    },
+    loadSettings: loadPrivacySettings,
+    async loadPhotos(id) {
+      return db
+        .select({ id: activityPhotos.id, takenAt: activityPhotos.takenAt, gpsLat: activityPhotos.gpsLat, gpsLng: activityPhotos.gpsLng })
+        .from(activityPhotos)
+        .where(eq(activityPhotos.activityId, id))
+        .orderBy(asc(activityPhotos.id));
+    },
+    async writePhotoPins(id, pins) {
+      // one statement per photo (neon-http: no transactions); pins only
+      for (const p of pins) {
+        await db
+          .update(activityPhotos)
+          .set({ pinLat: p.pinLat, pinLng: p.pinLng })
+          .where(and(eq(activityPhotos.id, p.id), eq(activityPhotos.activityId, id)));
+      }
     },
     loadRaw: loadRawBytes,
     async storeDerived(key, bytes) {

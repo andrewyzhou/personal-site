@@ -36,6 +36,13 @@
       "when": 1793788782396,
       "tag": "0004_lift",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793790307646,
+      "tag": "0005_privacy",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,25 @@ export interface RouteBounds {
   maxLng: number;
 }
 
+// a stretch of the activity hidden by a privacy zone. entry/exit are the last
+// and first published points around it (null when it starts/ends in the fog).
+export interface FogEvent {
+  entry: [number, number] | null; // [lat, lng]
+  exit: [number, number] | null;
+  durationS: number; // rounded to the minute
+}
+
+// privacy settings (privacy_settings rows; latest wins)
+export interface PrivacySettings {
+  // distance of fogged activities: include the hidden part rounded, include it
+  // exactly, or publish only the visible distance
+  distance: { mode: "include-rounded" | "include-exact" | "visible-only"; roundToM: number };
+  // floor the published start time to this many minutes (0 = exact)
+  coarsenStartMin: number;
+  // privacy trim at both ends for gps tracks without a trim edit
+  defaultTrimM: number;
+}
+
 export const activities = pgTable(
   "activities",
   {
@@ -69,6 +88,20 @@ export const activities = pgTable(
     processingVersion: integer("processing_version").notNull().default(0),
     publishedInputsHash: text("published_inputs_hash"),
     canonicalTrackKey: text("canonical_track_key"), // private bucket key, never public
+    // visibility (private = hidden). applied by the public serializer, so
+    // toggling never touches published data and is always restorable
+    mapHidden: boolean("map_hidden").notNull().default(false),
+    hrHidden: boolean("hr_hidden").notNull().default(false),
+    // published (possibly coarsened) start; null until republished → fall back
+    publishedLocalTime: text("published_local_time"),
+    publishedStartUtc: timestamp("published_start_utc", { withTimezone: true, mode: "date" }),
+    // fog output (public): events at zone edges + the touched zones' public shapes
+    fogEvents: jsonb("fog_events").$type<FogEvent[]>(),
+    fogShapes: jsonb("fog_shapes").$type<number[][][][]>(),
+    // PRIVATE: bounds of the full unfogged track, used to find zones that touch it
+    trackBbox: jsonb("track_bbox").$type<RouteBounds>(),
+    // set by zone/settings/photo edits; the rebuild job republishes and clears it
+    needsRepublish: boolean("needs_republish").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
@@ -94,6 +127,13 @@ export const activityPhotos = pgTable(
     caption: text("caption"),
     // private raw-store copy of the photo bytes (set by migrate-originals-private)
     originalSha256: text("original_sha256"),
+    // PRIVATE: from the original's exif (never selected by public routes)
+    takenAt: timestamp("taken_at", { withTimezone: true, mode: "date" }),
+    gpsLat: doublePrecision("gps_lat"),
+    gpsLng: doublePrecision("gps_lng"),
+    // public map pin, written by republish: null inside zones, hidden or trimmed parts
+    pinLat: doublePrecision("pin_lat"),
+    pinLng: doublePrecision("pin_lng"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (t) => [index("activity_photos_activity_idx").on(t.activityId, t.position)]
@@ -185,8 +225,19 @@ export const privacyZones = pgTable("privacy_zones", {
   // geojson Polygon coordinates: rings of [lng, lat]
   polygon: jsonb("polygon").$type<number[][][]>().notNull(),
   enabled: boolean("enabled").notNull().default(true),
+  // geometry is never edited in place: an edit inserts a new row that replaces
+  // this one and archives it, so every earlier shape stays restorable
+  replacesId: bigint("replaces_id", { mode: "number" }),
+  archivedAt: timestamp("archived_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+// insert-only; the newest row is in effect (restore = insert an older value)
+export const privacySettings = pgTable("privacy_settings", {
+  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+  settings: jsonb("settings").$type<PrivacySettings>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
 export type RawObjectRow = typeof rawObjects.$inferSelect;

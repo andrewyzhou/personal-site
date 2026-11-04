@@ -26,6 +26,19 @@ function encodeValue(v: number): string {
   return out;
 }
 
+// a route broken into visible segments (privacy zones): each segment encoded
+// on its own, joined by a space (never part of the polyline alphabet). a
+// single segment encodes exactly like encodePolyline.
+export const SEGMENT_SEPARATOR = " ";
+
+export function encodeMultiPolyline(segments: [number, number][][]): string {
+  return segments.filter((s) => s.length > 0).map(encodePolyline).join(SEGMENT_SEPARATOR);
+}
+
+export function decodeMultiPolyline(encoded: string): [number, number][][] {
+  return encoded.split(SEGMENT_SEPARATOR).filter(Boolean).map(decodePolyline);
+}
+
 export function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];
   let index = 0;
