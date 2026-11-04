@@ -1,5 +1,6 @@
-// month grid for the history calendar. local time throughout: a workout
-// belongs to the day it started on the phone's clock.
+// month grid for the history calendar. a workout belongs to the day it
+// started where it was logged (its stored utc offset), so travelling doesn't
+// move old workouts to a neighbouring day. "today" is the phone's clock.
 
 export interface MonthRef {
   year: number;
@@ -45,6 +46,35 @@ export function dayKey(ms: number): string {
   return dayKeyOf(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+const MIN = 60_000;
+
+/** day key at a fixed utc offset (minutes east of utc, like -getTimezoneOffset()) */
+export function dayKeyAt(ms: number, utcOffsetMin: number): string {
+  const d = new Date(ms + utcOffsetMin * MIN);
+  return dayKeyOf(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** a workout's day where it was logged; rows from before the offset was stored use the phone's zone */
+export function workoutDayKey(w: { startedAt: number; utcOffsetMin?: number | null }): string {
+  const off = w.utcOffsetMin;
+  return off === null || off === undefined || !Number.isFinite(off) ? dayKey(w.startedAt) : dayKeyAt(w.startedAt, off);
+}
+
+/** ms from `now` until the next local midnight (at least 1s, so a timer can't spin) */
+export function msUntilNextDay(now: number): number {
+  const d = new Date(now);
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+  return Math.max(1000, next - now);
+}
+
+const SHORT = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** "yyyy-mm-dd" -> "nov 4, 2026", same shape as formatDay */
+export function dayKeyLabel(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return `${SHORT[(m ?? 1) - 1]} ${d}, ${y}`;
+}
+
 export function monthOf(ms: number): MonthRef {
   const d = new Date(ms);
   return { year: d.getFullYear(), month: d.getMonth() };
@@ -78,11 +108,11 @@ export function monthLabel(ref: MonthRef): string {
   return `${MONTHS[ref.month]} ${ref.year}`;
 }
 
-/** count of items per local day */
-export function countByDay<T>(items: readonly T[], at: (item: T) => number): Map<string, number> {
+/** count of items per day; `key` maps an item to its day key */
+export function countByDay<T>(items: readonly T[], key: (item: T) => string): Map<string, number> {
   const out = new Map<string, number>();
   for (const item of items) {
-    const k = dayKey(at(item));
+    const k = key(item);
     out.set(k, (out.get(k) ?? 0) + 1);
   }
   return out;

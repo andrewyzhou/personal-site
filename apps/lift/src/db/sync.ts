@@ -7,7 +7,7 @@ import { and, asc, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { randomUUID } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { db } from "./client";
-import { subscribe } from "./events";
+import { notify, subscribe } from "./events";
 import { getSetting, setSetting } from "./settings";
 import { kv, outbox, workouts } from "./schema";
 import { backoffDelay } from "../lib/sync/backoff";
@@ -35,18 +35,29 @@ export function setServerUrl(url: string): void {
 /** after a reinstall: put the keychain copy of the server url back into kv */
 export async function recoverServerUrl(): Promise<void> {
   if (getSetting("serverUrl")) return;
-  const saved = await SecureStore.getItemAsync(URL_KEY);
+  const saved = await SecureStore.getItemAsync(URL_KEY).catch(() => null);
   if (saved) setSetting("serverUrl", saved);
 }
 
+/*
+ * keychain caveats: on ios the keychain usually survives a reinstall, so the
+ * token comes back on its own. android deletes secure-store data with the
+ * app, and a backup-restored entry can be undecryptable (its keystore key
+ * isn't backed up), so a new or reinstalled android phone (or a new iphone
+ * without an encrypted backup) starts tokenless: the user re-enters it in
+ * settings, and home's restore offer appears then.
+ */
 export async function getToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  // an unreadable entry is the same as no token, not a crash
+  return SecureStore.getItemAsync(TOKEN_KEY).catch(() => null);
 }
 
 export async function setToken(token: string): Promise<void> {
   const t = token.trim();
   if (t) await SecureStore.setItemAsync(TOKEN_KEY, t);
   else await SecureStore.deleteItemAsync(TOKEN_KEY);
+  // not a db write, but home's restore offer depends on the token: re-check now
+  notify();
 }
 
 /** generated once per install; the server keys seqs by it */

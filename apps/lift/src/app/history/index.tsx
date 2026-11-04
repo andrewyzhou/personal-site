@@ -2,23 +2,24 @@ import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack, router } from "expo-router";
 import { getUnit, listFinishedWorkouts } from "../../db/history";
-import { formatDay, formatDuration, formatVolume } from "../../components/charts/units";
+import { formatDuration, formatVolume } from "../../components/charts/units";
 import { MonthCalendar } from "../../components/history/MonthCalendar";
 import { useColors } from "../../components/theme";
 import { useDbVersion } from "../../components/useDbVersion";
-import { countByDay, dayKey, monthOf, shiftMonth, type MonthRef } from "../../lib/calendar";
+import { useToday } from "../../components/useToday";
+import { countByDay, dayKeyLabel, monthOf, shiftMonth, workoutDayKey, type MonthRef } from "../../lib/calendar";
 
 export default function HistoryList() {
   const c = useColors();
   const version = useDbVersion();
   const items = useMemo(() => listFinishedWorkouts(), [version]);
   const unit = useMemo(() => getUnit(), [version]);
-  const counts = useMemo(() => countByDay(items, (i) => i.workout.startedAt), [items]);
-  const [now] = useState(Date.now);
+  const counts = useMemo(() => countByDay(items, (i) => workoutDayKey(i.workout)), [items]);
+  const now = useToday();
   const [month, setMonth] = useState<MonthRef>(() => monthOf(now));
   const [selected, setSelected] = useState<string | null>(null);
   const shown = useMemo(
-    () => (selected ? items.filter((i) => dayKey(i.workout.startedAt) === selected) : items),
+    () => (selected ? items.filter((i) => workoutDayKey(i.workout) === selected) : items),
     [items, selected]
   );
 
@@ -35,7 +36,7 @@ export default function HistoryList() {
       {selected ? (
         <Pressable accessibilityRole="button" onPress={() => setSelected(null)} hitSlop={8} style={styles.filter}>
           <Text style={{ color: c.muted }}>
-            {shown.length ? `${shown.length} on ${formatDay(shown[0]!.workout.startedAt)}` : "no workouts that day"}
+            {shown.length ? `${shown.length} on ${dayKeyLabel(selected)}` : "no workouts that day"}
           </Text>
           <Text style={{ color: c.accent }}>show all</Text>
         </Pressable>
@@ -69,7 +70,7 @@ export default function HistoryList() {
                 { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 },
               ]}
             >
-              <Text style={[styles.date, { color: c.muted }]}>{formatDay(w.startedAt)}</Text>
+              <Text style={[styles.date, { color: c.muted }]}>{dayKeyLabel(workoutDayKey(w))}</Text>
               <Text style={[styles.title, { color: c.text }]}>{w.title || "workout"}</Text>
               <Text style={{ color: c.muted }}>{meta}</Text>
             </Pressable>

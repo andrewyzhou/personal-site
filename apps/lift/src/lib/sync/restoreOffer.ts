@@ -1,6 +1,8 @@
 // whether home should offer "restore from server" instead of a blank slate.
-// the keychain outlives a reinstall on ios, so a saved token with an empty db
-// almost always means a reinstall (or a new phone restored from a backup).
+// a saved token with an empty db almost always means a reinstall or a new
+// phone. the token can come from the ios keychain surviving a reinstall, or
+// be typed into settings by hand: android wipes secure storage on uninstall
+// and backup-restored entries may not decrypt, so don't rely on survival.
 
 export interface RestoreOfferState {
   hasToken: boolean;

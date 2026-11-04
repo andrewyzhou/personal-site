@@ -47,7 +47,7 @@ describe("month helpers", () => {
     const ms = new Date(2026, 10, 4, 23, 59).getTime();
     expect(dayKey(ms)).toBe("2026-11-04");
     expect(monthOf(ms)).toEqual({ year: 2026, month: 10 });
-    const counts = countByDay([ms, new Date(2026, 10, 4, 6).getTime(), new Date(2026, 10, 5, 0, 1).getTime()], (x) => x);
+    const counts = countByDay([ms, new Date(2026, 10, 4, 6).getTime(), new Date(2026, 10, 5, 0, 1).getTime()], dayKey);
     expect(counts.get("2026-11-04")).toBe(2);
     expect(counts.get("2026-11-05")).toBe(1);
   });
