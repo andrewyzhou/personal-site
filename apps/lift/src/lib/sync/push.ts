@@ -122,7 +122,7 @@ export async function pushAll(deps: PushDeps): Promise<PushResult> {
     );
     if (!plan.progressed) return { ok: false, error: "server did not accept the batch", kind: "protocol", ...stats };
     deps.ack(plan);
-    stats.pushed += rows.filter((r) => r.id <= (plan.syncedThrough ?? -1)).length;
+    stats.pushed += plan.seqs.length;
     stats.applied += out.res.applied;
     stats.skipped += out.res.skipped;
     stats.rejected += plan.rejected.length;

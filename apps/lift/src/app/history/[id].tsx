@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { getExerciseLookup } from "../../db/exercises";
 import { deleteFinishedWorkout, getHistoryDetail } from "../../db/history";
+import { clearPriorBests } from "../../db/prs";
 import { Button } from "../../components/Button";
 import { formatDay, formatDuration, round } from "../../components/charts/units";
 import { useColors } from "../../components/theme";
@@ -46,6 +47,7 @@ export default function HistoryDetail() {
         style: "destructive",
         onPress: () => {
           deleteFinishedWorkout(w.id);
+          clearPriorBests();
           router.back();
         },
       },
@@ -80,7 +82,13 @@ export default function HistoryDetail() {
         </View>
       ))}
 
-      <Button label="delete workout" variant="danger" onPress={confirmDelete} style={styles.gap} />
+      <Button
+        label="summary"
+        variant="plain"
+        onPress={() => router.push({ pathname: "/summary/[id]", params: { id: w.id } })}
+        style={styles.gap}
+      />
+      <Button label="delete workout" variant="danger" onPress={confirmDelete} style={styles.small} />
     </ScrollView>
   );
 }
@@ -94,4 +102,5 @@ const styles = StyleSheet.create({
   setRow: { flexDirection: "row", gap: 12 },
   setNo: { width: 20 },
   gap: { marginTop: 24 },
+  small: { marginTop: 8 },
 });

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await ingestStrongText(incoming.text, { source: "telegram" });
-    await reply(result.status === "empty" ? `couldn't log that: ${result.text}` : result.text);
+    await reply(result.status === "empty" ? `couldn't log that: ${result.text}` : result.details || result.text);
     return NextResponse.json({ ok: true, handled: result.status, workoutId: result.workoutId });
   } catch (error) {
     log.error("api:lift/telegram", "ingest failed", error);

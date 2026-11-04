@@ -3,22 +3,30 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { exerciseSessions, fromKg, personalRecords, type PersonalRecords, type SessionPoint } from "lift-core";
 import { lookupExercise } from "../../db/exercises";
-import { getUnit, loadExerciseHistory } from "../../db/history";
+import { getUnit, loadExerciseHistory, loadExerciseNotes } from "../../db/history";
 import { LineChart } from "../../components/charts/LineChart";
 import { formatDay, formatKg, round } from "../../components/charts/units";
 import { useColors } from "../../components/theme";
 import { useDbVersion } from "../../components/useDbVersion";
 import { formatList, humanize } from "../../lib/format";
+import { bestSetsByE1rm, noteTimeline, type NoteEntry, type RankedSet } from "../../lib/records";
 
 interface History {
   sessions: SessionPoint[];
   prs: PersonalRecords;
+  best: RankedSet[];
+  notes: NoteEntry[];
 }
 
 function loadHistory(id: string): History | null {
   try {
     const rows = loadExerciseHistory(id);
-    return { sessions: exerciseSessions(rows, id), prs: personalRecords(rows, id) };
+    return {
+      sessions: exerciseSessions(rows, id),
+      prs: personalRecords(rows, id),
+      best: bestSetsByE1rm(rows, id, 5),
+      notes: noteTimeline(loadExerciseNotes(id)),
+    };
   } catch {
     // keeps the details readable if the history math throws
     return null;
@@ -118,6 +126,50 @@ export default function ExerciseDetail() {
           <LineChart title={`e1rm (${unit})`} data={e1rmData} formatY={fmt} />
           <LineChart title={`volume (${unit})`} data={volumeData} formatY={fmt} />
 
+          {history.best.length > 0 ? (
+            <>
+              <Text style={[styles.section, { color: c.text }]}>best sets</Text>
+              <View style={[styles.tableRow, { borderColor: c.border }]}>
+                <Text style={[styles.rank, styles.th, { color: c.muted }]}>#</Text>
+                <Text style={[styles.cellWide, styles.th, { color: c.muted }]}>set</Text>
+                <Text style={[styles.cell, styles.th, { color: c.muted }]}>e1rm</Text>
+                <Text style={[styles.cellDate, styles.th, { color: c.muted }]}>date</Text>
+              </View>
+              {history.best.map((b, i) => (
+                <Pressable
+                  key={`${b.workoutId}:${b.weight}:${b.reps}`}
+                  onPress={() => router.push({ pathname: "/history/[id]", params: { id: b.workoutId } })}
+                  style={({ pressed }) => [styles.tableRow, { borderColor: c.border, opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Text style={[styles.rank, { color: c.muted }]}>{i + 1}</Text>
+                  <Text style={[styles.cellWide, { color: c.text }]}>
+                    {round(b.weight)} {b.unit} × {b.reps}
+                  </Text>
+                  <Text style={[styles.cell, { color: c.text }]}>{formatKg(b.e1rmKg, unit)}</Text>
+                  <Text style={[styles.cellDate, { color: c.muted }]}>{formatDay(b.startedAt)}</Text>
+                </Pressable>
+              ))}
+            </>
+          ) : null}
+
+          {history.notes.length > 0 ? (
+            <>
+              <Text style={[styles.section, { color: c.text }]}>notes</Text>
+              {history.notes.map((n, i) => (
+                <Pressable
+                  key={`${n.workoutId}:${n.label}:${i}`}
+                  onPress={() => router.push({ pathname: "/history/[id]", params: { id: n.workoutId } })}
+                  style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Text style={[styles.key, { color: c.muted }]}>
+                    {formatDay(n.startedAt)} · {n.label}
+                  </Text>
+                  <Text style={[styles.value, { color: c.text }]}>{n.text}</Text>
+                </Pressable>
+              ))}
+            </>
+          ) : null}
+
           <Text style={[styles.section, { color: c.text }]}>sessions</Text>
           {[...sessions].reverse().map((s) => (
             <Pressable
@@ -154,4 +206,10 @@ const styles = StyleSheet.create({
   repRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
   key: { fontSize: 13 },
   value: { fontSize: 16, marginTop: 2 },
+  tableRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  th: { fontSize: 12 },
+  rank: { width: 16, fontVariant: ["tabular-nums"] },
+  cellWide: { flex: 1.3, fontVariant: ["tabular-nums"] },
+  cell: { flex: 1, fontVariant: ["tabular-nums"] },
+  cellDate: { flex: 1.2, textAlign: "right", fontSize: 13 },
 });

@@ -1,5 +1,7 @@
 // minimal telegram bot helpers for the lift bot webhook. plain fetch so tests can stub it.
 
+import { truncateText } from "./summary";
+
 export interface TelegramMessage {
   message_id: number;
   chat: { id: number; type?: string };
@@ -49,7 +51,7 @@ export async function sendTelegramMessage(
 ): Promise<void> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
-    text: text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT - 1)}…` : text,
+    text: truncateText(text, MAX_TEXT),
   };
   if (replyTo != null) {
     body.reply_to_message_id = replyTo;

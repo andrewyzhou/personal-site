@@ -75,6 +75,10 @@ export interface CalendarActivity {
   kilojoules: number | null;
   description: string | null;
   sufferScore: number | null;
+  // set on entries with their own page (lift-only workouts); absent for recordings
+  href?: string;
+  // "3 exercises · 6 sets" on lift-only entries, shown instead of a 0 min time
+  liftSummary?: string;
 }
 
 // fetch all activities with pagination, optionally after a timestamp.
