@@ -5,9 +5,11 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { HistorySet, WeightUnit } from "lift-core";
 import { db } from "./client";
 import { notify } from "./events";
+import { bumpedAt } from "../lib/clock";
 import { writeOutbox } from "./outbox";
 import { getDefaultUnit } from "./settings";
 import { sets, workoutExercises, workouts, type SetRow, type WorkoutExerciseRow, type WorkoutRow } from "./schema";
+import type { NoteRow } from "../lib/records";
 
 export function getUnit(): WeightUnit {
   return getDefaultUnit();
@@ -121,7 +123,7 @@ export function deleteFinishedWorkout(workoutId: string, now = Date.now()): bool
   const row = db.transaction((tx) => {
     const updated = tx
       .update(workouts)
-      .set({ status: "discarded", updatedAt: now })
+      .set({ status: "discarded", updatedAt: bumpedAt(workouts.updatedAt, now) })
       .where(and(eq(workouts.id, workoutId), eq(workouts.status, "finished")))
       .returning()
       .get();
@@ -130,4 +132,59 @@ export function deleteFinishedWorkout(workoutId: string, now = Date.now()): bool
   });
   notify();
   return Boolean(row);
+}
+
+/** like loadExerciseHistory, for several exercises at once (summary prs) */
+export function loadHistoryFor(exerciseIds: readonly string[]): HistorySet[] {
+  if (exerciseIds.length === 0) return [];
+  const rows = db
+    .select({
+      workoutId: workouts.id,
+      startedAt: workouts.startedAt,
+      exerciseId: workoutExercises.exerciseId,
+      kind: sets.kind,
+      weight: sets.weight,
+      unit: sets.unit,
+      reps: sets.reps,
+      completed: sets.completed,
+    })
+    .from(sets)
+    .innerJoin(workoutExercises, eq(sets.workoutExerciseId, workoutExercises.id))
+    .innerJoin(workouts, eq(workoutExercises.workoutId, workouts.id))
+    .where(and(eq(workouts.status, "finished"), inArray(workoutExercises.exerciseId, [...new Set(exerciseIds)])))
+    .orderBy(asc(workouts.startedAt), asc(workoutExercises.position), asc(sets.position))
+    .all();
+  return rows.map((r) => ({ ...r, completed: r.completed === 1 }));
+}
+
+/** card notes and set notes of one exercise across finished workouts, one row per entry */
+export function loadExerciseNotes(exerciseId: string): NoteRow[] {
+  const entries = db
+    .select({ id: workoutExercises.id, notes: workoutExercises.notes, workoutId: workouts.id, startedAt: workouts.startedAt })
+    .from(workoutExercises)
+    .innerJoin(workouts, eq(workoutExercises.workoutId, workouts.id))
+    .where(and(eq(workouts.status, "finished"), eq(workoutExercises.exerciseId, exerciseId)))
+    .orderBy(desc(workouts.startedAt), asc(workoutExercises.position))
+    .all();
+  if (entries.length === 0) return [];
+  const setRows = db
+    .select({ workoutExerciseId: sets.workoutExerciseId, position: sets.position, note: sets.note })
+    .from(sets)
+    .where(
+      inArray(
+        sets.workoutExerciseId,
+        entries.map((e) => e.id)
+      )
+    )
+    .orderBy(asc(sets.position))
+    .all();
+  return entries.map((e) => ({
+    workoutId: e.workoutId,
+    startedAt: e.startedAt,
+    exerciseNote: e.notes,
+    setNotes: setRows
+      .filter((s) => s.workoutExerciseId === e.id)
+      .map((s, i) => ({ setNumber: i + 1, text: s.note ?? "" }))
+      .filter((s) => s.text.trim() !== ""),
+  }));
 }

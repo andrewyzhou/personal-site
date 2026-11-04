@@ -39,11 +39,24 @@ interface CalendarActivity {
   kilojoules: number | null;
   description: string | null;
   sufferScore: number | null;
+  href?: string; // own page (lift-only workouts); no preview fetch
+  liftSummary?: string; // "3 exercises · 6 sets" on lift-only workouts
+}
+
+// lift-only workouts without a watch recording have no duration; "0 min" would be wrong
+function liftMetric(activity: CalendarActivity): string | null {
+  if (!activity.href || activity.duration > 0) return null;
+  return activity.liftSummary || "lift";
 }
 
 interface StoredActivities {
   activities: CalendarActivity[];
   lastFetchedAt: number | null;
+}
+
+// lift-only workouts arrive beside the list; appended so activities[0] stays the latest recording
+function withLifts(result: StoredActivities & { lifts?: CalendarActivity[] }): StoredActivities {
+  return { ...result, activities: [...(result.activities ?? []), ...(result.lifts ?? [])] };
 }
 
 const ACTIVITY_ICONS: Record<string, string> = {
@@ -218,7 +231,7 @@ function StravaActivitySelector({
       <div className="flex flex-col gap-2">
         {activities.map((activity) => {
           const isDurationBased = DURATION_TYPES.includes(activity.type);
-          const metric = isDurationBased ? formatDuration(activity.elapsedTime) : formatDistance(activity.distance);
+          const metric = liftMetric(activity) ?? (isDurationBased ? formatDuration(activity.elapsedTime) : formatDistance(activity.distance));
           return (
             <button
               key={activity.id}
@@ -256,6 +269,7 @@ function StravaActivityDetail({
   // no-op on failure (list payload stays polyline-free to keep load cost flat)
   const [detail, setDetail] = useState<{ cardPolyline: string | null; photos: { url: string }[] } | null>(null);
   useEffect(() => {
+    if (activity.href) return;
     let cancelled = false;
     fetch(`/api/activities/${activity.id}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -268,7 +282,7 @@ function StravaActivityDetail({
     return () => {
       cancelled = true;
     };
-  }, [activity.id]);
+  }, [activity.id, activity.href]);
 
   const showDistance = DISTANCE_TYPES.includes(activity.type);
   const showPace = PACE_TYPES.includes(activity.type);
@@ -284,7 +298,8 @@ function StravaActivityDetail({
   }).toLowerCase();
 
   const stats: { label: string; value: string }[] = [];
-  stats.push({ label: "time", value: formatDuration(isDurationBased ? activity.elapsedTime : activity.duration) });
+  const lift = liftMetric(activity);
+  if (!lift) stats.push({ label: "time", value: formatDuration(isDurationBased ? activity.elapsedTime : activity.duration) });
   if (showDistance) stats.push({ label: "distance", value: formatDistance(activity.distance) });
   if (showPace && activity.averageSpeed > 0) stats.push({ label: "avg pace", value: formatPace(activity.averageSpeed) });
   if (showSpeed && activity.averageSpeed > 0) stats.push({ label: "avg speed", value: formatSpeed(activity.averageSpeed) });
@@ -312,6 +327,7 @@ function StravaActivityDetail({
           <span className="font-sans text-gray text-xs">{formatTimeOfDay(activity.startTime)}</span>
         </div>
       </div>
+      {lift && <p className="font-sans text-gray text-sm mb-4">{lift}</p>}
       {activity.description && (
         <p className="font-sans text-gray text-sm mb-4 leading-relaxed">{activity.description}</p>
       )}
@@ -337,10 +353,10 @@ function StravaActivityDetail({
         </div>
       )}
       <a
-        href={`/activities/${activity.id}`}
+        href={activity.href ?? `/activities/${activity.id}`}
         className="font-sans text-gray text-sm hover:text-off-white transition-colors text-center mt-auto"
       >
-        view activity &rarr;
+        {activity.href ? "view workout" : "view activity"} &rarr;
       </a>
     </div>
   );
@@ -557,7 +573,7 @@ export default function ActivityCalendar() {
         const response = await fetch("/api/activities");
         if (response.ok) {
           const result = await response.json();
-          setStravaData(result);
+          setStravaData(withLifts(result));
         }
       } catch (error) {
         console.error("Failed to fetch strava activities:", error);
@@ -576,7 +592,7 @@ export default function ActivityCalendar() {
       if (latestActivityId && latestActivityId !== cachedLatestId) {
         fetch("/api/activities")
           .then(res => res.ok ? res.json() : null)
-          .then(result => { if (result) setStravaData(result); })
+          .then(result => { if (result) setStravaData(withLifts(result)); })
           .catch(err => console.error("Failed to refresh strava activities:", err));
       }
     }

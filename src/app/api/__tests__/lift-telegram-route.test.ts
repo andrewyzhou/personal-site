@@ -8,6 +8,12 @@ import { POST } from "@/app/api/lift/telegram/route";
 
 const fetchMock = vi.fn();
 
+const DETAILS = [
+  "logged push day · wed nov 4 · 1 exercise · 2 sets · 1,850 lb · watch: not linked yet",
+  "bench press (barbell): 2×5 @ 185 lb · top e1rm 216 lb",
+  "https://www.andrewzhou.org/lifts/q2W8vN0aZk1pL4xE",
+].join("\n");
+
 function update(body: unknown, secret: string | null = "hook-secret"): Request {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (secret) headers["x-telegram-bot-api-secret-token"] = secret;
@@ -31,7 +37,7 @@ describe("POST /api/lift/telegram", () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     looksLike.mockImplementation((t: string) => t.includes("Set 1"));
-    ingest.mockResolvedValue({ status: "created", workoutId: "share-x", text: "logged push day · wed nov 4" });
+    ingest.mockResolvedValue({ status: "created", workoutId: "share-x", text: "logged push day · wed nov 4", details: DETAILS });
   });
 
   afterEach(() => vi.unstubAllGlobals());
@@ -74,12 +80,38 @@ describe("POST /api/lift/telegram", () => {
     });
   });
 
-  it("ingests a workout share and replies with the summary", async () => {
+  it("ingests a workout share and replies with the multi-line breakdown", async () => {
     const text = "Push Day\nSet 1: 185 lb × 5";
     const res = await POST(update(msg(text)));
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, handled: "created", workoutId: "share-x" });
     expect(ingest).toHaveBeenCalledWith(text, { source: "telegram" });
-    expect(sentBodies()[0]).toMatchObject({ chat_id: 42, text: "logged push day · wed nov 4", reply_to_message_id: 7 });
+    expect(sentBodies()[0]).toMatchObject({ chat_id: 42, text: DETAILS, reply_to_message_id: 7 });
+  });
+
+  it("says updated for an edited re-share", async () => {
+    const details = DETAILS.replace(/^logged/, "updated");
+    ingest.mockResolvedValueOnce({ status: "updated", workoutId: "share-x", text: "updated push day", details });
+    const res = await POST(update(msg("Push Day\nSet 1: 185 lb × 6")));
+    expect(await res.json()).toMatchObject({ handled: "updated" });
+    expect(sentBodies()[0].text).toBe(details);
+    expect(sentBodies()[0].text.toLowerCase()).not.toContain("strava");
+  });
+
+  it("falls back to the one-liner without details", async () => {
+    ingest.mockResolvedValueOnce({ status: "duplicate", workoutId: "share-x", text: "already logged push day" });
+    await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
+    expect(sentBodies()[0].text).toBe("already logged push day");
+  });
+
+  it("caps a long reply without splitting an emoji", async () => {
+    const details = "a" + "\u{1F4AA}".repeat(3000);
+    ingest.mockResolvedValueOnce({ status: "created", workoutId: "share-x", text: "x", details });
+    await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
+    const sent: string = sentBodies()[0].text;
+    expect(sent.length).toBeLessThanOrEqual(4000);
+    expect(sent.endsWith("\u{1F4AA}…")).toBe(true);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(sent)).toBe(false);
   });
 
   it("reads captions and edited messages", async () => {

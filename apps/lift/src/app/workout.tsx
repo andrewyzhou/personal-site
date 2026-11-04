@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { getExerciseLookup } from "../db/exercises";
+import { clearPriorBests, getPriorBests } from "../db/prs";
 import type { SetRow } from "../db/schema";
 import { getDefaultRestS } from "../db/settings";
 import { discardWorkout, finishWorkout, getActiveWorkout, getPreviousSessions, getWorkoutDetail } from "../db/workouts";
@@ -15,7 +17,25 @@ import { countUncompleted, decideFinish } from "../lib/finish";
 import { formatElapsed } from "../lib/format";
 import { flushPendingWrites } from "../lib/pending";
 import { resolveRestS, shouldStartRest } from "../lib/rest";
+import { sessionPrFlags, type SetPrKind } from "../lib/prs";
 import { groupEdges } from "../lib/sets";
+
+type Detail = NonNullable<ReturnType<typeof getWorkoutDetail>>;
+
+/** pr flags for every set in the workout; repeat entries of one exercise share a running best */
+function prFlagsOf(detail: Detail): Record<string, SetPrKind[]> {
+  const byExercise = new Map<string, SetRow[]>();
+  for (const e of detail.exercises) {
+    const list = byExercise.get(e.row.exerciseId) ?? [];
+    list.push(...e.sets);
+    byExercise.set(e.row.exerciseId, list);
+  }
+  const out: Record<string, SetPrKind[]> = {};
+  for (const [exerciseId, list] of byExercise) {
+    Object.assign(out, sessionPrFlags(getPriorBests(detail.workout.id, exerciseId), list));
+  }
+  return out;
+}
 
 function useNow(intervalMs = 1000): number {
   const [now, setNow] = useState(Date.now);
@@ -49,6 +69,9 @@ export default function Workout() {
   );
   const defaultRestS = useMemo(() => getDefaultRestS(), [version]);
   const timer = useRestTimer();
+  // prior bests are cached per workout, so this is only in-memory math per write
+  const prFlags = useMemo(() => (detail ? prFlagsOf(detail) : {}), [detail]);
+  const [celebrate, setCelebrate] = useState<{ setId: string; n: number } | null>(null);
 
   if (!detail) {
     return (
@@ -72,6 +95,10 @@ export default function Workout() {
     const list = fresh.exercises.map((e) => ({ id: e.row.id, supersetGroup: e.row.supersetGroup, sets: e.sets }));
     const owner = fresh.exercises.find((e) => e.row.id === set.workoutExerciseId);
     if (!owner) return;
+    if (prFlagsOf(fresh)[set.id]) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setCelebrate((prev) => ({ setId: set.id, n: (prev?.n ?? 0) + 1 }));
+    }
     if (shouldStartRest(list, set.id)) {
       startRest(resolveRestS(owner.row.restS, getDefaultRestS()), owner.row.id);
     } else {
@@ -84,7 +111,21 @@ export default function Workout() {
     flushPendingWrites();
     fn();
     clearRest();
+    clearPriorBests();
     router.back();
+  };
+
+  const finish = () => {
+    flushPendingWrites();
+    const decision = finishWorkout(workout.id);
+    clearRest();
+    clearPriorBests();
+    if (decision === "finish") {
+      // replace, so back from the summary goes home rather than to a closed workout
+      router.replace({ pathname: "/summary/[id]", params: { id: workout.id, fresh: "1" } });
+    } else {
+      router.back();
+    }
   };
 
   const onFinish = () => {
@@ -99,10 +140,10 @@ export default function Workout() {
       return;
     }
     const undone = countUncompleted(current?.exercises ?? []);
-    if (undone === 0) return close(() => finishWorkout(workout.id));
+    if (undone === 0) return finish();
     Alert.alert("finish workout?", `${undone} unchecked ${undone === 1 ? "set is" : "sets are"} removed.`, [
       { text: "cancel", style: "cancel" },
-      { text: "finish", onPress: () => close(() => finishWorkout(workout.id)) },
+      { text: "finish", onPress: finish },
     ]);
   };
 
@@ -138,6 +179,8 @@ export default function Workout() {
             linkedToNext={row.supersetGroup != null && exercises[i + 1]?.row.supersetGroup === row.supersetGroup}
             defaultRestS={defaultRestS}
             onSetCompleted={onSetCompleted}
+            prFlags={prFlags}
+            celebrate={celebrate}
           />
         ))}
 

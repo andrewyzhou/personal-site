@@ -7,6 +7,8 @@ import { getDb, activities, activityPhotos, type ActivityRow } from "@/lib/db";
 import RouteMap from "@/components/RouteMap";
 import ActivityPhotoCarousel from "@/components/ActivityPhotoCarousel";
 import EngagementSection from "@/components/EngagementSection";
+import LiftWorkoutCard from "@/components/lift/LiftWorkoutCard";
+import { loadActivityLiftWorkouts } from "@/lib/lift/public";
 import { isPublic, publicActivityDetail } from "@/lib/public-activity";
 import {
   DURATION_ONLY_TYPES,
@@ -54,6 +56,8 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const row = await loadActivity(id);
   if (!row) notFound();
+  // started now so it overlaps the photo query; one indexed lookup when there are no lifts
+  const liftsPromise = loadActivityLiftWorkouts(row);
 
   // public columns only: the exif time/gps (taken_at, gps_*) never leave the db
   const photoRows = await getDb()
@@ -72,6 +76,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   // everything rendered below comes from the public serializer (hide map /
   // hide hr / coarsened start applied there)
   const a = publicActivityDetail(row, photoRows);
+  const lifts = await liftsPromise;
   // hide map → fogEvents is null here, so nothing about fog is shown either
   const fog = fogLine(a.fogEvents);
 
@@ -149,6 +154,10 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
             {a.description}
           </p>
         )}
+
+        {lifts.map((w, i) => (
+          <LiftWorkoutCard key={`${w.date}:${i}`} workout={w} />
+        ))}
 
         <ActivityPhotoCarousel photos={a.photos} />
 

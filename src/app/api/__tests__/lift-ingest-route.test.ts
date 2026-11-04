@@ -14,14 +14,18 @@ function req(body: BodyInit | null, headers: Record<string, string> = {}, token:
   return new Request(URL_, { method: "POST", body, headers: h });
 }
 
-function result(status: "created" | "duplicate" | "empty") {
+const DETAILS = "logged push day\nbench press (barbell): 2×5 @ 185 lb · top e1rm 216 lb\nwatch: not linked yet · https://www.andrewzhou.org/lifts/q2W8vN0aZk1pL4xE";
+
+function result(status: "created" | "updated" | "duplicate" | "empty") {
+  const empty = "no exercises found in that text, so nothing was logged";
   return {
     status,
     duplicate: status === "duplicate",
     ingestId: "ing_1",
     workoutId: status === "empty" ? null : "share-x",
     summary: null,
-    text: status === "empty" ? "no exercises found in that text, so nothing was logged" : "logged push day",
+    text: status === "empty" ? empty : "logged push day",
+    details: status === "empty" ? empty : DETAILS,
     links: [],
     warnings: [],
   };
@@ -55,10 +59,13 @@ describe("POST /api/lift/ingest/share-text", () => {
     expect(await res.json()).toEqual({
       ok: true,
       duplicate: false,
+      updated: false,
       ingestId: "ing_1",
       workoutId: "share-x",
       summary: null,
+      // the shortcut notification stays one line; details carries the breakdown
       text: "logged push day",
+      details: DETAILS,
       warnings: [],
       links: [],
     });
@@ -117,7 +124,12 @@ describe("POST /api/lift/ingest/share-text", () => {
     ingest.mockResolvedValueOnce(result("duplicate"));
     const dup = await POST(req(TEXT, { "content-type": "text/plain" }));
     expect(dup.status).toBe(200);
-    expect(await dup.json()).toMatchObject({ ok: true, duplicate: true, workoutId: "share-x" });
+    expect(await dup.json()).toMatchObject({ ok: true, duplicate: true, updated: false, workoutId: "share-x" });
+
+    ingest.mockResolvedValueOnce(result("updated"));
+    const upd = await POST(req(TEXT, { "content-type": "text/plain" }));
+    expect(upd.status).toBe(200);
+    expect(await upd.json()).toMatchObject({ ok: true, duplicate: false, updated: true, workoutId: "share-x", details: DETAILS });
 
     ingest.mockResolvedValueOnce(result("empty"));
     const empty = await POST(req("hello", { "content-type": "text/plain" }));

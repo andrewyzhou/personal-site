@@ -3,20 +3,23 @@
 
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { and, asc, count, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { randomUUID } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { db } from "./client";
-import { subscribe } from "./events";
+import { notify, subscribe } from "./events";
 import { getSetting, setSetting } from "./settings";
 import { kv, outbox, workouts } from "./schema";
 import { backoffDelay } from "../lib/sync/backoff";
 import { isRetryableRejection, type AckPlan, type OutboxLike } from "../lib/sync/mutations";
 import { chunk } from "../lib/sync/snapshot";
 import { pushAll, type FetchLike, type PushErrorKind, type PushResult } from "../lib/sync/push";
+import { singleFlight } from "../lib/sync/singleFlight";
 
 export const DEFAULT_SERVER_URL = "https://www.andrewzhou.org";
 const TOKEN_KEY = "lift.appToken";
+// mirrored from kv: kv is wiped by a reinstall, the keychain isn't
+const URL_KEY = "lift.serverUrl";
 const AUTO_INTERVAL_MS = 5 * 60_000;
 
 export function getServerUrl(): string {
@@ -24,17 +27,37 @@ export function getServerUrl(): string {
 }
 
 export function setServerUrl(url: string): void {
-  setSetting("serverUrl", url.trim());
+  const u = url.trim();
+  setSetting("serverUrl", u);
+  void (u ? SecureStore.setItemAsync(URL_KEY, u) : SecureStore.deleteItemAsync(URL_KEY)).catch(() => {});
 }
 
+/** after a reinstall: put the keychain copy of the server url back into kv */
+export async function recoverServerUrl(): Promise<void> {
+  if (getSetting("serverUrl")) return;
+  const saved = await SecureStore.getItemAsync(URL_KEY).catch(() => null);
+  if (saved) setSetting("serverUrl", saved);
+}
+
+/*
+ * keychain caveats: on ios the keychain usually survives a reinstall, so the
+ * token comes back on its own. android deletes secure-store data with the
+ * app, and a backup-restored entry can be undecryptable (its keystore key
+ * isn't backed up), so a new or reinstalled android phone (or a new iphone
+ * without an encrypted backup) starts tokenless: the user re-enters it in
+ * settings, and home's restore offer appears then.
+ */
 export async function getToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  // an unreadable entry is the same as no token, not a crash
+  return SecureStore.getItemAsync(TOKEN_KEY).catch(() => null);
 }
 
 export async function setToken(token: string): Promise<void> {
   const t = token.trim();
   if (t) await SecureStore.setItemAsync(TOKEN_KEY, t);
   else await SecureStore.deleteItemAsync(TOKEN_KEY);
+  // not a db write, but home's restore offer depends on the token: re-check now
+  notify();
 }
 
 /** generated once per install; the server keys seqs by it */
@@ -121,21 +144,22 @@ function readBatch(limit: number): OutboxLike[] {
 }
 
 function ack(plan: AckPlan): void {
-  if (plan.syncedThrough === null) return;
-  const through = plan.syncedThrough;
+  if (!plan.seqs.length) return;
   const now = Date.now();
   db.transaction((tx) => {
     for (const r of plan.rejected) tx.update(outbox).set({ rejected: r.reason }).where(eq(outbox.id, r.seq)).run();
-    tx.update(outbox)
-      .set({ syncedAt: now })
-      .where(and(isNull(outbox.syncedAt), lte(outbox.id, through)))
-      .run();
+    // only the rows this request carried: a row requeued while it was in flight stays queued
+    for (const part of chunk(plan.seqs, 500)) {
+      tx.update(outbox)
+        .set({ syncedAt: now })
+        .where(and(isNull(outbox.syncedAt), inArray(outbox.id, part)))
+        .run();
+    }
   });
 }
 
-// one sync at a time; status listeners are separate from db/events so a sync
-// doesn't make every screen re-read
-let inflight: Promise<PushResult> | null = null;
+// status listeners are separate from db/events so a sync doesn't make every
+// screen re-read
 let failures = 0;
 let nextAllowedAt = 0;
 const statusListeners = new Set<() => void>();
@@ -147,8 +171,8 @@ export function subscribeSyncStatus(l: () => void): () => void {
   };
 }
 
-export function isSyncing(): boolean {
-  return inflight !== null;
+function emitStatus(): void {
+  for (const l of [...statusListeners]) l();
 }
 
 function describe(r: PushResult): string {
@@ -190,11 +214,10 @@ async function run(fetchFn: FetchLike): Promise<PushResult> {
   return result;
 }
 
-/** manual sync: ignores backoff, joins a sync already in flight */
-export function syncNow(fetchFn: FetchLike = fetch as unknown as FetchLike): Promise<PushResult> {
-  if (inflight) return inflight;
-  const p = run(fetchFn)
-    .catch(
+// one sync at a time across foreground, interval, finish and manual triggers
+const flight = singleFlight<PushResult, FetchLike>(
+  (fetchFn) =>
+    run(fetchFn).catch(
       (e: unknown): PushResult => ({
         ok: false,
         error: e instanceof Error ? e.message : "sync failed",
@@ -205,20 +228,23 @@ export function syncNow(fetchFn: FetchLike = fetch as unknown as FetchLike): Pro
         rejected: 0,
         rounds: 0,
       })
-    )
-    .finally(() => {
-      inflight = null;
-      for (const l of [...statusListeners]) l();
-    });
-  inflight = p;
-  for (const l of [...statusListeners]) l();
-  return p;
+    ),
+  emitStatus
+);
+
+export function isSyncing(): boolean {
+  return flight.busy();
+}
+
+/** manual sync: ignores backoff, joins a sync already in flight */
+export function syncNow(fetchFn: FetchLike = fetch as unknown as FetchLike): Promise<PushResult> {
+  return flight.run(fetchFn);
 }
 
 /** background attempt: quiet no-op without a token, with nothing to push, or while backing off */
 async function autoSync(): Promise<void> {
   try {
-    if (inflight || Date.now() < nextAllowedAt) return;
+    if (flight.busy() || Date.now() < nextAllowedAt) return;
     // requeued rows count as unsynced, so this runs before the empty check
     requeueRetryableRejections();
     if (countUnsynced() === 0) return;
