@@ -50,6 +50,13 @@
       "when": 1793793266033,
       "tag": "0006_lift_mvp",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793819847129,
+      "tag": "0007_activity_cleaning",
+      "breakpoints": true
     }
   ]
 }
