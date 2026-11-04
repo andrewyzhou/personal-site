@@ -256,6 +256,15 @@ describe("republish", () => {
     expect(writes).toHaveLength(0);
   });
 
+  it("skips a device file with no timed points (empty gpx shell)", async () => {
+    const shell = new TextEncoder().encode('<?xml version="1.0"?><gpx version="1.1"><trk><name>x</name></trk></gpx>');
+    const shellSha = sha256Hex(shell);
+    raw.set(shellSha, shell);
+    sources = [src({ id: 2, rawSha256: shellSha })];
+    expect((await republish(7, { deps })).status).toBe("no-source");
+    expect(writes).toHaveLength(0);
+  });
+
   it("reports not-found", async () => {
     expect((await republish(99, { deps })).status).toBe("not-found");
   });
