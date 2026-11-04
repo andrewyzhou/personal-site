@@ -1,4 +1,4 @@
-import { eq, sql, type SQL } from "drizzle-orm";
+import { eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import {
@@ -14,7 +14,7 @@ import {
 } from "@/lib/db";
 import { log } from "@/lib/log";
 import { linkWorkout } from "./link";
-import { planStrongIngest, type IngestPlan, type IngestSource, type IngestSummary } from "./plan";
+import { planStrongIngest, type IngestPlan, type IngestSource, type IngestSummary, type WorkoutPlan } from "./plan";
 import { formatIngestSummary, type LinkedActivity } from "./summary";
 
 export type IngestStatus = "created" | "duplicate" | "empty";
@@ -64,12 +64,16 @@ function unlessLinked(col: PgColumn): Record<string, SQL> {
  */
 export function buildIngestBatch(db: Db, plan: IngestPlan): [BatchItem<"pg">, ...BatchItem<"pg">[]] {
   const first = db.insert(liftIngests).values(plan.ingest).onConflictDoNothing();
-  const rest: BatchItem<"pg">[] = [];
-  const w = plan.workout;
-  if (!w) return [first];
+  if (!plan.workout) return [first];
+  return [first, ...buildWorkoutWrites(db, plan.workout)];
+}
 
+/** the workout half of an ingest batch (the csv import shares one ingest row across many) */
+export function buildWorkoutWrites(db: Db, w: WorkoutPlan): BatchItem<"pg">[] {
+  const rest: BatchItem<"pg">[] = [];
   // catalog rows ride along with each ingest so nothing depends on the seed script
-  rest.push(db.insert(exercises).values(w.exercises).onConflictDoNothing());
+  // (empty when every exercise redirected to an existing custom row)
+  if (w.exercises.length) rest.push(db.insert(exercises).values(w.exercises).onConflictDoNothing());
   if (w.aliases.length) rest.push(db.insert(exerciseAliases).values(w.aliases).onConflictDoNothing());
   if (w.muscles.length) rest.push(db.insert(exerciseMuscles).values(w.muscles).onConflictDoNothing());
 
@@ -104,7 +108,47 @@ export function buildIngestBatch(db: Db, plan: IngestPlan): [BatchItem<"pg">, ..
   rest.push(db.delete(liftWorkoutExercises).where(eq(liftWorkoutExercises.workoutId, w.workout.id)));
   rest.push(db.insert(liftWorkoutExercises).values(w.workoutExercises));
   if (w.sets.length) rest.push(db.insert(liftSets).values(w.sets));
-  return [first, ...rest];
+  return rest;
+}
+
+const MAX_MERGE_HOPS = 5;
+
+/**
+ * custom id -> final merge target, following mergedInto chains up to 5 hops
+ * (cycles stop where they loop). `lookup` maps an id to its mergedInto.
+ */
+export function followMergeChains(
+  ids: readonly string[],
+  lookup: ReadonlyMap<string, string | null>
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const id of ids) {
+    let cur = id;
+    const seen = new Set([id]);
+    for (let hop = 0; hop < MAX_MERGE_HOPS; hop++) {
+      const next = lookup.get(cur);
+      if (!next || seen.has(next)) break;
+      seen.add(next);
+      cur = next;
+    }
+    if (cur !== id) out.set(id, cur);
+  }
+  return out;
+}
+
+/** merge redirects for these custom ids, one select per hop (usually zero hops) */
+export async function loadMergeRedirects(db: Db, ids: readonly string[]): Promise<Map<string, string>> {
+  const lookup = new Map<string, string | null>();
+  let frontier = [...new Set(ids)];
+  for (let hop = 0; hop < MAX_MERGE_HOPS && frontier.length; hop++) {
+    const rows = await db
+      .select({ id: exercises.id, mergedInto: exercises.mergedInto })
+      .from(exercises)
+      .where(inArray(exercises.id, frontier));
+    for (const r of rows) lookup.set(r.id, r.mergedInto);
+    frontier = rows.map((r) => r.mergedInto).filter((m): m is string => !!m && !lookup.has(m));
+  }
+  return followMergeChains(ids, lookup);
 }
 
 async function safeLinks(fn: () => Promise<LinkedActivity[]>, workoutId: string): Promise<LinkedActivity[]> {
@@ -118,8 +162,15 @@ async function safeLinks(fn: () => Promise<LinkedActivity[]>, workoutId: string)
 }
 
 export async function ingestStrongText(rawText: string, opts: { source: IngestSource }): Promise<IngestResult> {
-  const plan = planStrongIngest(rawText, { source: opts.source });
+  let plan = planStrongIngest(rawText, { source: opts.source });
   const db = getDb();
+
+  // exercises merged on the phone keep resolving to the merge target
+  const customIds = plan.summary?.exercises.filter((e) => e.custom).map((e) => e.exerciseId) ?? [];
+  if (customIds.length) {
+    const redirects = await loadMergeRedirects(db, customIds);
+    if (redirects.size) plan = planStrongIngest(rawText, { source: opts.source, redirects });
+  }
 
   const [existing] = await db
     .select({ id: liftIngests.id, workoutId: liftIngests.workoutId, status: liftIngests.status })
