@@ -10,8 +10,10 @@ import { DEFAULT_REBUILD_BUDGET_MS, republishPending } from "@/lib/privacy/rebui
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// leave headroom under maxDuration for the slowest single republish
-const CRON_DEADLINE_MS = 45_000;
+// leave headroom under maxDuration for the slowest single republish: no
+// republish starts after 35 s of this run, and the rebuild gets at most 30 s
+const CRON_DEADLINE_MS = 35_000;
+const CRON_REBUILD_MAX_MS = 30_000;
 const MIN_REBUILD_MS = 5_000;
 
 // scheduled import from every configured source (vercel cron + github actions).
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const budget = Math.min(CRON_DEADLINE_MS - (Date.now() - started), DEFAULT_REBUILD_BUDGET_MS);
+  const budget = Math.min(CRON_DEADLINE_MS - (Date.now() - started), CRON_REBUILD_MAX_MS, DEFAULT_REBUILD_BUDGET_MS);
   if (budget >= MIN_REBUILD_MS) {
     try {
       const r = await republishPending({ timeBudgetMs: budget, revalidate: revalidatePath });

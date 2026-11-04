@@ -29,7 +29,8 @@ export async function POST(request: Request) {
   const poly = normalizePolygon(body.polygon);
   if ("error" in poly) return bad(poly.error);
   try {
-    const { zone, touched } = await createZone(name, poly.polygon);
+    const { zone, touched } = await createZone(name, poly.polygon, { markStale: markStaleForZones });
+    // marked before the write (inside the zone lib) and again after it
     const marked = await markStaleForZones(touched);
     return NextResponse.json({ ok: true, zone, marked, pending: await countPending() });
   } catch (error) {

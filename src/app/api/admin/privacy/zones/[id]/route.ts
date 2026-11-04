@@ -36,7 +36,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
   if (Object.keys(patch).length === 0) return bad("nothing to change");
 
   try {
-    const { zone, touched } = await updateZone(id, patch);
+    const { zone, touched } = await updateZone(id, patch, { markStale: markStaleForZones });
+    // marked before the write (inside the zone lib) and again after it
     const marked = await markStaleForZones(touched);
     return NextResponse.json({ ok: true, zone, marked, pending: await countPending() });
   } catch (error) {
@@ -51,7 +52,8 @@ export async function DELETE(request: Request, { params }: Ctx) {
   const id = parseId((await params).id);
   if (!id) return bad("bad id");
   try {
-    const { zone, touched } = await archiveZone(id);
+    const { zone, touched } = await archiveZone(id, { markStale: markStaleForZones });
+    // marked before the write (inside the zone lib) and again after it
     const marked = await markStaleForZones(touched);
     return NextResponse.json({ ok: true, zone, marked, pending: await countPending() });
   } catch (error) {

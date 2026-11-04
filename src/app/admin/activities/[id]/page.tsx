@@ -5,10 +5,12 @@ import { getDb, activities, activityPhotos, activitySources } from "@/lib/db";
 import { visibilityOf } from "@/lib/public-activity";
 import EditActivity from "@/components/admin/EditActivity";
 import RouteThumb from "@/components/RouteThumb";
+import { isAdminViewer } from "../../require-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminEditActivityPage({ params }: { params: Promise<{ id: string }> }) {
+  if (!(await isAdminViewer())) return null;
   const { id: idStr } = await params;
   const id = Number(idStr);
   if (!Number.isInteger(id) || id <= 0) notFound();

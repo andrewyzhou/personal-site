@@ -70,6 +70,8 @@ describe("POST /api/admin/photos/original", () => {
     expect(bucket).toBe("raw-bucket");
     expect(key).toBe(rawKey(SHA));
     expect(opts.headers).toEqual({ "if-none-match": "*", "x-amz-checksum-sha256": Buffer.from(SHA, "hex").toString("base64") });
+    // the declared size is signed, so r2 rejects any other body length
+    expect(opts.contentLength).toBe(JPEG.length);
   });
 
   it("shortcuts when the bytes are already stored", async () => {

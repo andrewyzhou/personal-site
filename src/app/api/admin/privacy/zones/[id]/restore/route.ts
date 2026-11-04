@@ -14,7 +14,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const id = parseId((await params).id);
   if (!id) return bad("bad id");
   try {
-    const { zone, touched } = await restoreZone(id);
+    const { zone, touched } = await restoreZone(id, { markStale: markStaleForZones });
+    // marked before the write (inside the zone lib) and again after it
     const marked = await markStaleForZones(touched);
     return NextResponse.json({ ok: true, zone, marked, pending: await countPending() });
   } catch (error) {

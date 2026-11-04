@@ -3,6 +3,8 @@ import { encodeMultiPolyline, encodePolyline } from "../polyline";
 import { ZONE_EDGE_BUFFER_M, publicZoneShape } from "../privacy/fog";
 import {
   checkBounds,
+  checkChords,
+  checkFogEvents,
   checkFogShapes,
   checkPhotoMetadata,
   checkPolyline,
@@ -41,15 +43,37 @@ describe("points against zones", () => {
   it("strictly inside is a leak, within the buffer a warning, far away nothing", () => {
     const pl = encodePolyline([farOutside, inside, nearOutside]);
     const f = checkPolyline(pl, zones, "a");
-    expect(summarize(f)).toEqual({ leaks: 1, warnings: 1 });
+    // + the two drawn lines into and out of the zone
+    expect(summarize(f)).toEqual({ leaks: 2, warnings: 1 });
     expect(f[0].message).toMatch(/1 point\(s\) inside zone\(s\) 5/);
     expect(f[1].message).toMatch(new RegExp(`within ${ZONE_EDGE_BUFFER_M} m`));
+    expect(f[2].message).toMatch(/2 drawn line\(s\) between points touch zone\(s\) 5/);
     expect(checkPolyline(encodePolyline([farOutside, [37.91, -122.255]]), zones, "a")).toEqual([]);
   });
 
   it("checks every segment of a multi-segment polyline", () => {
     const pl = encodeMultiPolyline([[farOutside, [37.91, -122.255]], [[37.92, -122.255], inside]]);
-    expect(summarize(checkPolyline(pl, zones, "a")).leaks).toBe(1);
+    expect(summarize(checkPolyline(pl, zones, "a")).leaks).toBe(2);
+  });
+
+  it("a straight line between two outside points that crosses a zone is a leak", () => {
+    const south: [number, number] = [37.86, -122.255];
+    const pl = encodePolyline([south, farOutside]); // both outside, the chord runs straight through
+    const f = checkPolyline(pl, zones, "card");
+    expect(f).toEqual([{ severity: "leak", where: "card", message: "1 drawn line(s) between points touch zone(s) 5" }]);
+  });
+
+  it("no line is drawn across a segment break", () => {
+    const south: [number, number] = [37.86, -122.255];
+    expect(checkPolyline(encodeMultiPolyline([[south, [37.859, -122.255]], [farOutside, [37.91, -122.255]]]), zones, "a")).toEqual([]);
+    expect(checkChords([[[37.86, -122.255]], [farOutside]], zones, "a")).toEqual([]);
+    expect(checkChords([[[37.86, -122.255], farOutside]], [], "a")).toEqual([]);
+  });
+
+  it("a line clipping a zone corner counts too", () => {
+    // both ends outside (south, then west); the line cuts across the south-west corner
+    const f = checkChords([[[37.8695, -122.259], [37.8705, -122.2605]]], zones, "a");
+    expect(summarize(f).leaks).toBe(1);
   });
 
   it("no zones, no findings; null polylines are fine", () => {
@@ -66,19 +90,29 @@ describe("points against zones", () => {
 });
 
 describe("checkFogShapes", () => {
-  it("accepts the published shape (outer ring, rounded)", () => {
-    expect(checkFogShapes([publicZoneShape(zone.polygon)], "a")).toEqual([]);
+  it("any published zone shape is a leak, even rounded outer rings or an empty list", () => {
     expect(checkFogShapes(null, "a")).toEqual([]);
+    expect(checkFogShapes(undefined, "a")).toEqual([]);
+    for (const shapes of [[publicZoneShape(zone.polygon)], [], "x"]) {
+      const f = checkFogShapes(shapes, "a");
+      expect(f).toHaveLength(1);
+      expect(f[0]).toMatchObject({ severity: "leak", where: "a" });
+      expect(f[0].message).toMatch(/zone shapes are published/);
+    }
+  });
+});
+
+describe("checkFogEvents", () => {
+  it("the aggregate event (no points) is clean", () => {
+    expect(checkFogEvents([{ entry: null, exit: null, durationS: 600 }], zones, "a")).toEqual([]);
+    expect(checkFogEvents(null, zones, "a")).toEqual([]);
   });
 
-  it("flags inner rings and unrounded vertices", () => {
-    const holed = [[...zone.polygon, [[-122.256, 37.874], [-122.254, 37.874], [-122.254, 37.876]]]];
-    expect(checkFogShapes(holed, "a").some((f) => /2 rings/.test(f.message))).toBe(true);
-    const precise = [[[[-122.2512345, 37.87], [-122.25, 37.88], [-122.26, 37.88]]]];
-    const f = checkFogShapes(precise, "a");
-    expect(f).toHaveLength(1);
-    expect(f[0]).toMatchObject({ severity: "leak" });
-    expect(f[0].message).toMatch(/finer than 4 decimals/);
+  it("entry/exit points are a warning; one inside a zone is a leak", () => {
+    const f = checkFogEvents([{ entry: farOutside, exit: null, durationS: 60 }], zones, "a");
+    expect(f).toEqual([{ severity: "warning", where: "a", message: "1 fog event(s) carry entry/exit points" }]);
+    const g = checkFogEvents([{ entry: inside, exit: nearOutside, durationS: 60 }], zones, "a");
+    expect(summarize(g)).toEqual({ leaks: 1, warnings: 2 });
   });
 });
 
@@ -102,6 +136,8 @@ describe("checkPublicActivity", () => {
     expect(wheres).toContain("leak activity 1"); // the private key
     expect(wheres).toContain("leak activity 1 cardPolyline");
     expect(wheres).toContain("warning activity 1 fogEvents");
+    expect(wheres).toContain("leak activity 1 fogShapes");
+    expect(f.some((x) => x.where === "activity 1 cardPolyline" && /drawn line/.test(x.message))).toBe(true);
     expect(wheres).toContain("leak activity 1 photo pins");
     expect(wheres.some((w) => w.endsWith(" polyline"))).toBe(false);
   });

@@ -7,8 +7,10 @@
 // checks every public activity as the serializer would serve it: polyline +
 // card polyline (all segments), bounds corners, fog edge points and photo pins
 // against the enabled, non-archived privacy zones (strictly inside = leak,
-// within the edge buffer = warning); fog shapes outer-ring-only and rounded;
-// private keys; the hide-map / hide-hr promises. downloads each public photo
+// within the edge buffer = warning); every straight line drawn between
+// consecutive points of a segment touching a zone (leak); any published zone
+// shape (leak); fog events with entry/exit points (warning); private keys;
+// the hide-map / hide-hr promises. downloads each public photo
 // and flags exif/gps metadata. counts originals still in the public bucket
 // under activities/fit/ (warning; deleting them is the owner's call).
 // --site runs the same checks on the served json (/api/activities, /latest,
@@ -161,9 +163,8 @@ for (const row of publicRows) {
   const detail = publicActivityDetail(row, photosByActivity.get(row.id) ?? []);
   add(checkPublicActivity(detail, zones, where));
   add(checkVisibility(detail as unknown as Record<string, unknown>, row, where));
-  for (const k of findPrivateKeys(publicCalendarActivity(row))) {
-    findings.push({ severity: "leak", where: `${where} (list item)`, message: `private key "${k}"` });
-  }
+  // the list item: private keys plus its card polyline's points and drawn lines
+  add(checkPublicActivity(publicCalendarActivity(row) as unknown as Record<string, unknown>, zones, `${where} (list item)`));
 }
 
 // ---------------------------------------------------------------------------
@@ -223,8 +224,8 @@ function checkServed(item: Record<string, unknown>, where: string, detail: boole
     findings.push({ severity: "leak", where, message: `serves activity ${item.id}, which is not public` });
     return;
   }
-  if (detail) add(checkPublicActivity(item, zones, where));
-  else for (const k of findPrivateKeys(item)) findings.push({ severity: "leak", where, message: `private key "${k}" is served` });
+  // list items carry the card polyline: same point + drawn-line checks as a detail
+  add(checkPublicActivity(item, zones, detail ? where : `${where} (list item)`));
   add(checkVisibility(item, row, where));
   // a coarsened start must never be served raw
   const raw = row.localTime;
