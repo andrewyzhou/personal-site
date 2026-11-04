@@ -1,0 +1,6 @@
+Date;Workout Name;Exercise Name;Set Order;Weight;Weight Unit;Reps;RPE;Distance;Distance Unit;Seconds;Notes;Workout Notes;Workout Duration
+2019-05-11 07:12:34;Leg Day;Squat (Barbell);W1;60;kg;5;;;;;;;1h
+2019-05-11 07:12:34;Leg Day;Squat (Barbell);1;102,5;kg;5;;;;;;;1h
+2019-05-11 07:12:34;Leg Day;Squat (Barbell);2;102,5;kg;5;;;;;"form; check";;1h
+2019-05-11 07:12:34;Leg Day;Rowing (Machine);1;;;;;2000;m;480;;;1h
+2019-05-11 07:12:34;Leg Day;Calf Raise (Machine);1;100;lbs;15;;;;;;;1h

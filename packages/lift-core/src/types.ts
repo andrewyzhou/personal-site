@@ -64,6 +64,8 @@ export interface ParsedWorkout {
   /** last path segment of the link, used as an idempotency key */
   linkSlug: string | null;
   warnings: ParseWarning[];
+  /** workout length in seconds when the source has it (the csv export); share text has none */
+  durationS?: number | null;
 }
 
 // ---------------------------------------------------------------------------
