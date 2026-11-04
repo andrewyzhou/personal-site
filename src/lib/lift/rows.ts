@@ -43,8 +43,14 @@ export function catalogExerciseRows(ex: Exercise): ExerciseRows {
   };
 }
 
+/** stable hash key for a printed name */
+export function nameKey(name: string): string {
+  // normalizeName keeps only latin letters and digits, so "Жим лёжа" and "深蹲" would both be ""
+  return normalizeName(name) || name.normalize("NFKC").toLowerCase().trim();
+}
+
 export function customExerciseId(name: string): string {
-  return `custom-${sha256Hex(normalizeName(name)).slice(0, 12)}`;
+  return `custom-${sha256Hex(nameKey(name)).slice(0, 12)}`;
 }
 
 // strong prints equipment as a trailing parenthetical: "Curl (Cable)"

@@ -13,7 +13,7 @@ import {
   type LiftWarning,
 } from "@/lib/db";
 import { log } from "@/lib/log";
-import { getWorkoutLinks, linkWorkout } from "./link";
+import { linkWorkout } from "./link";
 import { planStrongIngest, type IngestPlan, type IngestSource, type IngestSummary } from "./plan";
 import { formatIngestSummary, type LinkedActivity } from "./summary";
 
@@ -39,6 +39,24 @@ function excluded(col: PgColumn): SQL {
   return sql.raw(`excluded."${col.name}"`);
 }
 
+const TIMING_KEYS = {
+  started_at: "startedAt",
+  utc_offset_min: "utcOffsetMin",
+  ended_at: "endedAt",
+  duration_s: "durationS",
+} as const;
+
+// keep the current value when the workout already has watch links
+function unlessLinked(col: PgColumn): Record<string, SQL> {
+  const key = TIMING_KEYS[col.name as keyof typeof TIMING_KEYS];
+  return {
+    [key]: sql.raw(
+      `case when exists (select 1 from "lift_workout_activities" a where a."workout_id" = "lift_workouts"."id") ` +
+        `then "lift_workouts"."${col.name}" else excluded."${col.name}" end`
+    ),
+  };
+}
+
 /**
  * every write for a planned ingest, in order, for one atomic db.batch. the
  * workout is upserted and its exercises replaced wholesale (sets cascade),
@@ -62,13 +80,14 @@ export function buildIngestBatch(db: Db, plan: IngestPlan): [BatchItem<"pg">, ..
       .values(w.workout)
       .onConflictDoUpdate({
         target: t.id,
+        // once linked, linkWorkout owns the timing columns; until then an edited share's start wins
         set: {
+          ...unlessLinked(t.startedAt),
+          ...unlessLinked(t.utcOffsetMin),
+          ...unlessLinked(t.endedAt),
+          ...unlessLinked(t.durationS),
           title: excluded(t.title),
           startedLocal: excluded(t.startedLocal),
-          startedAt: excluded(t.startedAt),
-          utcOffsetMin: excluded(t.utcOffsetMin),
-          endedAt: excluded(t.endedAt),
-          durationS: excluded(t.durationS),
           notes: excluded(t.notes),
           source: excluded(t.source),
           latestIngestId: excluded(t.latestIngestId),
@@ -108,59 +127,38 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
     .where(eq(liftIngests.rawSha256, plan.sha256))
     .limit(1);
 
-  if (existing) {
-    if (!existing.workoutId || !plan.summary) {
-      return {
-        status: "empty",
-        duplicate: true,
-        ingestId: existing.id,
-        workoutId: null,
-        summary: null,
-        text: EMPTY_TEXT,
-        links: [],
-        warnings: plan.warnings,
-      };
-    }
-    const workoutId = existing.workoutId;
-    const links = await safeLinks(() => getWorkoutLinks(workoutId), workoutId);
-    return {
-      status: "duplicate",
-      duplicate: true,
-      ingestId: existing.id,
-      workoutId,
-      summary: plan.summary,
-      text: formatIngestSummary(plan.summary, links, { duplicate: true }),
-      links,
-      warnings: plan.warnings,
-    };
-  }
-
+  // the batch is idempotent, so a seen sha still writes: that un-deletes a
+  // soft-deleted workout, restores A after an edited B, and lets an old
+  // 'empty' ingest log once the parser learns to read it
   await db.batch(buildIngestBatch(db, plan));
+  const ingestId = existing?.id ?? plan.ingest.id;
 
   if (!plan.workout || !plan.summary) {
-    log.warn("lift:ingest", `${plan.ingest.id}: nothing parsed, raw kept`);
+    log.warn("lift:ingest", `${ingestId}: ${plan.rejected ?? "nothing parsed"}, raw kept`);
     return {
       status: "empty",
-      duplicate: false,
-      ingestId: plan.ingest.id,
+      duplicate: Boolean(existing),
+      ingestId,
       workoutId: null,
       summary: null,
-      text: EMPTY_TEXT,
+      text: plan.rejected ?? EMPTY_TEXT,
       links: [],
       warnings: plan.warnings,
     };
   }
 
   const workout = plan.workout.workout;
+  // an old 'empty' row for this sha never logged anything, so this is new
+  const duplicate = Boolean(existing?.workoutId);
   const links = await safeLinks(() => linkWorkout(workout), workout.id);
-  log.info("lift:ingest", `${plan.ingest.id} -> ${workout.id} (${links.length} links)`);
+  log.info("lift:ingest", `${ingestId} -> ${workout.id} (${links.length} links${duplicate ? ", re-share" : ""})`);
   return {
-    status: "created",
-    duplicate: false,
-    ingestId: plan.ingest.id,
+    status: duplicate ? "duplicate" : "created",
+    duplicate,
+    ingestId,
     workoutId: workout.id,
     summary: plan.summary,
-    text: formatIngestSummary(plan.summary, links),
+    text: formatIngestSummary(plan.summary, links, { duplicate }),
     links,
     warnings: plan.warnings,
   };

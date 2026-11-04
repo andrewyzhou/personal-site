@@ -22,7 +22,7 @@ import type {
   NewLiftWorkoutExerciseRow,
   NewLiftWorkoutRow,
 } from "@/lib/db/lift-schema";
-import { catalogExerciseRows, customExerciseRows, sha256Hex } from "./rows";
+import { catalogExerciseRows, customExerciseRows, nameKey, sha256Hex } from "./rows";
 import { liftTimezone, localToUtc, utcToLocal } from "./time";
 
 // pure ingest planning: raw share text in, every row the ingest writes out.
@@ -75,6 +75,8 @@ export interface IngestPlan {
   summary: IngestSummary | null;
   parsed: ParsedWorkout;
   warnings: LiftWarning[];
+  /** why a parsed share was refused (kept as an 'empty' ingest), if it was */
+  rejected?: string | null;
 }
 
 const DISTANCE_TO_M: Record<DistanceUnit, number> = {
@@ -124,14 +126,33 @@ function joinNotes(notes: readonly string[]): string | null {
   return text || null;
 }
 
+// one batch binds every row's columns; postgres caps a statement at 65535 params
+export const MAX_SETS = 500;
+export const MAX_EXERCISES = 100;
+
+function tooLarge(parsed: ParsedWorkout): string | null {
+  const sets = parsed.exercises.reduce((n, e) => n + e.sets.length, 0);
+  if (parsed.exercises.length > MAX_EXERCISES || sets > MAX_SETS) {
+    return `too big to log: ${parsed.exercises.length} exercises / ${sets} sets (max ${MAX_EXERCISES} / ${MAX_SETS})`;
+  }
+  return null;
+}
+
 export function planStrongIngest(rawText: string, opts: PlanOptions): IngestPlan {
   const sha256 = sha256Hex(rawText);
   const parsed = parseStrongText(rawText);
   const warnings: LiftWarning[] = parsed.warnings.map((w) => ({ line: w.line, message: w.message, text: w.text }));
   const slug = parsed.linkSlug && SLUG_RE.test(parsed.linkSlug) ? parsed.linkSlug : null;
   const ingestId = `ing_${sha256.slice(0, 24)}`;
-  const hasWorkout = parsed.exercises.length > 0;
-  const workoutId = slug ? `strong-${slug}` : `strong-${sha256.slice(0, 16)}`;
+  const rejected = tooLarge(parsed);
+  if (rejected) warnings.push({ line: 0, message: rejected, text: "" });
+  const hasWorkout = parsed.exercises.length > 0 && !rejected;
+  const workoutId = slug
+    ? `strong-${slug}`
+    : parsed.startedLocal
+      ? // same title + start from any channel (or with stray whitespace) is the same workout
+        `strong-${sha256Hex(`${nameKey(parsed.title)}|${parsed.startedLocal}`).slice(0, 16)}`
+      : `strong-${sha256.slice(0, 16)}`;
 
   const ingest: IngestPlan["ingest"] = {
     id: ingestId,
@@ -143,7 +164,7 @@ export function planStrongIngest(rawText: string, opts: PlanOptions): IngestPlan
     status: hasWorkout ? "parsed" : "empty",
     warnings,
   };
-  if (!hasWorkout) return { sha256, ingest, workout: null, summary: null, parsed, warnings };
+  if (!hasWorkout) return { sha256, ingest, workout: null, summary: null, parsed, warnings, rejected };
 
   const tz = opts.timezone ?? liftTimezone();
   let startedLocal = parsed.startedLocal;
@@ -245,5 +266,6 @@ export function planStrongIngest(rawText: string, opts: PlanOptions): IngestPlan
     summary,
     parsed,
     warnings,
+    rejected: null,
   };
 }

@@ -132,14 +132,44 @@ describe("planStrongIngest", () => {
     expect(planStrongIngest(RAW, { source: "shortcut" })).toEqual(plan);
   });
 
-  it("falls back to a sha-based workout id without a (sane) link", () => {
-    const sha = sha256Hex(RAW);
+  it("ids a linkless workout by title + parsed start, so other channels collapse onto it", () => {
+    const want = `strong-${sha256Hex("push day|2026-11-04T18:12").slice(0, 16)}`;
     parse.mockReturnValue(pushDay({ link: null, linkSlug: null }));
-    expect(planStrongIngest(RAW, { source: "api" }).workout!.workout.id).toBe(`strong-${sha.slice(0, 16)}`);
+    expect(planStrongIngest(RAW, { source: "api" }).workout!.workout.id).toBe(want);
+    // different raw bytes, same workout
+    expect(planStrongIngest(RAW + "  \n", { source: "telegram" }).workout!.workout.id).toBe(want);
     parse.mockReturnValue(pushDay({ linkSlug: "../../etc'; drop" }));
     const plan = planStrongIngest(RAW, { source: "api" });
-    expect(plan.workout!.workout.id).toBe(`strong-${sha.slice(0, 16)}`);
+    expect(plan.workout!.workout.id).toBe(want);
     expect(plan.ingest.strongSlug).toBeNull();
+    expect(plan.ingest.workoutId).toBe(want);
+  });
+
+  it("falls back to the raw sha without a link or a parsed date", () => {
+    parse.mockReturnValue(pushDay({ link: null, linkSlug: null, startedLocal: null }));
+    const plan = planStrongIngest(RAW, { source: "api", now: new Date("2026-11-05T02:12:00Z") });
+    expect(plan.workout!.workout.id).toBe(`strong-${sha256Hex(RAW).slice(0, 16)}`);
+  });
+
+  it("refuses shares too big for one batch but keeps the raw ingest row", () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => set({ position: i, weight: 100, unit: "lb", reps: 5 }));
+    const bench = (n: number) => ({ name: "Bench Press (Barbell)", notes: [], sets: many(n) });
+
+    parse.mockReturnValue(pushDay({ exercises: [bench(250), bench(251)] }));
+    const big = planStrongIngest(RAW, { source: "api" });
+    expect(big.workout).toBeNull();
+    expect(big.summary).toBeNull();
+    expect(big.rejected).toMatch(/too big to log: 2 exercises \/ 501 sets/);
+    expect(big.ingest).toMatchObject({ status: "empty", workoutId: null, rawText: RAW });
+    expect(big.warnings.some((w) => w.message === big.rejected)).toBe(true);
+
+    parse.mockReturnValue(pushDay({ exercises: Array.from({ length: 101 }, () => bench(1)) }));
+    expect(planStrongIngest(RAW, { source: "api" }).rejected).toMatch(/101 exercises/);
+
+    parse.mockReturnValue(pushDay({ exercises: [bench(250), bench(250)] }));
+    const ok = planStrongIngest(RAW, { source: "api" });
+    expect(ok.rejected).toBeNull();
+    expect(ok.workout!.sets).toHaveLength(500);
   });
 
   it("keeps the raw text byte-for-byte", () => {

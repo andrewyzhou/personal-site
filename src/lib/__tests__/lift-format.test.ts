@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addDays, localToUtc, utcToLocal } from "@/lib/lift/time";
+import { addDays, localToUtc, safeTimezone, utcToLocal } from "@/lib/lift/time";
 import {
   formatIngestSummary,
   formatLocalDay,
@@ -28,9 +28,17 @@ describe("lift time", () => {
     expect(localToUtc("2026-06-01T08:00", "UTC")!.date.toISOString()).toBe("2026-06-01T08:00:00.000Z");
   });
 
-  it("rejects malformed input and zones", () => {
+  it("rejects malformed input", () => {
     expect(localToUtc("nov 4", "UTC")).toBeNull();
-    expect(localToUtc("2026-11-04T18:12", "Not/AZone")).toBeNull();
+  });
+
+  it("falls back to los angeles for an unknown zone in both directions", () => {
+    expect(safeTimezone("Not/AZone")).toBe("America/Los_Angeles");
+    expect(safeTimezone("")).toBe("America/Los_Angeles");
+    expect(safeTimezone("Asia/Kolkata")).toBe("Asia/Kolkata");
+    expect(localToUtc("2026-11-04T18:12", "Not/AZone")).toEqual(localToUtc("2026-11-04T18:12", "America/Los_Angeles"));
+    expect(() => utcToLocal(new Date("2026-11-05T02:12:00Z"), "Not/AZone")).not.toThrow();
+    expect(utcToLocal(new Date("2026-11-05T02:12:00Z"), "Not/AZone")).toBe("2026-11-04T18:12");
   });
 
   it("round-trips utc to wall clock", () => {

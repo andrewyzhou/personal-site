@@ -7,7 +7,24 @@ export function liftTimezone(): string {
   return process.env.LIFT_TIMEZONE || DEFAULT_LIFT_TIMEZONE;
 }
 
-const LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+const validZones = new Map<string, boolean>();
+
+/** `tz` when Intl knows it, else the default, so a typo'd env var can't throw mid-ingest */
+export function safeTimezone(tz: string): string {
+  let ok = validZones.get(tz);
+  if (ok === undefined) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: tz });
+      ok = true;
+    } catch {
+      ok = false;
+    }
+    validZones.set(tz, ok);
+  }
+  return ok ? tz : DEFAULT_LIFT_TIMEZONE;
+}
+
+const LOCAL_RE =/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
 /** minutes east of utc for `tz` at instant `ms` */
 function zoneOffsetMin(ms: number, tz: string): number {
@@ -26,24 +43,21 @@ function zoneOffsetMin(ms: number, tz: string): number {
   return Math.round((asUtc - Math.floor(ms / 1000) * 1000) / 60000);
 }
 
-/** "YYYY-MM-DDTHH:MM" in `tz` -> utc instant + offset. null for malformed input or zone. */
+/** "YYYY-MM-DDTHH:MM" in `tz` -> utc instant + offset. null for malformed input; a bad zone falls back. */
 export function localToUtc(local: string, tz: string): { date: Date; utcOffsetMin: number } | null {
   const m = LOCAL_RE.exec(local);
   if (!m) return null;
+  const zone = safeTimezone(tz);
   const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
-  try {
-    // two passes so a guess on the wrong side of a dst change corrects itself
-    let offset = zoneOffsetMin(wall, tz);
-    offset = zoneOffsetMin(wall - offset * 60000, tz);
-    return { date: new Date(wall - offset * 60000), utcOffsetMin: offset };
-  } catch {
-    return null;
-  }
+  // two passes so a guess on the wrong side of a dst change corrects itself
+  let offset = zoneOffsetMin(wall, zone);
+  offset = zoneOffsetMin(wall - offset * 60000, zone);
+  return { date: new Date(wall - offset * 60000), utcOffsetMin: offset };
 }
 
-/** utc instant -> "YYYY-MM-DDTHH:MM" wall clock in `tz` */
+/** utc instant -> "YYYY-MM-DDTHH:MM" wall clock in `tz` (a bad zone falls back) */
 export function utcToLocal(date: Date, tz: string): string {
-  const offset = zoneOffsetMin(date.getTime(), tz);
+  const offset = zoneOffsetMin(date.getTime(), safeTimezone(tz));
   return new Date(date.getTime() + offset * 60000).toISOString().slice(0, 16);
 }
 
