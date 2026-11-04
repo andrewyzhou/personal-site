@@ -27,6 +27,8 @@ import {
   statRows,
   timeToX,
   trimParams,
+  trimEffect,
+  cropWidens,
   xToTime,
   zoneBpm,
   zoneFractions,
@@ -162,18 +164,36 @@ describe("edits", () => {
     expect(newestFirst(edits).map((e) => e.id)).toEqual([5, 4, 3, 2, 1]);
   });
 
-  it("takes the latest active crop", () => {
+  it("intersects the active crops", () => {
     expect(currentCrop(edits)).toEqual({ startS: 60, endS: null });
     expect(currentCrop([])).toBeNull();
+    const many = [
+      edit(1, "crop", { startS: 60, endS: 900 }, "2025-07-06T15:00:00Z"),
+      edit(2, "crop", { startS: 30, endS: null }, "2025-07-06T15:01:00Z"), // wider: no effect
+      edit(3, "crop", { startS: null, endS: 700 }, "2025-07-06T15:02:00Z"),
+      edit(4, "crop", { startS: 500, endS: null }, "2025-07-06T15:03:00Z", "2025-07-06T15:04:00Z"),
+    ];
+    expect(currentCrop(many)).toEqual({ startS: 60, endS: 700 });
   });
 
-  it("trims one side, keeping the other side of the current crop", () => {
-    expect(trimParams({ startS: 60, endS: null }, "end", 800.4)).toEqual({ startS: 60, endS: 800 });
-    expect(trimParams({ startS: 60, endS: 800 }, "start", 120)).toEqual({ startS: 120, endS: 800 });
-    // a kept side that would invert the window is dropped
-    expect(trimParams({ startS: 60, endS: 800 }, "start", 900)).toEqual({ startS: 900, endS: null });
-    expect(trimParams({ startS: 600, endS: null }, "end", 500)).toEqual({ startS: null, endS: 500 });
-    expect(trimParams(null, "end", 500)).toEqual({ startS: null, endS: 500 });
+  it("trims one side only", () => {
+    expect(trimParams("end", 800.4)).toEqual({ startS: null, endS: 800 });
+    expect(trimParams("start", 120)).toEqual({ startS: 120, endS: null });
+  });
+
+  it("tells narrowing trims from widening and emptying ones", () => {
+    const w = { startS: 60, endS: 800 };
+    expect(trimEffect(w, "start", 120)).toBe("narrows");
+    expect(trimEffect(w, "start", 30)).toBe("widens");
+    expect(trimEffect(w, "start", 800)).toBe("empty");
+    expect(trimEffect(w, "end", 500)).toBe("narrows");
+    expect(trimEffect(w, "end", 900)).toBe("widens");
+    expect(trimEffect(w, "end", 60)).toBe("empty");
+    expect(trimEffect(null, "end", 500)).toBe("narrows");
+    expect(cropWidens(w, 100, 700)).toBe(false);
+    expect(cropWidens(w, 10, 700)).toBe(true);
+    expect(cropWidens(w, 100, 900)).toBe(true);
+    expect(cropWidens(null, 0, 9999)).toBe(false);
   });
 
   it("draws removed bands for active crops and cuts only", () => {

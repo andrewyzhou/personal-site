@@ -3,16 +3,20 @@
 // may be [id]). the absorbed one gets a 'merged-into' marker
 // { intoActivityId, wasHidden } and is hidden; then the target gets a 'merge'
 // { withActivityId } edit and is republished. refused: itself, more than 12 h
-// apart, split halves of each other, chains (target merged elsewhere, absorbed
-// has its own merges), and an activity already merged elsewhere. repeating a
-// merge resumes or returns the existing one. undo = revert the merge edit.
+// apart, chains (target merged elsewhere, absorbed has its own merges), an
+// activity already merged elsewhere, an absorbed one more private than the
+// target (hidden, or map / hr hidden where the target isn't), split halves
+// and split parents, route-only tracks, and crops at the joint (target end,
+// absorbed start). repeating a merge resumes or returns the existing one.
+// undo = revert the merge edit.
 //
 // 200 { ok: true, targetId, absorbedId, mergeEditId, markerEditId, unchanged: boolean,
 //       republished: { [activityId]: status | "failed" } }
-// 400 bad ids / itself / too far apart · 401 · 404 · 409 refused · 422 no track · 500
+// 400 bad ids / itself / too far apart · 401 · 404 · 409 refused ·
+// 422 no track / route-only track · 503 track unreadable · 500
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { getActivity, insertEdit, listEdits, setHidden } from "@/lib/cleaning/load";
+import { getActivity, insertEdit, listEdits, loadTrackForRow, setHidden } from "@/lib/cleaning/load";
 import { validateCleaningEdit } from "@/lib/cleaning/edits";
 import { planMerge } from "@/lib/cleaning/plan";
 import { defaultDeps, trackCandidates } from "@/lib/republish";
@@ -48,11 +52,19 @@ export async function POST(request: Request, { params }: Ctx) {
       return NextResponse.json({ ok: true, targetId, absorbedId, mergeEditId: plan.mergeEditId, markerEditId: plan.markerId, unchanged: true, republished });
     }
 
-    // both need a track: republish ignores merges on trackless rows
+    // both need a timed track: republish ignores merges on trackless rows,
+    // and route-only tracks have no real clock to join on
     const deps = defaultDeps();
-    for (const rid of [targetId, absorbedId]) {
-      if (!trackCandidates(await deps.loadSources(rid)).length) return bad(`activity ${rid} has no track to merge`, 422);
+    const synthetic: Record<number, boolean> = {};
+    for (const r of [a, b]) {
+      if (!trackCandidates(await deps.loadSources(r.id)).length) return bad(`activity ${r.id} has no track to merge`, 422);
+      const load = await loadTrackForRow(r, deps);
+      if (load.status === "no-track" || load.status === "not-found") return bad(`activity ${r.id} has no track to merge`, 422);
+      if (load.status !== "ok") return bad(`activity ${r.id}: the original file can't be read right now`, 503);
+      synthetic[r.id] = load.track.syntheticTime;
     }
+    const checked = planMerge({ row: a, edits: aEdits, syntheticTime: synthetic[a.id] }, { row: b, edits: bEdits, syntheticTime: synthetic[b.id] });
+    if (!checked.ok) return bad(checked.error, checked.status);
     const mergeEdit = validateCleaningEdit("merge", { withActivityId: absorbedId });
     if (!mergeEdit.ok) return bad(mergeEdit.error);
 

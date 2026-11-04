@@ -5,16 +5,18 @@
 //            start = parent start + atS, dedupe key sha256(`${parent key}:split:${atS}`),
 //            legacy fit_* columns, split_from_id = parent, route withheld until
 //            republish; the parent's sources are linked to it too. edits: crop
-//            { startS: atS, endS: parent's crop end | null } + the parent's trim
-//   parent → crop { startS: parent's crop start | null, endS: atS } + a 'split'
-//            marker { childId, atS, parentCropEditId }
-// both are republished. safe to retry: an existing child with that dedupe key
-// is reused and only missing steps run. undo = revert the split marker.
+//            { startS: atS, endS: end of the parent's crop window | null } + the
+//            parent's trim
+//   parent → crop { startS: null, endS: atS } (crops intersect, so its earlier
+//            crops keep applying) + a 'split' marker { childId, atS, parentCropEditId }
+// both crops carry anchorEpochMs. both are republished. safe to retry: an
+// existing child with that dedupe key is reused and only missing steps run.
+// undo = revert the split marker.
 //
 // 200 { ok: true, childId, parentCropEditId, markerEditId, reused: boolean,
 //       republished: { [activityId]: status | "failed" } }
 // 400 bad id / atS outside the range · 401 · 404 · 409 merged activity ·
-// 422 no track · 503 track unreadable · 500
+// 422 no track / route-only track · 503 track unreadable · 500
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { insertActivity } from "@/lib/activities";
@@ -32,11 +34,14 @@ import {
   childValues,
   cleanedRange,
   currentCrop,
+  findSplitCrop,
   latestOf,
   parseAtS,
   splitCrops,
   splitDedupeKey,
   splitRefusal,
+  syntheticRefusal,
+  withAnchor,
 } from "@/lib/cleaning/plan";
 import { PROCESSING_VERSION, defaultDeps } from "@/lib/republish";
 import { bad, effectiveEdits, failure, parseId, readJson, republishAll, type Ctx } from "../cleaning/shared";
@@ -76,13 +81,16 @@ export async function POST(request: Request, { params }: Ctx) {
       });
     }
 
+    const load = await loadTrackForRow(row, defaultDeps());
+    if (load.status === "no-track") return bad("no track stored for this activity", 422);
+    if (load.status !== "ok") return bad("track is unreadable right now", 503);
+    const synthetic = syntheticRefusal(load.track);
+    if (synthetic) return bad(synthetic.error, synthetic.status);
+    const anchor = load.track.startEpochMs;
+
     // an earlier attempt that died after cropping the parent left this crop
-    const latest = currentCrop(edits);
-    const ourCrop = existingChildId !== null && latest && latest.endS === atS ? latest : null;
+    const ourCrop = existingChildId !== null ? findSplitCrop(edits, atS) : null;
     if (!ourCrop) {
-      const load = await loadTrackForRow(row, defaultDeps());
-      if (load.status === "no-track") return bad("no track stored for this activity", 422);
-      if (load.status !== "ok") return bad("track is unreadable right now", 503);
       const range = cleanedRange(load.track, edits);
       if (!atSInside(range, atS)) {
         return bad(range ? `atS must be strictly inside ${range.startS}–${range.endS} s` : "nothing left to split");
@@ -105,7 +113,7 @@ export async function POST(request: Request, { params }: Ctx) {
     const childEdits = (await listEdits(childId)).filter((e) => !e.revertedAt);
     const childCrop = currentCrop(childEdits);
     if (!childCrop || childCrop.startS !== crops.child.startS || childCrop.endS !== crops.child.endS) {
-      await insertEdit(childId, "crop", crops.child, `split from #${id} at ${atS} s`);
+      await insertEdit(childId, "crop", withAnchor("crop", crops.child, anchor), `split from #${id} at ${atS} s`);
     }
     const trim = latestOf(edits, "trim");
     if (trim && !latestOf(childEdits, "trim")) await insertEdit(childId, "trim", trim.params, `trim copied from #${id} at split`);
@@ -118,7 +126,7 @@ export async function POST(request: Request, { params }: Ctx) {
       await insertEdit(childId, e.kind, e.params, `copied from #${id} at split`);
     }
 
-    const parentCropEditId = ourCrop?.id ?? (await insertEdit(id, "crop", crops.parent, `split at ${atS} s into #${childId}`));
+    const parentCropEditId = ourCrop?.id ?? (await insertEdit(id, "crop", withAnchor("crop", crops.parent, anchor), `split at ${atS} s into #${childId}`));
     const markerEditId = await insertEdit(id, "split", { childId, atS, parentCropEditId }, `split into #${childId}`);
 
     const republished = await republishAll([id, childId]);

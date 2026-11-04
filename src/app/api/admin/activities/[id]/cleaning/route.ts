@@ -8,6 +8,7 @@
 //   track: { t, lat, lng, speed, hr, ele, dist } | null   // ≤ 3000 points, first/last + per-bucket speed extremes
 //   totalPoints: number,                                   // samples before downsampling
 //   startEpochMs: number | null,                           // t = 0 of the canonical clock
+//   syntheticTime: boolean,                                // route-only track: no cleaning, split or merge
 //   published: { polyline, cardPolyline, bounds, distanceM, movingTimeS, elapsedTimeS, elevGainM,
 //                avgSpeedMs, maxSpeedMs, avgHr, maxHr, avgCadence, avgWatts, maxWatts, kilojoules,
 //                trimStartM, trimEndM, hrZonesS },
@@ -59,6 +60,7 @@ export async function GET(request: Request, { params }: Ctx) {
       track: track ? editorTrack(track) : null,
       totalPoints: track ? track.columns.t.length : 0,
       startEpochMs: track ? track.startEpochMs : null,
+      syntheticTime: track ? track.syntheticTime : false,
       published: { polyline: row.polyline, cardPolyline: row.cardPolyline, bounds: row.bounds, ...pickStats(row) },
       rawStats: row.rawStats ?? null,
       edits: edits.map((e) => ({ id: e.id, kind: e.kind, params: e.params, note: e.note, createdAt: e.createdAt, revertedAt: e.revertedAt })),

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as F from "./fixtures/cleaning-tracks";
 import { detectSuggestions, formatDuration } from "../cleaning/detect";
+import { isKnownSport } from "../cleaning/sport";
 import { applyCleaning, validateCleaningEdit, type EditLike } from "../cleaning/edits";
 import { cleanedStats } from "../cleaning/stats";
 import type { CanonicalTrack } from "../canonical-track";
@@ -303,5 +304,52 @@ describe("detectSuggestions: contract", () => {
     expect(formatDuration(41 * 60)).toBe("41 min");
     expect(formatDuration(5 * 3600 + 12 * 60)).toBe("5 h 12 min");
     expect(formatDuration(3599.9)).toBe("1 h");
+  });
+});
+
+describe("detectSuggestions: sports outside the speed table", () => {
+  // a ski day: walk to the lift, then 6 × (chairlift up, short wait, fast run down, queue)
+  function skiDay(sportType = "AlpineSki"): F.Built {
+    const segs: F.Segment[] = [{ dur: 300, v: 1.2, hr: 100 }];
+    for (let i = 0; i < 6; i++) {
+      segs.push(
+        { dur: 420, v: 4.5, hr: 95, grade: 0.35, turn: 0.0005 }, // lift
+        { dur: 60, v: 0, hr: 95 },
+        { dur: 240, v: (s) => 12 + 4 * Math.sin(s / 15), hr: 150, grade: -0.25, turn: 0.02 }, // run
+        { dur: 180, v: 0, hr: 110 }, // lift queue
+      );
+    }
+    segs.push({ dur: 1800, v: 0, hr: 80 }); // lunch with the watch on
+    return F.buildTrack(segs, { sportType, fileType: "fit", seed: 31 });
+  }
+
+  it("isKnownSport covers the foot, ride and swim tables only", () => {
+    for (const s of ["Run", "TrailRun", "Walk", "Hike", "Ride", "GravelRide", "EBikeRide", "Swim", "VirtualRun"]) expect(isKnownSport(s)).toBe(true);
+    for (const s of ["AlpineSki", "Snowboard", "Kayaking", "Soccer", "Workout", "", "constructor"]) expect(isKnownSport(s)).toBe(false);
+  });
+
+  it("6 ski runs: no vehicle cuts and nothing confident enough to auto-apply", () => {
+    for (const sport of ["AlpineSki", "BackcountrySki", "Snowboard", "NordicSki"]) {
+      const s = detect(skiDay(sport));
+      expect(kinds(s)).not.toContain("cut-vehicle");
+      expect(s.filter((x) => x.confidence >= 0.9)).toEqual([]);
+    }
+  });
+
+  it("an unknown sport gets no vehicle detection at all", () => {
+    const kayak = detect(F.carRideRun({ sportType: "Kayaking" }));
+    expect(kinds(kayak)).not.toContain("cut-vehicle");
+    expect(kayak.every((x) => !/vehicle ride/.test(x.summary))).toBe(true);
+    // the same track as a run still finds the car
+    expect(kinds(detect(F.carRideRun()))).toContain("cut-vehicle");
+  });
+
+  it("caps every confidence below the auto-apply threshold", () => {
+    const run = F.forgotToStop();
+    expect(detect(run).find((x) => x.kind === "crop-tail")!.confidence).toBeGreaterThanOrEqual(0.9);
+    const s = detectSuggestions(run.track, "Kitesurf");
+    expect(s.length).toBeGreaterThan(0);
+    expect(Math.max(...s.map((x) => x.confidence))).toBeLessThan(0.9);
+    expect(detectSuggestions(F.spikyRun().track, "Soccer").every((x) => x.confidence < 0.9)).toBe(true);
   });
 });

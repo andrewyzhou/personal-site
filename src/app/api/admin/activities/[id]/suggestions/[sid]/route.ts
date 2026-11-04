@@ -1,5 +1,7 @@
 // POST /api/admin/activities/[id]/suggestions/[sid] { action: "accept" | "dismiss" }
-//   accept  → open suggestions with an edit only: the edit is validated again,
+//   accept  → open suggestions with an edit only: the edit is validated again
+//             (and refused like a direct edit: no timed track, past a split
+//             boundary), anchored to the canonical track's start,
 //             recorded with note "accepted: <summary>", the suggestion stamped
 //             accepted (+ editId, decidedAt), then the activity republished
 //   dismiss → open suggestions only: stamped dismissed (+ decidedAt)
@@ -9,14 +11,14 @@
 // 200 { ok: true, suggestion: { id, status, editId, decidedAt }, unchanged: boolean,
 //       republished: { [activityId]: status | "failed" } }
 // 400 bad ids / action / stored edit invalid · 401 · 404 not on this activity ·
-// 409 already decided the other way, or information-only (no edit) · 500
+// 409 already decided the other way, information-only (no edit), or past a
+// live split boundary · 422 no track / route-only track · 503 unreadable · 500
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { decideSuggestion, getSuggestion, insertEdit, listEdits, revertEditOnce } from "@/lib/cleaning/load";
-import { combineCrop } from "@/lib/cleaning/edits";
+import { decideSuggestion, getActivity, getSuggestion, insertEdit, revertEditOnce } from "@/lib/cleaning/load";
 import { DIRECT_EDIT_KINDS, parseEditBody } from "@/lib/cleaning/plan";
 import type { ActivitySuggestionRow } from "@/lib/db";
-import { bad, failure, parseId, readJson, republishAll, type Ctx } from "../../cleaning/shared";
+import { bad, failure, guardCleaningEdit, parseId, readJson, republishAll, type Ctx } from "../../cleaning/shared";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -51,9 +53,12 @@ export async function POST(request: Request, { params }: Ctx<"id" | "sid">) {
     if (!s.edit) return bad("this suggestion is information only", 409);
     const edit = parseEditBody(s.edit.kind, s.edit.params, DIRECT_EDIT_KINDS);
     if (typeof edit === "string") return bad(`stored edit is invalid: ${edit}`);
-    // a one-sided crop keeps the other side of the crop already in effect
-    const params = edit.kind === "crop" ? combineCrop((await listEdits(id)).filter((e) => !e.revertedAt), edit.params) : edit.params;
-    const editId = await insertEdit(id, edit.kind, params, `accepted: ${s.summary}`);
+    // crops intersect, so a one-sided crop is stored as proposed
+    const row = await getActivity(id);
+    if (!row) return bad("not found", 404);
+    const guard = await guardCleaningEdit(row, edit);
+    if (!guard.ok) return guard.response;
+    const editId = await insertEdit(id, edit.kind, guard.params, `accepted: ${s.summary}`);
     if (!(await decideSuggestion(sid, "accepted", editId))) {
       // decided concurrently (e.g. auto-apply): drop ours, report theirs
       await revertEditOnce(editId);

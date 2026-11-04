@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { linked, known, byIdRows, updates, findSame, insert, sources, bySource, storeRaw, republish, invalidate } = vi.hoisted(() => ({
+const { linked, known, byIdRows, updates, updateWheres, returned, findSame, insert, sources, bySource, storeRaw, republish, invalidate } = vi.hoisted(() => ({
   linked: { value: [] as string[] },
   known: { value: [] as { externalId: string }[] },
-  byIdRows: { value: [] as { id: number }[] },
+  byIdRows: { value: [] as { id?: number; sportType?: string }[] },
   updates: [] as Record<string, unknown>[],
+  updateWheres: [] as unknown[],
+  returned: [] as { id: number }[][], // .returning() results, in update order
   findSame: vi.fn(),
   insert: vi.fn(),
   sources: [] as Record<string, unknown>[],
@@ -24,7 +26,15 @@ vi.mock("@/lib/db", () => ({
         where: () => Object.assign(Promise.resolve(known.value), { limit: async () => byIdRows.value }),
       }),
     }),
-    update: () => ({ set: (v: Record<string, unknown>) => ({ where: async () => updates.push(v) }) }),
+    update: () => ({
+      set: (v: Record<string, unknown>) => ({
+        where: (w: unknown) => {
+          updates.push(v);
+          updateWheres.push(w);
+          return Object.assign(Promise.resolve(updates.length), { returning: async () => returned.shift() ?? [] });
+        },
+      }),
+    }),
   }),
 }));
 
@@ -48,7 +58,7 @@ vi.mock("@/lib/strava", () => ({
   isStravaApiEnabled: () => true,
 }));
 
-import { applyStravaUpdate, syncStravaActivities } from "@/lib/strava-sync";
+import { applyStravaUpdate, hideStravaActivity, syncStravaActivities } from "@/lib/strava-sync";
 
 const DETAIL_SHA = "d".repeat(64);
 const STREAMS_SHA = "e".repeat(64);
@@ -84,6 +94,8 @@ beforeEach(() => {
   linked.value = [];
   byIdRows.value = [];
   updates.length = 0;
+  updateWheres.length = 0;
+  returned.length = 0;
   sources.length = 0;
   findSame.mockResolvedValue(null);
   bySource.mockResolvedValue(null);
@@ -207,5 +219,52 @@ describe("applyStravaUpdate", () => {
     mockApi();
     expect(await applyStravaUpdate(77)).toBe(false);
     expect(sources).toHaveLength(0);
+  });
+
+  it("a sport change marks the row stale; the same sport doesn't", async () => {
+    byIdRows.value = [{ id: 5, sportType: "Ride" }];
+    mockApi();
+    await applyStravaUpdate(77);
+    expect(updates[0]).toMatchObject({ sportType: "Run", needsRepublish: true, staleMarkedAt: expect.any(Date) });
+
+    updates.length = 0;
+    byIdRows.value = [{ id: 5, sportType: "Run" }];
+    await applyStravaUpdate(77);
+    expect(updates[0]).toMatchObject({ sportType: "Run" });
+    expect(updates[0]).not.toHaveProperty("needsRepublish");
+    expect(republish).not.toHaveBeenCalled();
+  });
+
+  it("updates only the one row (split halves keep their own names)", async () => {
+    byIdRows.value = [{ id: 5, sportType: "Run" }];
+    mockApi();
+    await applyStravaUpdate(77);
+    expect(updates).toHaveLength(1);
+  });
+});
+
+describe("hideStravaActivity", () => {
+  const gone = (status: number) => vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status })));
+
+  it("hides the row and its split halves, down the chain", async () => {
+    gone(404);
+    returned.push([{ id: 5 }], [{ id: 9 }], [{ id: 12 }], []);
+    expect(await hideStravaActivity(77)).toBe(true);
+    expect(updates).toHaveLength(4);
+    expect(updates.every((u) => u.hidden === true)).toBe(true);
+    expect(invalidate).toHaveBeenCalledWith("activities_list", "activities_latest");
+  });
+
+  it("no split halves: one update", async () => {
+    gone(404);
+    returned.push([{ id: 5 }], []);
+    expect(await hideStravaActivity(77)).toBe(true);
+    expect(updates).toHaveLength(2);
+  });
+
+  it("never hides anything while strava still has it", async () => {
+    gone(200);
+    expect(await hideStravaActivity(77)).toBe(false);
+    expect(updates).toHaveLength(0);
   });
 });

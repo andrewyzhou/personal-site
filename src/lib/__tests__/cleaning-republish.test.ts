@@ -124,6 +124,34 @@ describe("republish with cleaning", () => {
     expect(rows.get(1)!.rawStats!.elapsedTimeS).toBe(599);
   });
 
+  it("drops suggestions outside the crop in effect; no auto-apply for sports without limits", async () => {
+    edits.set(1, [...edits.get(1)!, { id: 3, kind: "crop", params: { startS: 0, endS: 200 } }]);
+    detected.value = [
+      { kind: "crop-tail", confidence: 0.95, edit: { kind: "crop", params: { startS: null, endS: 400 } }, summary: "tail", range: { fromS: 400, toS: 599 } },
+      { kind: "idle", confidence: 0.8, edit: null, summary: "stop", range: { fromS: 50, toS: 120 } },
+    ];
+    await republish(1, { deps: deps() });
+    expect(recorded[0].suggestions.map((s) => s.kind)).toEqual(["idle"]);
+    expect(recorded[0].min).toBe(0.9);
+    rows.get(1)!.sportType = "Kitesurf";
+    await republish(1, { deps: deps(), force: true });
+    expect(recorded[1].min).toBeNull();
+  });
+
+  it("an absorbed activity's republish marks its merge target stale", async () => {
+    edits.set(2, [{ id: 5, kind: "merged-into", params: { intoActivityId: 1, wasHidden: false } }]);
+    const marked: number[] = [];
+    await republish(2, { deps: deps({ markStale: async (id) => void marked.push(id) }) });
+    expect(marked).toEqual([1]);
+  });
+
+  it("the absorbed activity's own crop applies to its part of a merge", async () => {
+    edits.set(1, [...edits.get(1)!, { id: 2, kind: "merge", params: { withActivityId: 2 } }]);
+    edits.set(2, [{ id: 8, kind: "crop", params: { startS: 0, endS: 99 } }, { id: 9, kind: "merged-into", params: { intoActivityId: 1, wasHidden: false } }]);
+    await republish(1, { deps: deps() });
+    expect(rows.get(1)!.distanceM).toBeCloseTo(599 * 3 + 99 * 3, 6);
+  });
+
   it("dry runs never record suggestions", async () => {
     detected.value = [{ kind: "idle", confidence: 1, edit: null, summary: "stop", range: { fromS: 1, toS: 100 } }];
     await republish(1, { deps: deps(), dryRun: true });

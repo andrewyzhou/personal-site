@@ -265,26 +265,50 @@ export function newestFirst<T extends { id: number; createdAt: string }>(edits: 
   return [...edits].sort((a, b) => time(b.createdAt) - time(a.createdAt) || b.id - a.id);
 }
 
-// the crop republish applies: latest active one wins
-export function currentCrop(edits: EditRow[]): { startS: number | null; endS: number | null } | null {
-  const crop = newestFirst(edits).find((e) => e.kind === "crop" && !e.revertedAt);
-  if (!crop) return null;
-  return { startS: isNum(crop.params.startS) ? crop.params.startS : null, endS: isNum(crop.params.endS) ? crop.params.endS : null };
+export type CropWindow = {
+  startS: number | null;
+  endS: number | null;
+};
+
+// the crop window republish applies: active crops intersect (latest start,
+// earliest end), so a crop can only narrow it
+export function currentCrop(edits: EditRow[]): CropWindow | null {
+  const crops = edits.filter((e) => e.kind === "crop" && !e.revertedAt);
+  if (!crops.length) return null;
+  let startS: number | null = null;
+  let endS: number | null = null;
+  for (const c of crops) {
+    if (isNum(c.params.startS)) startS = startS === null ? c.params.startS : Math.max(startS, c.params.startS);
+    if (isNum(c.params.endS)) endS = endS === null ? c.params.endS : Math.min(endS, c.params.endS);
+  }
+  return { startS, endS };
 }
 
-// trim one side at s, keeping the other side of any current crop
-export function trimParams(
-  current: { startS: number | null; endS: number | null } | null,
-  side: "start" | "end",
-  s: number
-): { startS: number | null; endS: number | null } {
+// trim one side at s: a one-sided crop (the other side stays as it is)
+export function trimParams(side: "start" | "end", s: number): CropWindow {
   const at = Math.round(s);
+  return side === "start" ? { startS: at, endS: null } : { startS: null, endS: at };
+}
+
+// what a trim at s would do to the current window: narrow it, nothing
+// (it's outside what's already cropped: widening needs an undo), or leave
+// nothing at all
+export function trimEffect(current: CropWindow | null, side: "start" | "end", s: number): "narrows" | "widens" | "empty" {
+  const at = Math.round(s);
+  const lo = current?.startS ?? null;
+  const hi = current?.endS ?? null;
   if (side === "start") {
-    const endS = current?.endS ?? null;
-    return { startS: at, endS: endS !== null && endS > at ? endS : null };
+    if (hi !== null && at >= hi) return "empty";
+    return lo !== null && at <= lo ? "widens" : "narrows";
   }
-  const startS = current?.startS ?? null;
-  return { startS: startS !== null && startS < at ? startS : null, endS: at };
+  if (lo !== null && at <= lo) return "empty";
+  return hi !== null && at >= hi ? "widens" : "narrows";
+}
+
+// a crop to [fromS, toS] only takes effect inside the current window
+export function cropWidens(current: CropWindow | null, fromS: number, toS: number): boolean {
+  if (!current) return false;
+  return (current.startS !== null && fromS < current.startS) || (current.endS !== null && toS > current.endS);
 }
 
 export interface Band extends Range {

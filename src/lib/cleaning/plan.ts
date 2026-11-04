@@ -90,11 +90,76 @@ export interface Crop {
   endS: number | null;
 }
 
-// latest active crop (that's the one applyCleaning uses), optionally ignoring one
+// the crop window in effect: active crops intersect (latest start, earliest
+// end), optionally ignoring one. id is the latest crop's. times as stored
+// (the canonical clock the edits were made on)
 export function currentCrop(edits: EditLike[], excludeId?: number): Crop | null {
   const crops = edits.filter((e) => e.kind === "crop" && e.id !== excludeId);
-  const c = crops[crops.length - 1];
-  return c ? { id: c.id, startS: num(c.params.startS), endS: num(c.params.endS) } : null;
+  if (!crops.length) return null;
+  let startS: number | null = null;
+  let endS: number | null = null;
+  for (const c of crops) {
+    const a = num(c.params.startS);
+    const b = num(c.params.endS);
+    if (a !== null) startS = startS === null ? a : Math.max(startS, a);
+    if (b !== null) endS = endS === null ? b : Math.min(endS, b);
+  }
+  return { id: crops[crops.length - 1].id, startS, endS };
+}
+
+// a merged part's own edits: its active cleaning, minus merges and markers
+export function ownCleaning(edits: EditLike[]): EditLike[] {
+  return edits.filter((e) => (CLEANING_EDIT_KINDS as readonly string[]).includes(e.kind) && e.kind !== "merge");
+}
+
+const TIMED_KINDS = ["crop", "cut", "drop-points"];
+
+// new crop/cut/drop-points times are on the current canonical clock; the
+// anchor records that clock's start so they land in the same place later
+export function withAnchor(kind: string, params: Record<string, unknown>, startEpochMs: number | null): Record<string, unknown> {
+  if (startEpochMs === null || !TIMED_KINDS.includes(kind)) return params;
+  return { ...params, anchorEpochMs: startEpochMs };
+}
+
+export const NO_TIMED_TRACK = "this activity has no timed track (route only)";
+
+// route-only tracks have made-up timestamps: nothing time-based applies
+export function syntheticRefusal(track: Pick<CanonicalTrack, "syntheticTime"> | null): Refusal | null {
+  return track?.syntheticTime ? { ok: false, status: 422, error: NO_TIMED_TRACK } : null;
+}
+
+// ---------------------------------------------------------------------------
+// split boundaries
+
+export interface SplitBounds {
+  maxS: number | null; // parent of a live split: nothing after this
+  minS: number | null; // live split half: nothing before this
+}
+
+// live split markers: the parent's own (its child takes everything after
+// atS) and, for a child, its parent's marker for it
+export function splitBounds(activityId: number, edits: EditLike[], parentEdits: EditLike[] | null): SplitBounds {
+  const own = edits.filter((e) => e.kind === "split").map((e) => num(e.params.atS)).filter((v): v is number => v !== null);
+  const mine = (parentEdits ?? []).find((e) => e.kind === "split" && Number(e.params.childId) === activityId);
+  return {
+    maxS: own.length ? Math.min(...own) : null,
+    minS: mine ? num(mine.params.atS) : null,
+  };
+}
+
+// a crop or cut must stay on its own side of a live split
+export function boundaryRefusal(edit: { kind: string; params: Record<string, unknown> }, b: SplitBounds): Refusal | null {
+  if (b.maxS === null && b.minS === null) return null;
+  const p = edit.params;
+  const lo = edit.kind === "crop" ? num(p.startS) : edit.kind === "cut" ? num(p.fromS) : null;
+  const hi = edit.kind === "crop" ? num(p.endS) : edit.kind === "cut" ? num(p.toS) : null;
+  if (b.maxS !== null && ((lo !== null && lo >= b.maxS) || (hi !== null && hi > b.maxS))) {
+    return { ok: false, status: 409, error: `this activity was split at ${b.maxS} s — nothing after that belongs to it (undo the split first)` };
+  }
+  if (b.minS !== null && ((lo !== null && lo < b.minS) || (hi !== null && hi <= b.minS))) {
+    return { ok: false, status: 409, error: `this activity starts at the split (${b.minS} s) — nothing before that belongs to it (undo the split first)` };
+  }
+  return null;
 }
 
 export function latestOf(edits: EditLike[], kind: string): EditLike | null {
@@ -194,12 +259,20 @@ export function childValues(parent: ParentForChild, atS: number, processingVersi
   };
 }
 
-// crops a split at atS creates, from the parent's crop before the split
+// crops a split at atS creates. crops intersect, so the parent only needs
+// its new end (its earlier crops keep applying); the child starts with no
+// crops of its own, so it gets atS plus the end of the parent's window
 export function splitCrops(prior: Crop | null, atS: number) {
   return {
-    parent: { startS: prior?.startS ?? null, endS: atS },
+    parent: { startS: null, endS: atS },
     child: { startS: atS, endS: prior?.endS ?? null },
   };
+}
+
+// the parent crop an interrupted split left behind (end at atS, no start)
+export function findSplitCrop(edits: EditLike[], atS: number): EditLike | null {
+  const list = edits.filter((e) => e.kind === "crop" && num(e.params.startS) === null && num(e.params.endS) === atS);
+  return list[list.length - 1] ?? null;
 }
 
 export type Refusal = { ok: false; status: number; error: string };
@@ -220,13 +293,44 @@ export function atSInside(range: { startS: number; endS: number } | null, atS: n
 
 export const MERGE_WINDOW_MS = 12 * 3600 * 1000;
 
-type MergeSide = { row: Pick<ActivityRow, "id" | "startDateUtc" | "splitFromId">; edits: EditLike[] };
+type MergeSide = {
+  row: Pick<ActivityRow, "id" | "startDateUtc" | "splitFromId" | "hidden" | "mapHidden" | "hrHidden">;
+  edits: EditLike[];
+  syntheticTime?: boolean; // canonical track is route only
+};
 
 export type MergePlan =
   | Refusal
   | { ok: true; targetId: number; absorbedId: number; alreadyMerged: boolean; markerId: number | null; mergeEditId: number | null };
 
 const mergedInto = (edits: EditLike[]) => edits.find((e) => e.kind === "merged-into") ?? null;
+
+// what a fresh merge needs: nothing private shown through the target, no
+// split halves, timed tracks on both sides, and no crop cutting the joint
+function mergeGuards(target: MergeSide, absorbed: MergeSide): Refusal | null {
+  const t = target.row;
+  const a = absorbed.row;
+  if (target.syntheticTime || absorbed.syntheticTime) {
+    const which = target.syntheticTime ? t.id : a.id;
+    return { ok: false, status: 422, error: `activity ${which}: ${NO_TIMED_TRACK}` };
+  }
+  if (a.hidden) return { ok: false, status: 409, error: `activity ${a.id} is private — merging would publish it through #${t.id}` };
+  if (a.mapHidden && !t.mapHidden) return { ok: false, status: 409, error: `activity ${a.id} hides its map but #${t.id} doesn't — merging would show its route` };
+  if (a.hrHidden && !t.hrHidden) return { ok: false, status: 409, error: `activity ${a.id} hides heart rate but #${t.id} doesn't — merging would show it` };
+  for (const s of [target, absorbed]) {
+    if (s.row.splitFromId) return { ok: false, status: 409, error: `activity ${s.row.id} is a split half — undo the split first` };
+    if (s.edits.some((e) => e.kind === "split")) return { ok: false, status: 409, error: `activity ${s.row.id} was split — undo the split first` };
+  }
+  const tc = currentCrop(target.edits);
+  if (tc?.endS !== null && tc?.endS !== undefined) {
+    return { ok: false, status: 409, error: `activity ${t.id} has its end cropped — undo the crop first, or merge before cropping` };
+  }
+  const ac = currentCrop(absorbed.edits);
+  if (ac?.startS !== null && ac?.startS !== undefined) {
+    return { ok: false, status: 409, error: `activity ${a.id} has its start cropped — undo the crop first, or merge before cropping` };
+  }
+  return null;
+}
 
 // later-starting activity goes into the earlier one; no chains, no cycles,
 // nothing merged twice. a half-finished merge into the same target resumes.
@@ -247,6 +351,11 @@ export function planMerge(a: MergeSide, b: MergeSide): MergePlan {
   if (marker && Number(marker.params.intoActivityId) !== target.row.id) {
     return { ok: false, status: 409, error: `activity ${absorbed.row.id} is already merged into ${marker.params.intoActivityId}` };
   }
+  // a half-finished merge into this target already passed these
+  if (!marker) {
+    const refusal = mergeGuards(target, absorbed);
+    if (refusal) return refusal;
+  }
   const mergeEdit = target.edits.find((e) => e.kind === "merge" && Number(e.params.withActivityId) === absorbed.row.id) ?? null;
   return {
     ok: true,
@@ -265,14 +374,26 @@ export function planMerge(a: MergeSide, b: MergeSide): MergePlan {
 export function revertRefusal(
   edit: EditLike,
   activityEdits: EditLike[],
-  opts: { isSplitChild: boolean }
+  opts: { isSplitChild: boolean; splitAtS?: number | null }
 ): Refusal | null {
   if (edit.kind === "crop") {
     const marker = activityEdits.find((e) => e.kind === "split" && Number(e.params.parentCropEditId) === edit.id);
     if (marker) return { ok: false, status: 409, error: "this crop belongs to a split — undo the split instead" };
-    if (opts.isSplitChild && !activityEdits.some((e) => e.kind === "crop" && e.id !== edit.id)) {
-      return { ok: false, status: 409, error: "the split half needs a crop — undo the split on the original instead" };
+    if (opts.isSplitChild) {
+      // the half must still start at (or after) the split without this crop
+      const rest = currentCrop(activityEdits.filter((e) => e.id !== edit.id));
+      const atS = opts.splitAtS ?? null;
+      const covered = rest !== null && rest.startS !== null && (atS === null || rest.startS >= atS);
+      if (!covered) return { ok: false, status: 409, error: "the split half needs a crop — undo the split on the original instead" };
     }
+  }
+  return null;
+}
+
+// a split half that absorbed another activity can't be folded back yet
+export function splitRevertRefusal(childEdits: EditLike[]): Refusal | null {
+  if (childEdits.some((e) => e.kind === "merge")) {
+    return { ok: false, status: 409, error: "the split half has an activity merged into it — undo that merge first" };
   }
   return null;
 }

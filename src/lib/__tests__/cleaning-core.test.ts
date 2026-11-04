@@ -84,10 +84,10 @@ describe("applyCleaning", () => {
     expect(JSON.stringify(track)).toBe(before);
   });
 
-  it("crop keeps the window; latest crop wins", () => {
+  it("crop keeps the window; crops intersect", () => {
     const c = applyCleaning(track, [e(1, "crop", { startS: 0, endS: 100 }), e(2, "crop", { startS: 50, endS: 300 })]);
     expect(c.track.columns.t[0]).toBe(50);
-    expect(c.track.columns.t[c.track.columns.t.length - 1]).toBe(300);
+    expect(c.track.columns.t[c.track.columns.t.length - 1]).toBe(100);
     expect(c.track.columns.dist[0]).toBe(0);
     expect(c.track.session).toBeNull();
     expect(c.track.kilojoules).toBeNull();

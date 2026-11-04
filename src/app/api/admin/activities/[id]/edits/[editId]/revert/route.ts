@@ -13,11 +13,12 @@
 //
 // 200 { ok: true, reverted: number[] (edit ids stamped by this call),
 //       republished: { [activityId]: status | "failed" } }
-// 400 bad ids · 401 · 404 edit not on this activity · 409 crop a live split depends on · 500
+// 400 bad ids · 401 · 404 edit not on this activity · 409 crop a live split
+// depends on, or a split whose half has an activity merged into it · 500
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getActivity, getEdit, listEdits, revertEditOnce, setHidden } from "@/lib/cleaning/load";
-import { revertRefusal } from "@/lib/cleaning/plan";
+import { revertRefusal, splitRevertRefusal } from "@/lib/cleaning/plan";
 import type { ActivityEditRow } from "@/lib/db";
 import { bad, failure, parseId, republishAll, type Ctx } from "../../../cleaning/shared";
 
@@ -33,6 +34,8 @@ async function revertSplit(parentId: number, marker: ActivityEditRow) {
   const reverted: number[] = [];
   // child first, marker last: a retry sees the marker still active and redoes the rest
   const child = Number.isInteger(childId) && childId > 0 ? await getActivity(childId) : null;
+  const refusal = child ? splitRevertRefusal(await active(child.id)) : null;
+  if (refusal) return refusal;
   if (child) await setHidden(child.id, true);
   if (Number.isInteger(cropId) && cropId > 0 && (await revertEditOnce(cropId))) reverted.push(cropId);
   if (await revertEditOnce(marker.id)) reverted.push(marker.id);
@@ -73,7 +76,11 @@ export async function POST(request: Request, { params }: Ctx<"id" | "editId">) {
     const edit = await getEdit(editId);
     if (!edit || edit.activityId !== id) return bad("edit not found", 404);
 
-    if (edit.kind === "split") return NextResponse.json({ ok: true, ...(await revertSplit(id, edit)) });
+    if (edit.kind === "split") {
+      const out = await revertSplit(id, edit);
+      if ("ok" in out) return bad(out.error, out.status);
+      return NextResponse.json({ ok: true, ...out });
+    }
 
     if (edit.kind === "merge") {
       const absorbedId = Number(edit.params.withActivityId);
@@ -90,7 +97,8 @@ export async function POST(request: Request, { params }: Ctx<"id" | "editId">) {
     if (edit.revertedAt) return NextResponse.json({ ok: true, reverted: [], republished: {} });
     const row = await getActivity(id);
     if (!row) return bad("not found", 404);
-    const refusal = revertRefusal(edit, await active(id), { isSplitChild: await isLiveSplitChild(row.id, row.splitFromId) });
+    const splitAtS = await liveSplitAt(row.id, row.splitFromId);
+    const refusal = revertRefusal(edit, await active(id), { isSplitChild: splitAtS !== undefined, splitAtS: splitAtS ?? null });
     if (refusal) return bad(refusal.error, refusal.status);
     const reverted = (await revertEditOnce(edit.id)) ? [edit.id] : [];
     return NextResponse.json({ ok: true, reverted, republished: await republishAll([id]) });
@@ -99,8 +107,12 @@ export async function POST(request: Request, { params }: Ctx<"id" | "editId">) {
   }
 }
 
-// a child whose parent still carries the split marker for it
-async function isLiveSplitChild(id: number, splitFromId: number | null): Promise<boolean> {
-  if (!splitFromId) return false;
-  return (await active(splitFromId)).some((e) => e.kind === "split" && Number(e.params.childId) === id);
+// for a child whose parent still carries the split marker for it: the split
+// point (null when the marker has none); undefined when not a live split half
+async function liveSplitAt(id: number, splitFromId: number | null): Promise<number | null | undefined> {
+  if (!splitFromId) return undefined;
+  const marker = (await active(splitFromId)).find((e) => e.kind === "split" && Number(e.params.childId) === id);
+  if (!marker) return undefined;
+  const atS = marker.params.atS;
+  return typeof atS === "number" && Number.isFinite(atS) ? atS : null;
 }
