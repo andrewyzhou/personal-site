@@ -61,7 +61,9 @@ function respond(result: IngestResult): NextResponse {
     ingestId: result.ingestId,
     workoutId: result.workoutId,
     summary: result.summary,
+    // one line for the shortcut's notification; details is the full breakdown
     text: result.text,
+    details: result.details,
     warnings: result.warnings,
     links: result.links,
   };
@@ -69,9 +71,12 @@ function respond(result: IngestResult): NextResponse {
     return NextResponse.json({ ok: false, error: result.text, ...base }, { status: 422 });
   }
   if (result.status === "duplicate") {
-    return NextResponse.json({ ok: true, duplicate: true, ...base }, { status: 200 });
+    return NextResponse.json({ ok: true, duplicate: true, updated: false, ...base }, { status: 200 });
   }
-  return NextResponse.json({ ok: true, duplicate: false, ...base }, { status: 201 });
+  if (result.status === "updated") {
+    return NextResponse.json({ ok: true, duplicate: false, updated: true, ...base }, { status: 200 });
+  }
+  return NextResponse.json({ ok: true, duplicate: false, updated: false, ...base }, { status: 201 });
 }
 
 export async function POST(request: Request) {

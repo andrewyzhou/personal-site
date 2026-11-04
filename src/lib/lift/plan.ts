@@ -39,6 +39,10 @@ export interface PlanOptions {
   timezone?: string;
   /** custom exercise id -> id it was merged into (chains already followed) */
   redirects?: ReadonlyMap<string, string>;
+  /** existing workout this share rewrites (see pickEditTarget); replaces the derived id */
+  workoutId?: string;
+  /** warnings found before planning (e.g. by the edit lookup), stored on the ingest row */
+  extraWarnings?: readonly LiftWarning[];
 }
 
 export interface ParsedWorkoutPlanOptions {
@@ -56,6 +60,17 @@ export interface ParsedWorkoutPlanOptions {
   warnings: LiftWarning[];
 }
 
+/** one working set as logged, for the human summary */
+export interface SetBrief {
+  weight: number | null;
+  unit: WeightUnit | null;
+  reps: number | null;
+  durationS: number | null;
+  distance: number | null;
+  distanceUnit: DistanceUnit | null;
+  bodyweight: boolean;
+}
+
 export interface ExerciseLine {
   exerciseId: string;
   name: string;
@@ -64,6 +79,8 @@ export interface ExerciseLine {
   volumeKg: number;
   bestE1rmKg: number | null;
   topSet: { weight: number; unit: WeightUnit; reps: number } | null;
+  /** working sets in order (warm-ups left out) */
+  sets: SetBrief[];
 }
 
 export interface IngestSummary {
@@ -139,6 +156,18 @@ function setRow(set: ParsedSet, id: string, workoutExerciseId: string): NewLiftS
   };
 }
 
+function setBrief(s: ParsedSet): SetBrief {
+  return {
+    weight: s.weight,
+    unit: s.unit,
+    reps: s.reps,
+    durationS: s.durationS,
+    distance: s.distance,
+    distanceUnit: s.distanceUnit,
+    bodyweight: s.bodyweight,
+  };
+}
+
 function joinNotes(notes: readonly string[]): string | null {
   const text = notes.map((n) => n.trim()).filter(Boolean).join("\n");
   return text || null;
@@ -156,21 +185,24 @@ function tooLarge(parsed: ParsedWorkout): string | null {
   return null;
 }
 
+function derivedWorkoutId(parsed: ParsedWorkout, slug: string | null, sha256: string): string {
+  if (slug) return `share-${slug}`;
+  // same title + start from any channel (or with stray whitespace) is the same workout
+  if (parsed.startedLocal) return `share-${sha256Hex(`${nameKey(parsed.title)}|${parsed.startedLocal}`).slice(0, 16)}`;
+  return `share-${sha256.slice(0, 16)}`;
+}
+
 export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan {
   const sha256 = sha256Hex(rawText);
   const parsed = parseShareText(rawText);
   const warnings: LiftWarning[] = parsed.warnings.map((w) => ({ line: w.line, message: w.message, text: w.text }));
+  if (opts.extraWarnings) warnings.push(...opts.extraWarnings);
   const slug = parsed.linkSlug && SLUG_RE.test(parsed.linkSlug) ? parsed.linkSlug : null;
   const ingestId = `ing_${sha256.slice(0, 24)}`;
   const rejected = tooLarge(parsed);
   if (rejected) warnings.push({ line: 0, message: rejected, text: "" });
   const hasWorkout = parsed.exercises.length > 0 && !rejected;
-  const workoutId = slug
-    ? `share-${slug}`
-    : parsed.startedLocal
-      ? // same title + start from any channel (or with stray whitespace) is the same workout
-        `share-${sha256Hex(`${nameKey(parsed.title)}|${parsed.startedLocal}`).slice(0, 16)}`
-      : `share-${sha256.slice(0, 16)}`;
+  const workoutId = opts.workoutId ?? derivedWorkoutId(parsed, slug, sha256);
 
   const ingest: IngestPlan["ingest"] = {
     id: ingestId,
@@ -296,6 +328,7 @@ export function planParsedWorkout(
         volumeKg: round(s?.volumeKg ?? 0, 2),
         bestE1rmKg: s?.bestE1rmKg != null ? round(s.bestE1rmKg, 2) : null,
         topSet: s?.topSet ?? null,
+        sets: pe.sets.filter((x) => isWorkingSet(x)).map(setBrief),
       };
     }),
   };
@@ -311,4 +344,78 @@ export function planParsedWorkout(
     },
     summary,
   };
+}
+
+/** a stored workout a new share might be an edit of */
+export interface EditCandidate {
+  id: string;
+  title: string;
+  startedLocal: string;
+  shareSlug: string | null;
+  source: string;
+  deletedAt: Date | null;
+  /** nameRaw of its exercises */
+  exerciseNames: readonly string[];
+}
+
+export interface EditLookup {
+  /** the id the share gets on its own */
+  plannedId: string;
+  slug: string | null;
+  title: string;
+  /** the parsed start; null when the share had no date */
+  startedLocal: string | null;
+  exerciseNames: readonly string[];
+}
+
+export type EditTarget =
+  | { kind: "new" }
+  /** this share rewrites a stored workout (a deleted one comes back, so it reads as logged again) */
+  | { kind: "existing"; workoutId: string; deleted: boolean }
+  /** several workouts could be the one edited, so it's logged as new rather than guessed */
+  | { kind: "ambiguous"; workoutIds: string[] };
+
+// an edit keeps at least this share of the exercise names
+export const EDIT_OVERLAP = 0.5;
+
+function exerciseOverlap(a: readonly string[], b: readonly string[]): number {
+  const ka = new Set(a.map(nameKey));
+  const kb = new Set(b.map(nameKey));
+  const size = Math.max(ka.size, kb.size);
+  if (!size) return 0;
+  let both = 0;
+  for (const k of ka) if (kb.has(k)) both++;
+  return both / size;
+}
+
+function existing(c: EditCandidate): EditTarget {
+  return { kind: "existing", workoutId: c.id, deleted: c.deletedAt != null };
+}
+
+/**
+ * which stored workout a share lands on. the app can issue a new link (and the
+ * title can change) when a workout is edited and re-shared, so a share whose
+ * own id is unknown still updates the one imported workout that started the same
+ * minute with the same title or mostly the same exercises.
+ */
+export function pickEditTarget(share: EditLookup, candidates: readonly EditCandidate[]): EditTarget {
+  const own = candidates.find((c) => c.id === share.plannedId);
+  if (own) return existing(own);
+  // the same link already landed on another id (an earlier edit moved it there).
+  // the slug is unique on workouts, so a new row with it would fail anyway
+  const sameSlug = share.slug ? candidates.find((c) => c.shareSlug === share.slug) : undefined;
+  if (sameSlug) return existing(sameSlug);
+  if (!share.startedLocal) return { kind: "new" };
+
+  const title = nameKey(share.title);
+  const matches = candidates.filter(
+    (c) =>
+      c.startedLocal === share.startedLocal &&
+      c.source.startsWith("share") &&
+      !c.deletedAt &&
+      (nameKey(c.title) === title || exerciseOverlap(c.exerciseNames, share.exerciseNames) >= EDIT_OVERLAP)
+  );
+  if (matches.length === 1) return existing(matches[0]);
+  if (matches.length > 1) return { kind: "ambiguous", workoutIds: matches.map((m) => m.id).sort() };
+  return { kind: "new" };
 }
