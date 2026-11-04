@@ -25,6 +25,34 @@ describe("linkWorkoutToActivities", () => {
     ]);
   });
 
+  it("2026-11-02 (real): strong at 19:18 inside activity 496 (14:01, 365 min) links as overrun", () => {
+    const candidates = [c(496, "2026-11-02T14:01", 21909), c(497, "2026-11-02T19:10", 1800, "Ride")];
+    expect(linkWorkoutToActivities("2026-11-02T19:18", candidates)).toEqual([
+      { activityId: 496, role: "overrun", deltaMin: -317 },
+    ]);
+  });
+
+  it("prefers a start-window primary over a long container", () => {
+    const candidates = [c(496, "2026-11-02T14:01", 21909), c(498, "2026-11-02T19:20", 3600)];
+    expect(linkWorkoutToActivities("2026-11-02T19:18", candidates)).toEqual([
+      { activityId: 496, role: "duplicate", deltaMin: -317 },
+      { activityId: 498, role: "primary", deltaMin: 2 },
+    ]);
+  });
+
+  it("picks the latest-starting container and ignores recordings that ended before the start", () => {
+    const candidates = [
+      c(1, "2026-11-02T10:00", 12 * 3600),
+      c(2, "2026-11-02T14:01", 21909),
+      c(3, "2026-11-02T12:00", 3600),
+    ];
+    expect(linkWorkoutToActivities("2026-11-02T19:18", candidates)).toEqual([
+      { activityId: 2, role: "overrun", deltaMin: -317 },
+    ]);
+    // recording ended at 20:06, so a 20:30 workout is not inside it
+    expect(linkWorkoutToActivities("2026-11-02T20:30", [c(2, "2026-11-02T14:01", 21909)])).toEqual([]);
+  });
+
   it("ignores non-strength activities", () => {
     const out = linkWorkoutToActivities("2026-11-02T14:05", [
       c(1, "2026-11-02T14:05", 3600, "Ride"),

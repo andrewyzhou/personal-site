@@ -82,10 +82,20 @@ export const exerciseMuscles = pgTable(
   (t) => [primaryKey({ columns: [t.exerciseId, t.region] })]
 );
 
+export const liftTemplateFolders = pgTable("lift_template_folders", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export const liftTemplates = pgTable("lift_templates", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  // legacy free-text folder; the app uses folder_id
   folder: text("folder"),
+  folderId: text("folder_id").references(() => liftTemplateFolders.id, { onDelete: "set null" }),
   notes: text("notes"),
   position: integer("position").notNull().default(0),
   archived: boolean("archived").notNull().default(false),
@@ -106,6 +116,10 @@ export const liftTemplateExercises = pgTable(
     position: integer("position").notNull().default(0),
     plannedSets: jsonb("planned_sets").$type<PlannedSet[]>().notNull().default([]),
     notes: text("notes"),
+    supersetGroup: integer("superset_group"),
+    restS: integer("rest_s"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [index("lift_template_exercises_template_idx").on(t.templateId, t.position)]
 );
@@ -144,7 +158,10 @@ export const liftWorkouts = pgTable(
     endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
     durationS: integer("duration_s"), // only known from linked recordings
     notes: text("notes"),
-    source: text("source").notNull(), // 'strong-text' | 'app'
+    source: text("source").notNull(), // 'strong-text' | 'strong-csv' | 'app'
+    status: text("status").notNull().default("finished"), // 'active' | 'finished' | 'discarded'
+    // soft pointer: templates can be deleted without touching history
+    templateId: text("template_id"),
     latestIngestId: text("latest_ingest_id"),
     strongSlug: text("strong_slug"),
     workingSets: integer("working_sets").notNull().default(0),
@@ -175,6 +192,10 @@ export const liftWorkoutExercises = pgTable(
     nameRaw: text("name_raw").notNull(), // exactly as strong printed it
     notes: text("notes"),
     supersetGroup: integer("superset_group"),
+    restS: integer("rest_s"),
+    // phone pushes are last-write-wins on updated_at
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [
     index("lift_workout_exercises_workout_idx").on(t.workoutId, t.position),
@@ -202,6 +223,8 @@ export const liftSets = pgTable(
     note: text("note"),
     e1rmKg: doublePrecision("e1rm_kg"),
     completed: boolean("completed").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   (t) => [index("lift_sets_workout_exercise_idx").on(t.workoutExerciseId, t.position)]
 );
@@ -217,7 +240,7 @@ export const liftWorkoutActivities = pgTable(
     activityId: bigint("activity_id", { mode: "number" })
       .notNull()
       .references(() => activities.id, { onDelete: "cascade" }),
-    role: text("role").notNull(), // 'primary' | 'duplicate' | 'continuation'
+    role: text("role").notNull(), // 'primary' | 'duplicate' | 'continuation' | 'overrun'
     method: text("method").notNull(), // 'auto' | 'manual'
     deltaMin: integer("delta_min").notNull().default(0),
     createdAt: createdAt(),
@@ -228,7 +251,37 @@ export const liftWorkoutActivities = pgTable(
   ]
 );
 
-export type ExerciseRow = typeof exercises.$inferSelect;
+export const liftBodyweights = pgTable(
+  "lift_bodyweights",
+  {
+    id: text("id").primaryKey(),
+    measuredAt: timestamp("measured_at", { withTimezone: true, mode: "date" }).notNull(),
+    weight: doublePrecision("weight").notNull(),
+    unit: text("unit").notNull(), // 'lb' | 'kg'
+    note: text("note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("lift_bodyweights_measured_at_idx").on(t.measuredAt)]
+);
+
+// one row per phone outbox entry seen, so a retried push is a no-op
+export const liftSyncLog = pgTable(
+  "lift_sync_log",
+  {
+    deviceId: text("device_id").notNull(),
+    seq: bigint("seq", { mode: "number" }).notNull(),
+    entity: text("entity").notNull(),
+    entityId: text("entity_id").notNull(),
+    op: text("op").notNull(),
+    appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    // reason when the server refused the mutation
+    rejected: text("rejected"),
+  },
+  (t) => [primaryKey({ columns: [t.deviceId, t.seq] })]
+);
+
+export type ExerciseRow =typeof exercises.$inferSelect;
 export type NewExerciseRow = typeof exercises.$inferInsert;
 export type ExerciseAliasRow = typeof exerciseAliases.$inferSelect;
 export type NewExerciseAliasRow = typeof exerciseAliases.$inferInsert;
@@ -248,3 +301,9 @@ export type LiftSetRow = typeof liftSets.$inferSelect;
 export type NewLiftSetRow = typeof liftSets.$inferInsert;
 export type LiftWorkoutActivityRow = typeof liftWorkoutActivities.$inferSelect;
 export type NewLiftWorkoutActivityRow = typeof liftWorkoutActivities.$inferInsert;
+export type LiftTemplateFolderRow = typeof liftTemplateFolders.$inferSelect;
+export type NewLiftTemplateFolderRow = typeof liftTemplateFolders.$inferInsert;
+export type LiftBodyweightRow = typeof liftBodyweights.$inferSelect;
+export type NewLiftBodyweightRow = typeof liftBodyweights.$inferInsert;
+export type LiftSyncLogRow = typeof liftSyncLog.$inferSelect;
+export type NewLiftSyncLogRow = typeof liftSyncLog.$inferInsert;

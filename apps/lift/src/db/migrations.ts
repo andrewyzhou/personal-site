@@ -72,6 +72,67 @@ export const MIGRATIONS: readonly (readonly string[])[] = [
     )`,
     `CREATE INDEX outbox_unsynced_idx ON outbox (synced_at, id)`,
   ],
+
+  // 2: b2 logging mvp: timezone + template on workouts, per-exercise rest,
+  // merges, templates/folders, bodyweight log, key-value settings, sync rejects
+  [
+    `ALTER TABLE workouts ADD COLUMN utc_offset_min INTEGER`,
+    `ALTER TABLE workouts ADD COLUMN template_id TEXT`,
+    `ALTER TABLE workout_exercises ADD COLUMN rest_s INTEGER`,
+    `ALTER TABLE custom_exercises ADD COLUMN merged_into TEXT`,
+
+    `CREATE TABLE template_folders (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+
+    `CREATE TABLE templates (
+      id TEXT PRIMARY KEY NOT NULL,
+      folder_id TEXT REFERENCES template_folders (id) ON DELETE SET NULL,
+      name TEXT NOT NULL,
+      notes TEXT,
+      position INTEGER NOT NULL DEFAULT 0,
+      archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX templates_folder_idx ON templates (folder_id, position)`,
+
+    `CREATE TABLE template_exercises (
+      id TEXT PRIMARY KEY NOT NULL,
+      template_id TEXT NOT NULL REFERENCES templates (id) ON DELETE CASCADE,
+      exercise_id TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      superset_group INTEGER,
+      rest_s INTEGER,
+      planned_sets TEXT NOT NULL DEFAULT '[]',
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX template_exercises_template_idx ON template_exercises (template_id, position)`,
+
+    `CREATE TABLE bodyweights (
+      id TEXT PRIMARY KEY NOT NULL,
+      measured_at INTEGER NOT NULL,
+      weight REAL NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'lb' CHECK (unit IN ('lb', 'kg')),
+      note TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX bodyweights_measured_idx ON bodyweights (measured_at)`,
+
+    `CREATE TABLE kv (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    )`,
+
+    `ALTER TABLE outbox ADD COLUMN rejected TEXT`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

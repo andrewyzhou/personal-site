@@ -2,16 +2,34 @@
 // are plain sync functions: every write is committed (with its outbox row)
 // before the call returns, and nothing about a set lives only in memory.
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { randomUUID } from "expo-crypto";
 import type { SetKind, WeightUnit } from "lift-core";
-import { db, type Tx } from "./client";
+import { db, type Db, type Tx } from "./client";
+
+// reads that run both inside a write transaction and outside one
+type Reader = Pick<Db, "select">;
 import { notify } from "./events";
 import { writeOutbox } from "./outbox";
+import { getDefaultUnit } from "./settings";
 import { sets, workoutExercises, workouts, type SetRow, type WorkoutExerciseRow, type WorkoutRow } from "./schema";
-import { decideFinish, type FinishDecision } from "../lib/finish";
+import { planFinish, type FinishDecision } from "../lib/finish";
 import { defaultWorkoutTitle } from "../lib/format";
-import { byPosition, lastByPosition, nextPosition, prefillSet } from "../lib/sets";
+import { MAX_NOTE_LENGTH, clampSetNumbers } from "../lib/numbers";
+import { clampRestS } from "../lib/rest";
+import {
+  byPosition,
+  choosePrefill,
+  diffExercises,
+  lastByPosition,
+  linkWithNext,
+  moveExercise,
+  nextPosition,
+  normalizeGroups,
+  prefillSet,
+  unlinkFromNext,
+  type OrderedExercise,
+} from "../lib/sets";
 
 function write<T>(fn: (tx: Tx) => T): T {
   const result = db.transaction(fn);
@@ -34,12 +52,15 @@ export function startWorkout(now = Date.now()): WorkoutRow {
   return write((tx) => {
     const existing = tx.select().from(workouts).where(eq(workouts.status, "active")).get();
     if (existing) return existing;
+    const started = new Date(now);
     const row = tx
       .insert(workouts)
       .values({
         id: randomUUID(),
-        title: defaultWorkoutTitle(new Date(now)),
+        title: defaultWorkoutTitle(started),
         startedAt: now,
+        // getTimezoneOffset is minutes west of utc; the payload wants east
+        utcOffsetMin: -started.getTimezoneOffset(),
         status: "active",
         createdAt: now,
         updatedAt: now,
@@ -51,15 +72,19 @@ export function startWorkout(now = Date.now()): WorkoutRow {
   });
 }
 
-export function getWorkoutDetail(workoutId: string): WorkoutDetail | undefined {
-  const workout = db.select().from(workouts).where(eq(workouts.id, workoutId)).get();
-  if (!workout) return undefined;
-  const exRows = db
+function exerciseRows(q: Reader, workoutId: string): WorkoutExerciseRow[] {
+  return q
     .select()
     .from(workoutExercises)
     .where(eq(workoutExercises.workoutId, workoutId))
     .orderBy(asc(workoutExercises.position))
     .all();
+}
+
+export function getWorkoutDetail(workoutId: string): WorkoutDetail | undefined {
+  const workout = db.select().from(workouts).where(eq(workouts.id, workoutId)).get();
+  if (!workout) return undefined;
+  const exRows = exerciseRows(db, workoutId);
   const setRows = exRows.length
     ? db
         .select()
@@ -82,24 +107,58 @@ export function getWorkoutDetail(workoutId: string): WorkoutDetail | undefined {
   };
 }
 
+/**
+ * completed sets of `exerciseId` from the most recent finished workout other
+ * than `excludeWorkoutId`. if that session logged the exercise twice, the
+ * first entry is the one compared against.
+ */
+export function previousSessionSets(q: Reader, exerciseId: string, excludeWorkoutId: string): SetRow[] {
+  const last = q
+    .select({ id: workoutExercises.id })
+    .from(workoutExercises)
+    .innerJoin(workouts, eq(workoutExercises.workoutId, workouts.id))
+    .where(
+      and(
+        eq(workoutExercises.exerciseId, exerciseId),
+        eq(workouts.status, "finished"),
+        ne(workouts.id, excludeWorkoutId)
+      )
+    )
+    .orderBy(desc(workouts.startedAt), asc(workoutExercises.position))
+    .get();
+  if (!last) return [];
+  return q
+    .select()
+    .from(sets)
+    .where(and(eq(sets.workoutExerciseId, last.id), eq(sets.completed, 1)))
+    .orderBy(asc(sets.position))
+    .all();
+}
+
+/** previous-session sets per exercise id, for the "prev" ghost text */
+export function getPreviousSessions(workoutId: string, exerciseIds: readonly string[]): Record<string, SetRow[]> {
+  const out: Record<string, SetRow[]> = {};
+  for (const id of new Set(exerciseIds)) out[id] = previousSessionSets(db, id, workoutId);
+  return out;
+}
+
 function insertSet(tx: Tx, workoutExerciseId: string, now: number): SetRow {
   const own = tx.select().from(sets).where(eq(sets.workoutExerciseId, workoutExerciseId)).all();
-  let previous: SetRow | undefined = lastByPosition(own);
-  if (!previous) {
+  const we = tx.select().from(workoutExercises).where(eq(workoutExercises.id, workoutExerciseId)).get();
+  const session = we ? previousSessionSets(tx, we.exerciseId, we.workoutId) : [];
+  const previous = choosePrefill<Parameters<typeof prefillSet>[0]>(session, own.length, lastByPosition(own), () =>
     // first set of a repeated exercise: borrow from its earlier entry in this workout
-    const we = tx.select().from(workoutExercises).where(eq(workoutExercises.id, workoutExerciseId)).get();
-    if (we) {
-      const siblings = tx
-        .select({ s: sets, pos: workoutExercises.position })
-        .from(sets)
-        .innerJoin(workoutExercises, eq(sets.workoutExerciseId, workoutExercises.id))
-        .where(and(eq(workoutExercises.workoutId, we.workoutId), eq(workoutExercises.exerciseId, we.exerciseId)))
-        .orderBy(desc(workoutExercises.position), desc(sets.position))
-        .get();
-      previous = siblings?.s;
-    }
-  }
-  const values = prefillSet(previous);
+    we
+      ? tx
+          .select({ s: sets })
+          .from(sets)
+          .innerJoin(workoutExercises, eq(sets.workoutExerciseId, workoutExercises.id))
+          .where(and(eq(workoutExercises.workoutId, we.workoutId), eq(workoutExercises.exerciseId, we.exerciseId)))
+          .orderBy(desc(workoutExercises.position), desc(sets.position))
+          .get()?.s
+      : undefined
+  );
+  const values = prefillSet(previous, getDefaultUnit());
   const row = tx
     .insert(sets)
     .values({
@@ -160,7 +219,10 @@ export interface SetPatch {
 }
 
 export function updateSet(setId: string, patch: SetPatch, now = Date.now()): SetRow | undefined {
-  const { completed, ...rest } = patch;
+  const { completed, ...raw } = patch;
+  // server bounds: an out-of-range value would be rejected on every push
+  const rest = clampSetNumbers(raw);
+  if (typeof rest.note === "string") rest.note = rest.note.slice(0, MAX_NOTE_LENGTH);
   return write((tx) => {
     const row = tx
       .update(sets)
@@ -179,11 +241,97 @@ export function toggleComplete(setId: string, now = Date.now()): SetRow | undefi
   return updateSet(setId, { completed: !current.completed }, now);
 }
 
+function deleteSetTx(tx: Tx, setId: string): void {
+  const gone = tx.delete(sets).where(eq(sets.id, setId)).returning({ id: sets.id }).get();
+  if (gone) writeOutbox(tx, "set", setId, "delete", { id: setId });
+}
+
 /** positions are left with a gap: order is all they encode, and renumbering would spam the outbox */
 export function deleteSet(setId: string): void {
+  write((tx) => deleteSetTx(tx, setId));
+}
+
+function patchExercise(
+  tx: Tx,
+  id: string,
+  patch: Partial<Pick<WorkoutExerciseRow, "position" | "supersetGroup" | "restS" | "notes" | "exerciseId">>,
+  now: number
+): WorkoutExerciseRow | undefined {
+  const row = tx
+    .update(workoutExercises)
+    .set({ ...patch, updatedAt: now })
+    .where(eq(workoutExercises.id, id))
+    .returning()
+    .get();
+  if (row) writeOutbox(tx, "workout_exercise", row.id, "update", row);
+  return row;
+}
+
+/** null restores the app default */
+export function setExerciseRest(workoutExerciseId: string, restS: number | null, now = Date.now()): void {
+  write((tx) => patchExercise(tx, workoutExerciseId, { restS: restS == null ? null : clampRestS(restS) }, now));
+}
+
+/** swaps the exercise but keeps its logged sets, for "the rack was taken" */
+export function replaceExercise(workoutExerciseId: string, exerciseId: string, now = Date.now()): void {
+  write((tx) => patchExercise(tx, workoutExerciseId, { exerciseId }, now));
+}
+
+function relayout(
+  tx: Tx,
+  workoutId: string,
+  op: (list: OrderedExercise[]) => OrderedExercise[],
+  now: number
+): void {
+  const before = exerciseRows(tx, workoutId).map(({ id, position, supersetGroup }) => ({ id, position, supersetGroup }));
+  for (const p of diffExercises(before, op(before))) {
+    patchExercise(tx, p.id, { position: p.position, supersetGroup: p.supersetGroup }, now);
+  }
+}
+
+function indexIn(tx: Tx, workoutId: string, workoutExerciseId: string): number {
+  return exerciseRows(tx, workoutId).findIndex((e) => e.id === workoutExerciseId);
+}
+
+export function moveWorkoutExercise(workoutId: string, workoutExerciseId: string, dir: -1 | 1, now = Date.now()): void {
   write((tx) => {
-    const gone = tx.delete(sets).where(eq(sets.id, setId)).returning({ id: sets.id }).get();
-    if (gone) writeOutbox(tx, "set", setId, "delete", { id: setId });
+    const i = indexIn(tx, workoutId, workoutExerciseId);
+    if (i >= 0) relayout(tx, workoutId, (l) => moveExercise(l, i, dir), now);
+  });
+}
+
+/** superset this exercise with the one below it */
+export function linkWithNextExercise(workoutId: string, workoutExerciseId: string, now = Date.now()): void {
+  write((tx) => {
+    const i = indexIn(tx, workoutId, workoutExerciseId);
+    if (i >= 0) relayout(tx, workoutId, (l) => linkWithNext(l, i), now);
+  });
+}
+
+export function unlinkFromNextExercise(workoutId: string, workoutExerciseId: string, now = Date.now()): void {
+  write((tx) => {
+    const i = indexIn(tx, workoutId, workoutExerciseId);
+    if (i >= 0) relayout(tx, workoutId, (l) => unlinkFromNext(l, i), now);
+  });
+}
+
+function deleteExerciseTx(tx: Tx, workoutExerciseId: string): void {
+  // explicit set deletes first: the fk cascade would remove them without outbox rows
+  const own = tx.select({ id: sets.id }).from(sets).where(eq(sets.workoutExerciseId, workoutExerciseId)).all();
+  for (const s of own) deleteSetTx(tx, s.id);
+  const gone = tx
+    .delete(workoutExercises)
+    .where(eq(workoutExercises.id, workoutExerciseId))
+    .returning({ id: workoutExercises.id })
+    .get();
+  if (gone) writeOutbox(tx, "workout_exercise", workoutExerciseId, "delete", { id: workoutExerciseId });
+}
+
+export function removeExercise(workoutId: string, workoutExerciseId: string, now = Date.now()): void {
+  write((tx) => {
+    deleteExerciseTx(tx, workoutExerciseId);
+    // a superset of two loses its partner: the survivor drops its group
+    relayout(tx, workoutId, normalizeGroups, now);
   });
 }
 
@@ -202,17 +350,30 @@ export function discardWorkout(workoutId: string, now = Date.now()): void {
   write((tx) => closeWorkout(tx, workoutId, "discarded", now));
 }
 
-/** finishes, or discards when no set was completed. returns which happened. */
+/**
+ * finishes, or discards when no set was completed. a finish drops unchecked
+ * sets (and exercises left empty) so history only holds what was lifted.
+ */
 export function finishWorkout(workoutId: string, now = Date.now()): FinishDecision {
   return write((tx) => {
-    const done = tx
-      .select({ completed: sets.completed })
-      .from(sets)
-      .innerJoin(workoutExercises, eq(sets.workoutExerciseId, workoutExercises.id))
-      .where(eq(workoutExercises.workoutId, workoutId))
-      .all();
-    const decision = decideFinish(done);
-    closeWorkout(tx, workoutId, decision === "finish" ? "finished" : "discarded", now);
-    return decision;
+    const exRows = exerciseRows(tx, workoutId);
+    const setRows = exRows.length
+      ? tx
+          .select({ id: sets.id, completed: sets.completed, workoutExerciseId: sets.workoutExerciseId })
+          .from(sets)
+          .where(
+            inArray(
+              sets.workoutExerciseId,
+              exRows.map((e) => e.id)
+            )
+          )
+          .all()
+      : [];
+    const plan = planFinish(exRows.map((e) => ({ id: e.id, sets: setRows.filter((s) => s.workoutExerciseId === e.id) })));
+    for (const id of plan.deleteSetIds) deleteSetTx(tx, id);
+    for (const id of plan.deleteExerciseIds) deleteExerciseTx(tx, id);
+    if (plan.deleteExerciseIds.length) relayout(tx, workoutId, normalizeGroups, now);
+    closeWorkout(tx, workoutId, plan.decision === "finish" ? "finished" : "discarded", now);
+    return plan.decision;
   });
 }

@@ -1,4 +1,4 @@
-import { LB_PER_KG, type WeightUnit } from "lift-core";
+import { LB_PER_KG, type LinkRole, type WeightUnit } from "lift-core";
 import type { IngestSummary } from "./plan";
 
 // one-line, lowercase, human summary for api responses and the bot reply.
@@ -6,7 +6,7 @@ import type { IngestSummary } from "./plan";
 
 export interface LinkedActivity {
   activityId: number;
-  role: "primary" | "duplicate" | "continuation";
+  role: LinkRole;
   method: "auto" | "manual";
   deltaMin: number;
   sportType: string;
@@ -45,7 +45,12 @@ export function formatVolume(volumeKg: number, unit: WeightUnit): string {
 
 export function formatWatch(links: readonly LinkedActivity[]): string {
   const primary = links.find((l) => l.role === "primary");
-  if (!primary) return "watch: not linked yet";
+  if (!primary) {
+    const overrun = links.find((l) => l.role === "overrun");
+    // the watch was left running from an earlier start; say so instead of a misleading time
+    if (overrun) return `watch: linked (inside ${sportLabel(overrun.sportType)} from ${overrun.localTime})`;
+    return "watch: not linked yet";
+  }
   const extra = links.filter((l) => l.role === "continuation").length;
   const more = extra ? ` +${extra} more` : "";
   return `watch: linked (${sportLabel(primary.sportType)} ${primary.localTime}${more})`;

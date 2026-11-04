@@ -41,3 +41,26 @@ export function customToExercise(row: CustomExerciseLike): Exercise {
     curated: false,
   };
 }
+
+export interface CustomUsage {
+  workoutExercises: number;
+  templateExercises: number;
+  /** other customs merged into this one; deleting it would leave their mergedInto dangling */
+  mergedFrom: number;
+}
+
+export function isCustomInUse(u: CustomUsage): boolean {
+  return u.workoutExercises > 0 || u.templateExercises > 0 || u.mergedFrom > 0;
+}
+
+/** "3 workout entries and 1 merged exercise" for the in-use prompt */
+export function describeCustomUsage(u: CustomUsage): string {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  return [
+    u.workoutExercises ? plural(u.workoutExercises, "workout entry", "workout entries") : "",
+    u.templateExercises ? plural(u.templateExercises, "template entry", "template entries") : "",
+    u.mergedFrom ? plural(u.mergedFrom, "merged exercise", "merged exercises") : "",
+  ]
+    .filter(Boolean)
+    .join(" and ");
+}

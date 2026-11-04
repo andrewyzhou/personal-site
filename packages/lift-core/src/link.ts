@@ -68,7 +68,16 @@ export function linkWorkoutToActivities(
       primary = s;
     }
   }
-  if (primary === null) return [];
+  if (primary === null) {
+    // forgot to stop: the workout starts inside a recording that began earlier than
+    // the window. the latest-starting container is the most specific one.
+    let container: Span | null = null;
+    for (const s of spans) {
+      if (s.start <= w && w <= s.end && (container === null || s.start > container.start)) container = s;
+    }
+    if (container === null) return [];
+    return [{ activityId: container.c.id, role: "overrun", deltaMin: Math.round(container.delta) }];
+  }
 
   const roles = new Map<Span, LinkRole>([[primary, "primary"]]);
   const p = primary;
