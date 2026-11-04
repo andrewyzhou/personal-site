@@ -13,6 +13,7 @@ function deps(over: Partial<RebuildDeps> & { statuses?: Record<number, Republish
     tick: (ms) => (clock += ms),
     now: () => clock,
     selectPending: vi.fn(async (limit: number, exclude: number[]) => [...flagged].filter((id) => !exclude.includes(id)).slice(0, limit)),
+    markAttempted: vi.fn(async () => undefined),
     countPending: vi.fn(async () => flagged.size),
     invalidate: vi.fn(async () => undefined),
     republish: vi.fn(async (id: number) => {
@@ -48,6 +49,8 @@ describe("republishPending", () => {
     expect(r.failedIds).toEqual([4, 2]);
     expect(r.remaining).toBe(2);
     expect([...d.flagged].sort()).toEqual([2, 4]);
+    // every attempt is stamped first, so failing rows move to the back of the queue
+    expect((d.markAttempted as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0])).toEqual([5, 4, 3, 2, 1]);
   });
 
   it("stops at the time budget", async () => {

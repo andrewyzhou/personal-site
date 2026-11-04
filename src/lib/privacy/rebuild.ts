@@ -2,7 +2,7 @@
 // an older processing version, newest first, within a time budget. a failure
 // leaves the row pending (republish only clears the flag on success).
 
-import { and, desc, notInArray } from "drizzle-orm";
+import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import { getDb, activities } from "../db";
 import { invalidateCache } from "../cache";
 import { log } from "../log";
@@ -15,6 +15,7 @@ const MAX_EXCLUDE = 1000;
 
 export interface RebuildDeps {
   selectPending(limit: number, excludeIds: number[]): Promise<number[]>;
+  markAttempted(id: number): Promise<void>;
   countPending(): Promise<number>;
   republish(id: number): Promise<RepublishResult>;
   invalidate(): Promise<void>;
@@ -57,9 +58,14 @@ export function defaultRebuildDeps(): RebuildDeps {
         .select({ id: activities.id })
         .from(activities)
         .where(where)
-        .orderBy(desc(activities.startDateUtc), desc(activities.id))
+        // never-attempted first, then least recently attempted: a row that keeps
+        // failing can't block the rest of the queue
+        .orderBy(sql`${activities.republishAttemptedAt} asc nulls first`, desc(activities.startDateUtc), desc(activities.id))
         .limit(limit);
       return rows.map((r) => r.id);
+    },
+    async markAttempted(id) {
+      await getDb().update(activities).set({ republishAttemptedAt: new Date() }).where(eq(activities.id, id));
     },
     countPending,
     republish: (id) => republish(id),
@@ -84,6 +90,7 @@ export async function republishPending(opts: RebuildOptions = {}): Promise<Rebui
       break;
     }
     try {
+      await deps.markAttempted(id);
       const r = await deps.republish(id);
       results.push({ id, status: r.status });
     } catch (error) {

@@ -102,6 +102,8 @@ export const activities = pgTable(
     trackBbox: jsonb("track_bbox").$type<RouteBounds>(),
     // set by zone/settings/photo edits; the rebuild job republishes and clears it
     needsRepublish: boolean("needs_republish").notNull().default(false),
+    // last rebuild-job attempt: failing rows go to the back of the queue
+    republishAttemptedAt: timestamp("republish_attempted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },

@@ -12,6 +12,7 @@ ALTER TABLE "activities" ADD COLUMN "fog_events" jsonb;--> statement-breakpoint
 ALTER TABLE "activities" ADD COLUMN "fog_shapes" jsonb;--> statement-breakpoint
 ALTER TABLE "activities" ADD COLUMN "track_bbox" jsonb;--> statement-breakpoint
 ALTER TABLE "activities" ADD COLUMN "needs_republish" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "activities" ADD COLUMN "republish_attempted_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "activity_photos" ADD COLUMN "taken_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "activity_photos" ADD COLUMN "gps_lat" double precision;--> statement-breakpoint
 ALTER TABLE "activity_photos" ADD COLUMN "gps_lng" double precision;--> statement-breakpoint

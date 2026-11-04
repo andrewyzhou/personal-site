@@ -1,5 +1,5 @@
 {
-  "id": "295a1009-da9d-4b7a-8f29-e85d57a79d9a",
+  "id": "215806f2-3772-4a6a-ad30-832733f304b6",
   "prevId": "0076b567-ba45-4e72-b9dc-86ebd3cf9b6e",
   "version": "7",
   "dialect": "postgresql",
@@ -310,6 +310,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "republish_attempted_at": {
+          "name": "republish_attempted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
