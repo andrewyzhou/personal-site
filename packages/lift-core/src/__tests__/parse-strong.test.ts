@@ -405,6 +405,20 @@ describe("parseStrongText: inline variations", () => {
     expect(w.exercises.map((e) => e.name)).toEqual(["Ex", "Curl (Cable)"]);
   });
 
+  it("keeps prose between set lines as a note, not a new exercise", () => {
+    const w = parseStrongText(
+      "Legs\nWednesday, November 4, 2026 at 6:12 PM\n\nSquat\nSet 1: 225 lb × 5\nfelt 2x harder than last week\nSet 2: 225 lb × 5\n"
+    );
+    expect(w.exercises).toHaveLength(1);
+    expect(w.exercises[0].sets).toHaveLength(2);
+    expect(w.exercises[0].notes).toEqual(["felt 2x harder than last week"]);
+  });
+
+  it("splits mid-block on a catalog name without an equipment suffix", () => {
+    const w = parseStrongText(head + "Set 1: 10 lb × 5\nPull Up\nSet 1: 12 reps\n");
+    expect(w.exercises.map((e) => e.name)).toEqual(["Ex", "Pull Up"]);
+  });
+
   it("keeps a stray blank line inside an exercise on the same exercise", () => {
     const w = parseStrongText(head + "Set 1: 10 lb × 5\n\nSet 2: 10 lb × 5\n");
     expect(w.exercises).toHaveLength(1);

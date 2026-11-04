@@ -1,3 +1,4 @@
+import { resolveExerciseName } from "./catalog";
 import type {
   DistanceUnit,
   ParsedExercise,
@@ -306,6 +307,15 @@ function looksLikeExerciseName(line: string): boolean {
   return /^[\p{L}\p{N}][\p{L}\p{N} '’()\-/&.,+]*$/u.test(line) && /\p{L}{2,}/u.test(line);
 }
 
+/**
+ * mid-block, prose like "felt 2x harder" also passes the name shape, so only a
+ * catalog hit or strong's "(Equipment)" suffix starts a new exercise there
+ */
+function startsNewExercise(line: string): boolean {
+  if (!looksLikeExerciseName(line)) return false;
+  return /\([^()]+\)\s*$/.test(line) || resolveExerciseName(line) !== undefined;
+}
+
 /** malformed measurements or noise: worth a warning instead of being kept as a note */
 function looksLikeGarbage(line: string): boolean {
   if (!/\p{L}{2,}/u.test(line)) return true;
@@ -439,7 +449,7 @@ function parseBlock(block: Line[], workout: ParsedWorkout, warn: Warn, setLines:
         // the first non-set line of a block names the exercise
         ex = { name: l.text, sets: [], notes: [] };
         workout.exercises.push(ex);
-      } else if (seenSet && setsFollow && looksLikeExerciseName(l.text)) {
+      } else if (seenSet && setsFollow && startsNewExercise(l.text)) {
         // exercises not separated by a blank line
         ex = { name: l.text, sets: [], notes: [] };
         workout.exercises.push(ex);
