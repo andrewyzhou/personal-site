@@ -1,0 +1,85 @@
+// hand-written migrations. MIGRATIONS[i] takes the db from user_version i to
+// i + 1. append only: never edit a shipped entry, add a new one instead.
+// no expo imports here so the sql can be exercised under node:sqlite in tests.
+
+export const MIGRATIONS: readonly (readonly string[])[] = [
+  // 1: initial schema
+  [
+    `CREATE TABLE workouts (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'finished', 'discarded')),
+      notes TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX workouts_status_idx ON workouts (status)`,
+    `CREATE INDEX workouts_started_at_idx ON workouts (started_at)`,
+
+    `CREATE TABLE workout_exercises (
+      id TEXT PRIMARY KEY NOT NULL,
+      workout_id TEXT NOT NULL REFERENCES workouts (id) ON DELETE CASCADE,
+      exercise_id TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      notes TEXT,
+      superset_group INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX workout_exercises_workout_idx ON workout_exercises (workout_id, position)`,
+    `CREATE INDEX workout_exercises_exercise_idx ON workout_exercises (exercise_id)`,
+
+    `CREATE TABLE sets (
+      id TEXT PRIMARY KEY NOT NULL,
+      workout_exercise_id TEXT NOT NULL REFERENCES workout_exercises (id) ON DELETE CASCADE,
+      position INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'normal' CHECK (kind IN ('warmup', 'normal', 'drop', 'failure')),
+      weight REAL,
+      unit TEXT NOT NULL DEFAULT 'lb' CHECK (unit IN ('lb', 'kg')),
+      reps INTEGER,
+      duration_s INTEGER,
+      distance_m REAL,
+      rpe REAL,
+      completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+      note TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX sets_workout_exercise_idx ON sets (workout_exercise_id, position)`,
+
+    `CREATE TABLE custom_exercises (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      equipment TEXT NOT NULL DEFAULT 'other',
+      tracking TEXT NOT NULL DEFAULT 'weight_reps',
+      "primary" TEXT NOT NULL DEFAULT '[]',
+      secondary TEXT NOT NULL DEFAULT '[]',
+      archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+
+    `CREATE TABLE outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      entity TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      op TEXT NOT NULL CHECK (op IN ('insert', 'update', 'delete')),
+      payload TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      synced_at INTEGER
+    )`,
+    `CREATE INDEX outbox_unsynced_idx ON outbox (synced_at, id)`,
+  ],
+];
+
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
+/** migration batches still to apply for a db currently at `version` */
+export function pendingMigrations(version: number): { version: number; statements: readonly string[] }[] {
+  return MIGRATIONS.slice(Math.max(0, version)).map((statements, i) => ({
+    version: Math.max(0, version) + i + 1,
+    statements,
+  }));
+}

@@ -1,0 +1,19 @@
+{
+  // lift-core must stay runtime-agnostic (expo, next, node scripts): no dom or
+  // node types are visible to the library sources. tests run under vitest from
+  // the repo root and are typechecked by the root tsconfig instead.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": [],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/__tests__/**"]
+}
