@@ -9,6 +9,7 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  unique,
 } from "drizzle-orm/pg-core";
 import { isNotNull } from "drizzle-orm";
 
@@ -63,6 +64,11 @@ export const activities = pgTable(
     // always collide regardless of trim settings; inserts are conflict-do-nothing
     dedupeKey: text("dedupe_key").notNull().unique(),
     hidden: boolean("hidden").notNull().default(false),
+    // republish bookkeeping (src/lib/republish.ts is the only writer of the
+    // published route/stat columns above). 0 = legacy pipeline output
+    processingVersion: integer("processing_version").notNull().default(0),
+    publishedInputsHash: text("published_inputs_hash"),
+    canonicalTrackKey: text("canonical_track_key"), // private bucket key, never public
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
@@ -86,10 +92,108 @@ export const activityPhotos = pgTable(
     height: integer("height"),
     position: integer("position").notNull().default(0),
     caption: text("caption"),
+    // private raw-store copy of the photo bytes (set by migrate-originals-private)
+    originalSha256: text("original_sha256"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (t) => [index("activity_photos_activity_idx").on(t.activityId, t.position)]
 );
+
+// ---------------------------------------------------------------------------
+// activities v2 data layer. raw inputs are content-addressed and write-once in a
+// private bucket; everything public is regenerated from them by republish().
+
+// manifest of every object in the private raw bucket. sha256 of the exact bytes
+// is the identity; rows are insert-only (conflict-do-nothing), never updated.
+export const rawObjects = pgTable(
+  "raw_objects",
+  {
+    sha256: text("sha256").primaryKey(),
+    key: text("key").notNull().unique(), // object key in R2_RAW_BUCKET
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    contentType: text("content_type").notNull(),
+    // what the bytes are: 'device-file' | 'strava-detail' | 'strava-streams' |
+    // 'strava-laps' | 'strava-photos' | 'intervals-activity' | 'strava-export-file' |
+    // 'strava-export-manifest' | 'photo-original' | 'text' | …
+    kind: text("kind").notNull(),
+    originalFilename: text("original_filename"),
+    // where the bytes came from (export path, api url, legacy public pathname…)
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("raw_objects_kind_idx").on(t.kind)]
+);
+
+// many sources per activity (replaces the single source/external_id pair, which
+// stays on activities for now). one row per (activity, provider identity, kind,
+// raw object); a newer snapshot of the same kind is a new row, latest wins.
+// raw_sha256 is deliberately not a foreign key: backfilled rows reference
+// originals still being copied into the raw store (the integrity audit checks it).
+export const activitySources = pgTable(
+  "activity_sources",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    activityId: bigint("activity_id", { mode: "number" })
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    // 'strava' | 'intervals-icu' | 'upload' | 'manual'
+    provider: text("provider").notNull(),
+    externalId: text("external_id"),
+    // 'device-file' | 'strava-streams' | 'strava-detail' | 'strava-laps' |
+    // 'strava-photos' | 'intervals-activity' | 'summary'
+    kind: text("kind").notNull(),
+    rawSha256: text("raw_sha256"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("activity_sources_identity_uq")
+      .on(t.activityId, t.provider, t.externalId, t.kind, t.rawSha256)
+      .nullsNotDistinct(),
+    index("activity_sources_activity_idx").on(t.activityId),
+    index("activity_sources_external_idx").on(t.provider, t.externalId),
+    index("activity_sources_raw_idx").on(t.rawSha256),
+  ]
+);
+
+// declarative, revertible edits applied at publish time. never deleted: a revert
+// stamps reverted_at, and republish ignores reverted rows.
+//   trim     { startM, endM }
+//   cut      { fromS, toS }            (A2)
+//   split    { atS }                   (A2)
+//   merge    { withActivityId }        (A2)
+//   override { field: value, … }       (whitelisted published stat fields)
+export const activityEdits = pgTable(
+  "activity_edits",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    activityId: bigint("activity_id", { mode: "number" })
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    params: jsonb("params").$type<Record<string, unknown>>().notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    revertedAt: timestamp("reverted_at", { withTimezone: true, mode: "date" }),
+  },
+  (t) => [index("activity_edits_activity_idx").on(t.activityId, t.id)]
+);
+
+// private polygons. applied only at publish time (A1); never shipped to clients.
+export const privacyZones = pgTable("privacy_zones", {
+  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+  name: text("name").notNull().default(""),
+  // geojson Polygon coordinates: rings of [lng, lat]
+  polygon: jsonb("polygon").$type<number[][][]>().notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+export type RawObjectRow = typeof rawObjects.$inferSelect;
+export type ActivitySourceRow = typeof activitySources.$inferSelect;
+export type NewActivitySourceRow = typeof activitySources.$inferInsert;
+export type ActivityEditRow = typeof activityEdits.$inferSelect;
+export type PrivacyZoneRow = typeof privacyZones.$inferSelect;
 
 export type ActivityRow = typeof activities.$inferSelect;
 export type NewActivityRow = typeof activities.$inferInsert;

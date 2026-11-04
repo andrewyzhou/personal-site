@@ -118,3 +118,52 @@ export async function r2Usage(prefix?: string): Promise<{ totalBytes: number; co
   } while (token);
   return { totalBytes, count };
 }
+
+// ---------------------------------------------------------------------------
+// bucket-explicit object access, used by the private raw store. nothing here
+// builds a public url: objects in other buckets are reachable only with
+// credentials.
+
+function endpointFor(bucket: string): string {
+  return `https://${requireEnv("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${bucket}`;
+}
+
+export function r2BucketFetch(bucket: string, key: string, init?: RequestInit): Promise<Response> {
+  return client().fetch(`${endpointFor(bucket)}/${encodeKey(key)}`, init);
+}
+
+// list keys (and sizes) under a prefix in any bucket
+export async function r2BucketList(
+  bucket: string,
+  prefix?: string
+): Promise<{ key: string; size: number }[]> {
+  const out: { key: string; size: number }[] = [];
+  let token: string | undefined;
+  do {
+    const url = new URL(endpointFor(bucket));
+    url.searchParams.set("list-type", "2");
+    url.searchParams.set("max-keys", "1000");
+    if (prefix) url.searchParams.set("prefix", prefix);
+    if (token) url.searchParams.set("continuation-token", token);
+    const res = await client().fetch(url.toString());
+    if (!res.ok) throw new Error(`r2 list failed: ${res.status}`);
+    const xml = await res.text();
+    for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+      const key = m[1].match(/<Key>([^<]+)<\/Key>/)?.[1];
+      const size = m[1].match(/<Size>(\d+)<\/Size>/)?.[1];
+      if (key && size) out.push({ key: decodeXmlEntities(key), size: Number(size) });
+    }
+    const next = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
+    token = next ? decodeXmlEntities(next[1]) : undefined;
+  } while (token);
+  return out;
+}
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
