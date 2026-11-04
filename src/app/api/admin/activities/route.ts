@@ -14,6 +14,7 @@ import { republish } from "@/lib/republish";
 import { getDb, activityPhotos } from "@/lib/db";
 import { invalidateCache } from "@/lib/cache";
 import { r2Get, r2PublicUrl } from "@/lib/r2";
+import { parsePhotoList, type PhotoInput } from "@/app/api/admin/photos/photo-input";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,8 @@ interface PublishBody {
   trimStartM?: number;
   trimEndM?: number;
   utcOffsetMinFallback?: number;
-  photos?: { pathname: string; url: string; width?: number; height?: number; caption?: string | null }[];
+  // private fields (originalSha256, takenAt, gpsLat/gpsLng) ride along per photo
+  photos?: unknown;
 }
 
 // the stored original: private raw store by sha when it exists, else the
@@ -86,6 +88,12 @@ export async function POST(request: Request) {
   if (!body.name || typeof body.name !== "string") {
     return NextResponse.json({ ok: false, error: "name is required" }, { status: 400 });
   }
+  let photos: PhotoInput[] = [];
+  if (body.photos !== undefined && body.photos !== null) {
+    const parsedPhotos = parsePhotoList(body.photos);
+    if ("error" in parsedPhotos) return NextResponse.json({ ok: false, error: parsedPhotos.error }, { status: 400 });
+    photos = parsedPhotos.photos;
+  }
 
   try {
     const original = await loadOriginal(body);
@@ -128,33 +136,38 @@ export async function POST(request: Request) {
     });
     // always recorded, even 0/0, so the default privacy trim never applies to an upload
     await addActivityEdit(outcome.id, "trim", { startM: trimStartM, endM: trimEndM });
-    let status = "not-run";
-    try {
-      status = (await republish(outcome.id)).status;
-    } catch (error) {
-      // the inserted row already carries the same trim's stats; a later rebuild catches up
-      log.error("admin:publish", `republish failed for activity ${outcome.id}`, error);
-    }
-
-    if (body.photos && body.photos.length > 0) {
+    // photos before republish: their pins are computed from the private exif
+    if (photos.length > 0) {
       try {
         await getDb()
           .insert(activityPhotos)
           .values(
-            body.photos.map((p, i) => ({
+            photos.map((p, i) => ({
               activityId: outcome.id,
               blobUrl: p.url,
               blobPathname: p.pathname,
-              width: p.width ?? null,
-              height: p.height ?? null,
+              width: p.width,
+              height: p.height,
               position: i,
-              caption: p.caption ?? null,
+              caption: p.caption,
+              originalSha256: p.originalSha256 ?? null,
+              takenAt: p.takenAt ?? null,
+              gpsLat: p.gps?.lat ?? null,
+              gpsLng: p.gps?.lng ?? null,
             }))
           );
       } catch (error) {
         // recoverable via PATCH; the activity itself is safely published
         log.error("admin:publish", `photo insert failed for activity ${outcome.id}`, error);
       }
+    }
+
+    let status = "not-run";
+    try {
+      status = (await republish(outcome.id)).status;
+    } catch (error) {
+      // the inserted row already carries the same trim's stats; a later rebuild catches up
+      log.error("admin:publish", `republish failed for activity ${outcome.id}`, error);
     }
 
     await invalidateCache("activities_list", "activities_latest");

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import RouteMap from "@/components/RouteMap";
-import { prepareImage } from "@/lib/client/image";
+import { uploadActivityPhoto, type OriginalStatus, type PhotoPrivateFields } from "@/lib/client/photo-original";
 import {
   DURATION_ONLY_TYPES,
   PACE_TYPES,
@@ -46,14 +46,15 @@ interface Draft {
   duplicate: { id: number; name: string; date: string } | null;
 }
 
-interface PhotoItem {
+interface PhotoItem extends Partial<PhotoPrivateFields> {
   key: string;
-  status: "converting" | "uploading" | "done" | "error";
+  status: "uploading" | "done" | "error";
   previewUrl: string;
   url?: string;
   pathname?: string;
   width?: number;
   height?: number;
+  originalStatus?: OriginalStatus;
 }
 
 type Phase =
@@ -178,24 +179,13 @@ export default function UploadFlow() {
     for (const file of list) {
       const key = `${file.name}-${Date.now()}-${Math.random()}`;
       const previewUrl = URL.createObjectURL(file);
-      setPhotos((prev) => [...prev, { key, status: "converting", previewUrl }]);
+      setPhotos((prev) => [...prev, { key, status: "uploading", previewUrl }]);
       try {
-        const prepared = await prepareImage(file);
-        setPhotos((prev) => prev.map((p) => (p.key === key ? { ...p, status: "uploading" } : p)));
-        const form = new FormData();
-        form.append("file", prepared.blob, "photo.jpg");
-        form.append("width", String(prepared.width));
-        form.append("height", String(prepared.height));
-        const res = await fetch("/api/admin/photos", { method: "POST", body: form });
-        const body = await res.json().catch(() => null);
-        if (!res.ok || !body?.ok) throw new Error(body?.error ?? "upload failed");
-        setPhotos((prev) =>
-          prev.map((p) =>
-            p.key === key
-              ? { ...p, status: "done", url: body.url, pathname: body.pathname, width: body.width, height: body.height }
-              : p
-          )
-        );
+        // public copy + private original in parallel; an exif time without an
+        // offset is read in the activity's time zone
+        const utcOffsetMin = draft?.hasLocalTime ? draft.utcOffsetMin : -new Date().getTimezoneOffset();
+        const up = await uploadActivityPhoto(file, { utcOffsetMin });
+        setPhotos((prev) => prev.map((p) => (p.key === key ? { ...p, ...up, status: "done" } : p)));
       } catch {
         setPhotos((prev) => prev.map((p) => (p.key === key ? { ...p, status: "error" } : p)));
       }
@@ -223,7 +213,16 @@ export default function UploadFlow() {
           utcOffsetMinFallback: draft.hasLocalTime ? undefined : -new Date().getTimezoneOffset(),
           photos: photos
             .filter((p) => p.status === "done")
-            .map((p) => ({ pathname: p.pathname!, url: p.url!, width: p.width, height: p.height })),
+            .map((p) => ({
+              pathname: p.pathname!,
+              url: p.url!,
+              width: p.width,
+              height: p.height,
+              originalSha256: p.originalSha256 ?? null,
+              takenAt: p.takenAt ?? null,
+              gpsLat: p.gpsLat ?? null,
+              gpsLng: p.gpsLng ?? null,
+            })),
         }),
       });
       const body = await res.json().catch(() => null);
@@ -308,6 +307,7 @@ export default function UploadFlow() {
       ? { label: "avg speed", value: formatMph(liveStats?.avgSpeedMs ?? 0) }
       : null;
   const durationOnly = DURATION_ONLY_TYPES.has(sportType);
+  const photosUploading = photos.some((p) => p.status === "uploading");
 
   return (
     <div className="flex flex-col" style={{ gap: "16px" }}>
@@ -440,9 +440,9 @@ export default function UploadFlow() {
                 >
                   ×
                 </button>
-                {p.status !== "done" && (
+                {(p.status !== "done" || p.originalStatus === "failed") && (
                   <span className="font-sans text-gray text-xs" style={{ position: "absolute", bottom: 2, left: 4 }}>
-                    {p.status === "error" ? "failed" : `${p.status}…`}
+                    {p.status === "error" ? "failed" : p.status === "uploading" ? "uploading…" : "no original"}
                   </span>
                 )}
               </div>
@@ -462,11 +462,11 @@ export default function UploadFlow() {
 
       <button
         onClick={publish}
-        disabled={phase.type === "publishing" || !!d.duplicate || !name.trim()}
+        disabled={phase.type === "publishing" || !!d.duplicate || !name.trim() || photosUploading}
         className="card-bg rounded-lg font-sans text-off-white text-lg"
-        style={{ padding: "14px", width: "100%", opacity: phase.type === "publishing" || d.duplicate ? 0.5 : 1 }}
+        style={{ padding: "14px", width: "100%", opacity: phase.type === "publishing" || d.duplicate || photosUploading ? 0.5 : 1 }}
       >
-        {phase.type === "publishing" ? "publishing…" : "publish"}
+        {phase.type === "publishing" ? "publishing…" : photosUploading ? "uploading photos…" : "publish"}
       </button>
     </div>
   );

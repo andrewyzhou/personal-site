@@ -18,8 +18,10 @@ interface StoredActivities {
 
 const CACHE_KEY = "strava_activities";
 
-// GET: Return cached activities
-export async function GET() {
+// GET: return cached activities. legacy pre-database cache that bypasses the
+// public serializer (visibility switches, published times), so admin only
+export async function GET(request: Request) {
+  if (!(await isAdminRequest(request))) return unauthorizedResponse();
   try {
     const stored = await redis.get<StoredActivities>(CACHE_KEY);
 

@@ -129,3 +129,114 @@ describe("PATCH /api/admin/activities/[id]", () => {
     expect(edits).toHaveLength(0);
   });
 });
+
+describe("PATCH photos: private fields", () => {
+  const SHA_A = "a".repeat(64);
+  const SHA_B = "b".repeat(64);
+  const taken = new Date("2026-10-03T15:10:00Z");
+
+  beforeEach(() => {
+    photoRows.value = [
+      {
+        pathname: "p/a.jpg", width: 2000, height: 1500, originalSha256: SHA_A, takenAt: taken,
+        gpsLat: 37.87, gpsLng: -122.26, pinLat: 37.87, pinLng: -122.26,
+      },
+      {
+        pathname: "p/b.jpg", width: 800, height: 600, originalSha256: null, takenAt: null,
+        gpsLat: null, gpsLng: null, pinLat: null, pinLng: null,
+      },
+    ];
+  });
+
+  it("keeps every private field (and a still-valid pin) for photos it already had", async () => {
+    const res = await patch({ photos: [{ pathname: "p/b.jpg", url: "ub" }, { pathname: "p/a.jpg", url: "ua" }] });
+    expect(res.status).toBe(200);
+    expect(inserted).toEqual([
+      expect.objectContaining({ blobPathname: "p/b.jpg", position: 0, width: 800, height: 600, originalSha256: null, takenAt: null, gpsLat: null, gpsLng: null }),
+      expect.objectContaining({
+        blobPathname: "p/a.jpg", position: 1, width: 2000, height: 1500, originalSha256: SHA_A,
+        takenAt: taken, gpsLat: 37.87, gpsLng: -122.26, pinLat: 37.87, pinLng: -122.26,
+      }),
+    ]);
+  });
+
+  it("new values win over stored ones; a moved photo loses its old pin until republish", async () => {
+    await patch({
+      photos: [
+        { pathname: "p/a.jpg", url: "ua", originalSha256: SHA_B, takenAt: "2026-10-03T16:00:00Z", gpsLat: 1.5, gpsLng: 2.5 },
+        { pathname: "p/new.jpg", url: "un", gpsLat: 3, gpsLng: 4 },
+      ],
+    });
+    expect(inserted).toEqual([
+      expect.objectContaining({
+        blobPathname: "p/a.jpg", originalSha256: SHA_B, takenAt: new Date("2026-10-03T16:00:00Z"),
+        gpsLat: 1.5, gpsLng: 2.5, pinLat: null, pinLng: null,
+      }),
+      expect.objectContaining({ blobPathname: "p/new.jpg", originalSha256: null, takenAt: null, gpsLat: 3, gpsLng: 4, pinLat: null }),
+    ]);
+  });
+
+  it("republishes after a photo change (pins)", async () => {
+    await patch({ photos: [{ pathname: "p/a.jpg", url: "ua" }] });
+    expect(republish).toHaveBeenCalledWith(5);
+    expect(edits).toHaveLength(0);
+  });
+
+  it("a republish failure after a photo change doesn't fail the edit", async () => {
+    republish.mockRejectedValue(new Error("r2 down"));
+    const res = await patch({ name: "renamed", photos: [{ pathname: "p/a.jpg", url: "ua" }] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(inserted).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ name: "renamed" });
+    expect(revalidate).toHaveBeenCalledWith("/activities/5");
+  });
+
+  it("rejects invalid private fields before writing anything", async () => {
+    for (const bad of [
+      { pathname: "p/a.jpg", url: "ua", originalSha256: "nope" },
+      { pathname: "p/a.jpg", url: "ua", takenAt: "soon" },
+      { pathname: "p/a.jpg", url: "ua", gpsLat: 10, gpsLng: 200 },
+      { pathname: "p/a.jpg", url: "ua", gpsLng: 20 },
+    ]) {
+      expect((await patch({ photos: [bad] })).status).toBe(400);
+    }
+    expect(updates).toHaveLength(0);
+    expect(inserted).toHaveLength(0);
+  });
+});
+
+describe("PATCH visibility", () => {
+  it.each([
+    ["public", { hidden: false, mapHidden: false }],
+    ["hide-map", { hidden: false, mapHidden: true }],
+    ["private", { hidden: true, mapHidden: false }],
+  ])("%s → columns", async (visibility, cols) => {
+    const res = await patch({ visibility });
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject(cols);
+    // a serializer switch: no edit, no rebuild
+    expect(republish).not.toHaveBeenCalled();
+    expect(edits).toHaveLength(0);
+    expect(invalidate).toHaveBeenCalledWith("activities_list", "activities_latest");
+    expect(revalidate).toHaveBeenCalledWith("/activities/5");
+  });
+
+  it("hrHidden is its own switch", async () => {
+    await patch({ hrHidden: true });
+    expect(updates[0]).toMatchObject({ hrHidden: true });
+    expect(updates[0]).not.toHaveProperty("hidden");
+    expect(updates[0]).not.toHaveProperty("mapHidden");
+  });
+
+  it("visibility wins over the legacy hidden flag", async () => {
+    await patch({ hidden: true, visibility: "hide-map" });
+    expect(updates[0]).toMatchObject({ hidden: false, mapHidden: true });
+  });
+
+  it("rejects unknown values", async () => {
+    expect((await patch({ visibility: "friends" })).status).toBe(400);
+    expect((await patch({ hrHidden: "yes" })).status).toBe(400);
+    expect(updates).toHaveLength(0);
+  });
+});

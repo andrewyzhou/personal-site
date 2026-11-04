@@ -1,21 +1,44 @@
-// republish against a pre-migration database: synthesizes the v2 sources/edits
-// from the legacy columns exactly like drizzle/0003_activities_v2_backfill.sql
-// would, so a dry run can prove republish reproduces the legacy output before
-// anything is migrated. read-only by construction: every write dep throws.
+// republish against a database that's behind the schema, read-only by
+// construction (every write dep throws):
+//   - partially migrated (e.g. 0004 without 0005): only the columns that exist
+//     are selected, the rest read as defaults (fillActivityRow), and the real
+//     sources/edits/zones tables are used (readOnlyDeps)
+//   - pre-0002: the v2 sources/edits are synthesized from the legacy columns
+//     exactly like drizzle/0003_activities_v2_backfill.sql would (legacyDeps)
 
 import { getTableColumns } from "drizzle-orm";
-import { activities, type ActivityRow } from "./db/schema";
+import { activities, type ActivityRow, type PrivacySettings } from "./db/schema";
 import { legacyProvider } from "./legacy-sources";
-import type { EditInput, PublicColumns, RepublishDeps, RepublishResult, SourceInput, ZoneInput } from "./republish";
+import { DEFAULT_PRIVACY_SETTINGS } from "./privacy/settings";
+import type {
+  EditInput,
+  PhotoInput,
+  PublicColumns,
+  RepublishDeps,
+  RepublishResult,
+  SourceInput,
+  ZoneInput,
+} from "./republish";
 
 // columns that exist before migrations 0002/0003 (processing_version,
 // published_inputs_hash, canonical_track_key are added by 0002)
-export type LegacyActivityRow = Omit<ActivityRow, "processingVersion" | "publishedInputsHash" | "canonicalTrackKey">;
+// (and the privacy columns added by 0005)
+type V2Column =
+  | "processingVersion" | "publishedInputsHash" | "canonicalTrackKey"
+  | "mapHidden" | "hrHidden" | "publishedLocalTime" | "publishedStartUtc"
+  | "fogEvents" | "fogShapes" | "trackBbox" | "needsRepublish" | "republishAttemptedAt" | "staleMarkedAt" | "legacyRoute";
+export type LegacyActivityRow = Omit<ActivityRow, V2Column>;
 
 // explicit select list for db.select(...): never names a v2 column
 export function legacyActivityColumns() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { processingVersion, publishedInputsHash, canonicalTrackKey, ...legacy } = getTableColumns(activities);
+  const {
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    processingVersion, publishedInputsHash, canonicalTrackKey,
+    mapHidden, hrHidden, publishedLocalTime, publishedStartUtc, fogEvents, fogShapes, trackBbox, needsRepublish,
+    republishAttemptedAt, staleMarkedAt, legacyRoute,
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+    ...legacy
+  } = getTableColumns(activities);
   return legacy;
 }
 
@@ -50,11 +73,92 @@ export function legacyEdits(row: Pick<LegacyActivityRow, "polyline" | "fitSha256
   return [{ id: 1, kind: "trim", params: { startM: row.trimStartM, endM: row.trimEndM } }];
 }
 
+// what a column that doesn't exist yet reads as: never republished, visible,
+// no fog, published start = raw start
+export const MISSING_COLUMN_DEFAULTS: Pick<ActivityRow, V2Column> = {
+  processingVersion: 0,
+  publishedInputsHash: null,
+  canonicalTrackKey: null,
+  mapHidden: false,
+  hrHidden: false,
+  publishedLocalTime: null,
+  publishedStartUtc: null,
+  fogEvents: null,
+  fogShapes: null,
+  trackBbox: null,
+  needsRepublish: false,
+  republishAttemptedAt: null,
+  staleMarkedAt: null,
+  legacyRoute: null,
+};
+
 // pre-migration rows look like never-republished ones
 export function toActivityRow(row: LegacyActivityRow): ActivityRow {
-  return { ...row, processingVersion: 0, publishedInputsHash: null, canonicalTrackKey: null };
+  return fillActivityRow(row);
 }
 
+// a row read from a partially migrated db: whatever columns exist, with the
+// defaults above for the ones that don't
+export function fillActivityRow(row: LegacyActivityRow & Partial<Pick<ActivityRow, V2Column>>): ActivityRow {
+  const out = { ...MISSING_COLUMN_DEFAULTS } as ActivityRow;
+  for (const [k, v] of Object.entries(row)) if (v !== undefined) (out as Record<string, unknown>)[k] = v;
+  return out;
+}
+
+// select list for db.select(...) naming only the activities columns that exist
+// (information_schema column names). the legacy columns are required.
+export function presentActivityColumns(present: Iterable<string>) {
+  const names = new Set(present);
+  const missingLegacy = LEGACY_ACTIVITY_COLUMN_NAMES.filter((n) => !names.has(n));
+  if (missingLegacy.length) throw new Error(`activities is missing legacy columns: ${missingLegacy.join(", ")}`);
+  const all = getTableColumns(activities);
+  return Object.fromEntries(Object.entries(all).filter(([, col]) => names.has(col.name))) as Partial<typeof all>;
+}
+
+// the schema columns (db names) a database doesn't have yet
+export function missingActivityColumns(present: Iterable<string>): string[] {
+  const names = new Set(present);
+  return Object.values(getTableColumns(activities))
+    .map((c) => c.name)
+    .filter((n) => !names.has(n));
+}
+
+const refuse = () => Promise.reject(new Error("legacy republish deps are read-only"));
+
+// read-only deps over preloaded inputs: every write throws. used by dry runs
+// against a database that may be behind the schema.
+export function readOnlyDeps(io: {
+  loadRow(id: number): Promise<ActivityRow | null>;
+  loadSources(id: number): Promise<SourceInput[]>;
+  loadEdits(id: number): Promise<EditInput[]>;
+  loadRaw(sha256: string, row: ActivityRow): Promise<Uint8Array | null>;
+  zones?: ZoneInput[];
+  settings?: PrivacySettings;
+  loadPhotos?(id: number): Promise<PhotoInput[]>;
+}): RepublishDeps {
+  return {
+    loadActivity: io.loadRow,
+    loadSources: io.loadSources,
+    loadEdits: io.loadEdits,
+    async loadZones() {
+      return io.zones ?? [];
+    },
+    async loadSettings() {
+      return io.settings ?? DEFAULT_PRIVACY_SETTINGS;
+    },
+    async loadPhotos(id) {
+      return io.loadPhotos ? io.loadPhotos(id) : [];
+    },
+    loadRaw: io.loadRaw,
+    storeDerived: refuse,
+    writeColumns: refuse,
+    recordEdit: refuse,
+    writePhotoPins: refuse,
+  };
+}
+
+// pre-0002 databases only (no activity_sources / activity_edits): sources and
+// edits synthesized from the legacy columns
 export function legacyDeps(io: {
   loadLegacyRow(id: number): Promise<LegacyActivityRow | null>;
   loadRaw(sha256: string, row: ActivityRow): Promise<Uint8Array | null>;
@@ -65,9 +169,8 @@ export function legacyDeps(io: {
     if (!cache.has(id)) cache.set(id, io.loadLegacyRow(id));
     return cache.get(id)!;
   };
-  const refuse = () => Promise.reject(new Error("legacy republish deps are read-only"));
-  return {
-    async loadActivity(id) {
+  return readOnlyDeps({
+    async loadRow(id) {
       const row = await load(id);
       return row ? toActivityRow(row) : null;
     },
@@ -79,13 +182,9 @@ export function legacyDeps(io: {
       const row = await load(id);
       return row ? legacyEdits(row) : [];
     },
-    async loadZones() {
-      return io.zones ?? [];
-    },
     loadRaw: io.loadRaw,
-    storeDerived: refuse,
-    writeColumns: refuse,
-  };
+    zones: io.zones,
+  });
 }
 
 // ---------------------------------------------------------------------------

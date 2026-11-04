@@ -274,7 +274,8 @@ export async function pullIntervalsActivities({ days = DEFAULT_LOOKBACK_DAYS } =
         continue;
       }
       await attachSources(outcome.id, a.id, built?.stored ?? null, jsonSha);
-      if (built) await republish(outcome.id);
+      // summary rows too: republish writes their published (coarsened) start
+      await republish(outcome.id);
       result.inserted++;
     } catch (error) {
       result.failures.push({ id: a.id, error: (error as Error).message });

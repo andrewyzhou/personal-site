@@ -1,10 +1,11 @@
-import { decodePolyline } from "@/lib/polyline";
-import { quadraticPathD } from "@/lib/route-smooth";
+import { decodeMultiPolyline } from "@/lib/polyline";
+import { multiQuadraticPathD, projectSegments } from "@/lib/route-smooth";
 
 // zero-dependency inline svg route thumbnail. equirectangular projection is
 // plenty at activity scale. inline svg themes via the css variable directly —
 // it never passes through the theme-light <img> invert filter, so this is the
 // correct mechanism here (static /icons/ files keep stroke="#EEEEEE").
+// multi-segment polylines draw each segment on its own (gaps stay gaps).
 export default function RouteThumb({
   polyline,
   height = 80,
@@ -16,25 +17,21 @@ export default function RouteThumb({
   strokeWidth?: number;
   className?: string;
 }) {
-  const pts = decodePolyline(polyline);
-  if (pts.length < 2) return null;
-
-  const midLat = (pts.reduce((s, p) => s + p[0], 0) / pts.length) * (Math.PI / 180);
-  const cos = Math.cos(midLat);
-  const xs = pts.map(([, lng]) => lng * cos);
-  const ys = pts.map(([lat]) => -lat);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const w = maxX - minX || 1e-6;
-  const h = maxY - minY || 1e-6;
+  let segments: [number, number][][];
+  try {
+    segments = decodeMultiPolyline(polyline);
+  } catch {
+    return null;
+  }
+  const proj = projectSegments(segments);
+  if (!proj) return null;
+  const { w, h } = proj;
   const pad = Math.max(w, h) * 0.05;
 
   // midpoint quadratic smoothing: gps points land ~20m apart (smart
   // recording), so straight chords read jagged at thumbnail scale
-  const d = quadraticPathD(
-    pts.map((_, i): [number, number] => [xs[i] - minX + pad, ys[i] - minY + pad]),
+  const d = multiQuadraticPathD(
+    proj.segments.map((s) => s.map(([x, y]): [number, number] => [x + pad, y + pad])),
     6
   );
 
