@@ -26,7 +26,7 @@ import type {
 type V2Column =
   | "processingVersion" | "publishedInputsHash" | "canonicalTrackKey"
   | "mapHidden" | "hrHidden" | "publishedLocalTime" | "publishedStartUtc"
-  | "fogEvents" | "fogShapes" | "trackBbox" | "needsRepublish" | "republishAttemptedAt" | "staleMarkedAt" | "legacyRoute";
+  | "fogEvents" | "fogShapes" | "trackBbox" | "needsRepublish" | "republishAttemptedAt" | "staleMarkedAt" | "legacyRoute" | "rawStats" | "hrZonesS" | "splitFromId";
 export type LegacyActivityRow = Omit<ActivityRow, V2Column>;
 
 // explicit select list for db.select(...): never names a v2 column
@@ -35,7 +35,7 @@ export function legacyActivityColumns() {
     /* eslint-disable @typescript-eslint/no-unused-vars */
     processingVersion, publishedInputsHash, canonicalTrackKey,
     mapHidden, hrHidden, publishedLocalTime, publishedStartUtc, fogEvents, fogShapes, trackBbox, needsRepublish,
-    republishAttemptedAt, staleMarkedAt, legacyRoute,
+    republishAttemptedAt, staleMarkedAt, legacyRoute, rawStats, hrZonesS, splitFromId,
     /* eslint-enable @typescript-eslint/no-unused-vars */
     ...legacy
   } = getTableColumns(activities);
@@ -89,7 +89,7 @@ export const MISSING_COLUMN_DEFAULTS: Pick<ActivityRow, V2Column> = {
   needsRepublish: false,
   republishAttemptedAt: null,
   staleMarkedAt: null,
-  legacyRoute: null,
+  legacyRoute: null, rawStats: null, hrZonesS: null, splitFromId: null,
 };
 
 // pre-migration rows look like never-republished ones

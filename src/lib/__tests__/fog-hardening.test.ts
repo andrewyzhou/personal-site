@@ -99,7 +99,7 @@ function row(over: Partial<ActivityRow> = {}): ActivityRow {
     fitBlobUrl: null, fitBlobPathname: null, fitSha256: null, fileType: null, source: "strava-api", externalId: "1",
     dedupeKey: "k", hidden: false, processingVersion: 0, publishedInputsHash: null, canonicalTrackKey: null,
     mapHidden: false, hrHidden: false, publishedLocalTime: null, publishedStartUtc: null, fogEvents: null, fogShapes: null,
-    trackBbox: null, needsRepublish: true, staleMarkedAt: null, legacyRoute: null, republishAttemptedAt: null,
+    trackBbox: null, needsRepublish: true, staleMarkedAt: null, legacyRoute: null, rawStats: null, hrZonesS: null, splitFromId: null, republishAttemptedAt: null,
     createdAt: new Date(), updatedAt: new Date(), ...over,
   };
 }

@@ -25,6 +25,9 @@ import {
   type FogEvent,
   type PrivacySettings,
   type RouteBounds,
+  type ActivitySettings,
+  type RawStats,
+  activitySuggestions,
 } from "./db";
 import {
   CARD_POLYLINE_MAX_POINTS,
@@ -48,6 +51,11 @@ import {
   loadPrivacySettings,
   publishedDistance,
 } from "./privacy/settings";
+import { applyCleaning, mergeTargets } from "./cleaning/edits";
+import { cleanedStats, hrZoneSeconds, rawStatsOf } from "./cleaning/stats";
+import { DEFAULT_ACTIVITY_SETTINGS, loadActivitySettings } from "./cleaning/settings";
+import { detectSuggestions } from "./cleaning/detect";
+import { DETECTOR_VERSION, type Suggestion } from "./cleaning/types";
 import {
   CANONICAL_FORMAT_VERSION,
   TRACK_SOURCE_PRECEDENCE,
@@ -67,7 +75,8 @@ import { r2Get } from "./r2";
 
 // bump when the publish math changes; every activity becomes stale
 // v2: privacy zones, distance policy, published start, photo pins
-export const PROCESSING_VERSION = 2;
+// v3: cleaning edits, raw stats, hr zones, detector suggestions
+export const PROCESSING_VERSION = 3;
 
 export type { ZoneInput } from "./privacy/fog";
 
@@ -157,11 +166,19 @@ export function inputsHash(input: {
   settings?: PrivacySettings;
   photos?: PhotoInput[];
   processingVersion?: number;
+  activity?: ActivitySettings;
+  sportType?: string;
+  merged?: TrackRef[];
 }): string {
   const payload = {
     processingVersion: input.processingVersion ?? PROCESSING_VERSION,
     canonicalFormat: CANONICAL_FORMAT_VERSION,
     track: input.track,
+    // hr zone bounds change hr_zones_s; auto-apply only matters through the
+    // edits it creates, which are hashed themselves
+    hrZones: input.activity ? { max: input.activity.hrMaxBpm, pcts: input.activity.hrZonePcts } : null,
+    sportType: input.sportType ?? null,
+    merged: input.merged ?? [],
     edits: [...input.edits].sort((a, b) => a.id - b.id),
     zones: [...input.zones].sort((a, b) => a.id - b.id).map((z) => ({ id: z.id, polygon: z.polygon })),
     settings: input.settings ?? DEFAULT_PRIVACY_SETTINGS,
@@ -257,23 +274,31 @@ export interface PublicColumns {
   trimEndM: number;
   fogEvents: FogEvent[] | null;
   fogShapes: number[][][][] | null;
+  hrZonesS: number[] | null;
 }
 
 export const PUBLIC_COLUMN_NAMES: readonly (keyof PublicColumns)[] = [
   "distanceM", "movingTimeS", "elapsedTimeS", "elevGainM", "avgSpeedMs", "maxSpeedMs",
   "avgHr", "maxHr", "avgCadence", "avgWatts", "maxWatts", "kilojoules",
-  "polyline", "cardPolyline", "bounds", "trimStartM", "trimEndM", "fogEvents", "fogShapes",
+  "polyline", "cardPolyline", "bounds", "trimStartM", "trimEndM", "fogEvents", "fogShapes", "hrZonesS",
 ];
+
+const ADDITIVE_COLUMNS = new Set<keyof PublicColumns>(["hrZonesS"]);
 
 export interface PublishContext {
   zones: ZoneInput[];
   settings: PrivacySettings;
+  activity?: ActivitySettings; // hr zones (none without)
+  merged?: CanonicalTrack[]; // tracks of activities merged into this one
+  sportType?: string; // the activity's (owner-set) sport; defaults to the track's
 }
 
 export interface PublishedTrack {
   columns: PublicColumns;
   // published (post-trim, post-fog) samples, in segments; pins snap to these
   visible: FogSample[][];
+  rawStats: RawStats; // the untouched track's stats
+  cleaned: boolean;
 }
 
 // reduce each visible run to a share of the point budget. one run reduces
@@ -347,29 +372,54 @@ export function fogStoredRoute(
   };
 }
 
-// deterministic: same track + edits + zones + settings → identical output
+// deterministic: same track + edits + zones + settings → identical output.
+// order: cleaning edits (merge, crop, cut, drop points, no gps) on a copy of
+// the canonical track → privacy trim → stats → fog → overrides.
 export function publishTrack(
-  track: CanonicalTrack,
+  rawTrack: CanonicalTrack,
   edits: EditInput[],
   ctx: PublishContext = { zones: [], settings: DEFAULT_PRIVACY_SETTINGS }
 ): PublishedTrack {
+  const cleaning = applyCleaning(rawTrack, edits, ctx.merged ?? []);
+  const track = cleaning.track;
   const parsed = canonicalToParsed(track);
   const trim = resolveTrim(edits, hasGps(track), ctx.settings.defaultTrimM);
   const zeroTrim = trim.startM === 0 && trim.endM === 0;
   const { kept, keptCum } = zeroTrim
     ? { kept: parsed.records, keptCum: parsed.cumDist }
     : trimByDistance(parsed.records, parsed.cumDist, trim.startM, trim.endM);
+  // discontinuities (cuts, merge gaps) aligned to the kept slice
+  const first = kept.length ? parsed.records.indexOf(kept[0]) : 0;
+  const breaks = kept.map((_, i) => i > 0 && cleaning.breaks[first + i]);
+  let excludedS = 0;
+  for (let i = 1; i < kept.length; i++) if (breaks[i]) excludedS += kept[i].t - kept[i - 1].t;
 
-  // zero trim uses the device session totals verbatim (no recompute drift); a
-  // polyline-only track has made-up timestamps, so its stats stay the summary
-  let stats =
-    (track.syntheticTime && track.session) || (zeroTrim && parsed.sessionStats)
+  // untouched activities: zero trim uses the device session totals verbatim
+  // (no recompute drift) and a polyline-only track keeps its summary, exactly
+  // as before cleaning existed. cleaned ones are recomputed from the cleaned track.
+  let stats = cleaning.cleaned
+    ? cleanedStats(kept, keptCum, breaks, excludedS, ctx.sportType ?? track.sportType)
+    : (track.syntheticTime && track.session) || (zeroTrim && parsed.sessionStats)
       ? parsed.sessionStats!
       : computeStats(kept, keptCum);
 
-  const samples: FogSample[] = [];
-  for (const r of kept) if (r.lat !== null && r.lng !== null) samples.push({ lat: r.lat, lng: r.lng, t: r.t });
-  const fog = applyFog(samples, ctx.zones);
+  // fog per continuous run, so nothing is ever drawn across a cut
+  const fog: { segments: FogSample[][]; events: FogEvent[]; visibleDistanceM: number } = { segments: [], events: [], visibleDistanceM: 0 };
+  let run: FogSample[] = [];
+  const flushRun = () => {
+    if (!run.length) return;
+    const r = applyFog(run, ctx.zones);
+    fog.segments.push(...r.segments);
+    fog.events.push(...r.events);
+    fog.visibleDistanceM += r.visibleDistanceM;
+    run = [];
+  };
+  for (let i = 0; i < kept.length; i++) {
+    if (breaks[i]) flushRun();
+    const r = kept[i];
+    if (r.lat !== null && r.lng !== null) run.push({ lat: r.lat, lng: r.lng, t: r.t });
+  }
+  flushRun();
   const fogged = fog.events.length > 0;
   if (fogged) {
     stats = { ...stats, distanceM: publishedDistance(stats.distanceM, fog.visibleDistanceM, true, ctx.settings.distance) };
@@ -397,13 +447,38 @@ export function publishTrack(
     trimEndM: Math.max(0, trim.endM),
     fogEvents: publishedFogEvents(fog.events),
     fogShapes: null, // zone shapes are never published (the shape would reveal the place)
+    hrZonesS: ctx.activity
+      ? hrZoneSeconds(kept, breaks, ctx.activity.hrMaxBpm, ctx.activity.hrZonePcts)
+      : null,
     ...resolveOverrides(edits),
   } as PublicColumns;
-  return { columns, visible: fog.segments };
+  const rawParsed = canonicalToParsed(rawTrack);
+  return {
+    columns,
+    visible: fog.segments,
+    rawStats: rawStatsOf(rawTrack.session, rawParsed.records, rawParsed.cumDist),
+    cleaned: cleaning.cleaned,
+  };
 }
 
 export function computePublicColumns(track: CanonicalTrack, edits: EditInput[], ctx?: PublishContext): PublicColumns {
   return publishTrack(track, edits, ctx).columns;
+}
+
+// stable identity of a suggestion across re-detection
+export function suggestionFingerprint(s: Suggestion): string {
+  return createHash("sha256").update(stableStringify({ kind: s.kind, edit: s.edit, range: s.range })).digest("hex");
+}
+
+export function boundsOfTracks(tracks: CanonicalTrack[]): RouteBounds | null {
+  const bs = tracks.map(trackBounds).filter((b): b is RouteBounds => b !== null);
+  if (!bs.length) return null;
+  return {
+    minLat: Math.min(...bs.map((b) => b.minLat)),
+    minLng: Math.min(...bs.map((b) => b.minLng)),
+    maxLat: Math.max(...bs.map((b) => b.maxLat)),
+    maxLng: Math.max(...bs.map((b) => b.maxLng)),
+  };
 }
 
 // bounds of every gps point of the full (untrimmed, unfogged) track. PRIVATE:
@@ -470,6 +545,8 @@ export function diffColumns(row: Partial<ActivityRow>, cols: PublicColumns): (ke
   for (const k of PUBLIC_COLUMN_NAMES) {
     const a = row[k as keyof ActivityRow];
     const b = cols[k];
+    // a metric appearing for the first time adds data, it doesn't change any
+    if (ADDITIVE_COLUMNS.has(k) && (a === null || a === undefined)) continue;
     if (typeof a === "number" && typeof b === "number") {
       if (Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a))) changed.push(k);
     } else if (stableStringify(a ?? null) !== stableStringify(b ?? null)) {
@@ -497,6 +574,10 @@ export interface RepublishDeps {
   loadSettings?(): Promise<PrivacySettings>;
   loadPhotos?(id: number): Promise<PhotoInput[]>;
   writePhotoPins?(id: number, pins: PhotoPin[]): Promise<void>;
+  loadActivitySettings?(): Promise<ActivitySettings>;
+  // store detector output (insert-only per fingerprint); when autoApplyMin is
+  // set, open suggestions at/above it become edits — returns those edits
+  recordSuggestions?(id: number, suggestions: Suggestion[], autoApplyMin: number | null): Promise<EditInput[]>;
 }
 
 export type RepublishResult =
@@ -523,7 +604,7 @@ export interface RepublishOptions {
 
 // "unavailable": raw bytes not reachable (never silently downgrade past it);
 // null: the bytes are there but hold no track (try the next source)
-async function buildTrack(
+export async function buildTrack(
   ref: TrackRef,
   row: ActivityRow,
   deps: RepublishDeps
@@ -576,13 +657,32 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     edits = edits.map((e) => (e === synthesized ? { ...e, id } : e));
   }
 
+  const activity = deps.loadActivitySettings ? await deps.loadActivitySettings() : DEFAULT_ACTIVITY_SETTINGS;
+  // activities merged into this one: their best track source is an input too
+  const merges: { id: number; row: ActivityRow; ref: TrackRef }[] = [];
+  for (const otherId of mergeTargets(edits)) {
+    if (otherId === activityId) continue;
+    const other = await deps.loadActivity(otherId);
+    const ref = other ? trackCandidates(await deps.loadSources(otherId))[0] : undefined;
+    if (other && ref) merges.push({ id: otherId, row: other, ref });
+  }
+
   const best = candidates[0] ?? null;
   // the route a trackless row publishes from: kept privately the first time
   const storedRoute = row.legacyRoute ?? { polyline: row.polyline, cardPolyline: row.cardPolyline, bounds: row.bounds };
   // only zones that can touch the activity count, so a zone edit elsewhere
   // never marks it stale (trackless rows: zones near their stored route)
   const hashFor = (track: TrackRef | null, bbox: RouteBounds | null) =>
-    inputsHash({ track, edits, zones: relevantZones(allZones, track ? bbox : storedRoute.bounds), settings, photos });
+    inputsHash({
+      track,
+      edits,
+      zones: relevantZones(allZones, track ? bbox : storedRoute.bounds),
+      settings,
+      photos,
+      activity,
+      sportType: row.sportType,
+      merged: merges.map((m) => m.ref),
+    });
   const bestHash = hashFor(best, row.trackBbox ?? null);
   if (!opts.force && row.publishedInputsHash === bestHash && row.processingVersion === PROCESSING_VERSION) {
     if (row.needsRepublish && !opts.dryRun) await deps.writeColumns(activityId, { needsRepublish: false }, startedAt);
@@ -617,10 +717,31 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       return { status: "source-unavailable", id: activityId, hash: bestHash, track: ref };
     }
     if (!track) continue;
-    const bbox = trackBounds(track);
+
+    // merged activities' tracks (a merge whose track can't be read waits)
+    const merged: CanonicalTrack[] = [];
+    for (const m of merges) {
+      const t = await buildTrack(m.ref, m.row, deps);
+      if (t === "unavailable") {
+        await fogCurrentRoute();
+        return { status: "source-unavailable", id: activityId, hash: bestHash, track: m.ref };
+      }
+      if (t) merged.push(t);
+    }
+
+    // detector suggestions on the untouched track; with auto-apply on, the
+    // confident ones become edits right away (still reversible)
+    if (!opts.dryRun && deps.recordSuggestions) {
+      const suggestions = detectSuggestions(track, row.sportType);
+      const accepted = await deps.recordSuggestions(activityId, suggestions, activity.autoApply.enabled ? activity.autoApply.minConfidence : null);
+      if (accepted.length) edits = [...edits, ...accepted].sort((a, b) => a.id - b.id);
+    }
+
+    const bbox = boundsOfTracks([track, ...merged]);
     const zones = relevantZones(allZones, bbox);
     const hash = hashFor(ref, bbox);
-    const { columns, visible } = publishTrack(track, edits, { zones, settings });
+    const published = publishTrack(track, edits, { zones, settings, activity, merged, sportType: row.sportType });
+    const { columns, visible } = published;
     const pins = computePhotoPins(photos, track, visible, zones);
     const changed = diffColumns(row, columns);
     const serialized = serializeCanonical(track);
@@ -633,6 +754,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     await deps.writeColumns(activityId, {
       ...columns,
       ...start,
+      rawStats: published.rawStats,
       trackBbox: bbox,
       needsRepublish: false,
       processingVersion: PROCESSING_VERSION,
@@ -752,6 +874,41 @@ export function defaultDeps(): RepublishDeps {
         set.needsRepublish = sql`(${activities.staleMarkedAt} is not null and ${activities.staleMarkedAt} > ${startedAt.toISOString()}::timestamptz)`;
       }
       await db.update(activities).set(set).where(eq(activities.id, id));
+    },
+    loadActivitySettings,
+    async recordSuggestions(id, suggestions, autoApplyMin) {
+      if (!suggestions.length) return [];
+      const rows = suggestions.map((s) => ({
+        activityId: id,
+        detectorVersion: DETECTOR_VERSION,
+        fingerprint: suggestionFingerprint(s),
+        kind: s.kind,
+        confidence: s.confidence,
+        edit: s.edit,
+        summary: s.summary,
+        range: s.range,
+      }));
+      // insert-only: a dismissed or accepted suggestion keeps its decision
+      await db.insert(activitySuggestions).values(rows).onConflictDoNothing();
+      if (autoApplyMin === null) return [];
+      const open = await db
+        .select()
+        .from(activitySuggestions)
+        .where(and(eq(activitySuggestions.activityId, id), eq(activitySuggestions.detectorVersion, DETECTOR_VERSION), eq(activitySuggestions.status, "open")));
+      const created: EditInput[] = [];
+      for (const s of open) {
+        if (!s.edit || s.confidence < autoApplyMin) continue;
+        const inserted = await db
+          .insert(activityEdits)
+          .values({ activityId: id, kind: s.edit.kind, params: s.edit.params, note: `auto-applied: ${s.summary}` })
+          .returning({ id: activityEdits.id });
+        await db
+          .update(activitySuggestions)
+          .set({ status: "accepted", editId: inserted[0].id, decidedAt: new Date() })
+          .where(and(eq(activitySuggestions.id, s.id), eq(activitySuggestions.status, "open")));
+        created.push({ id: inserted[0].id, kind: s.edit.kind, params: s.edit.params });
+      }
+      return created;
     },
     async recordEdit(id, kind, params, note) {
       const rows = await db
