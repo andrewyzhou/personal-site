@@ -1,5 +1,5 @@
 // leetcode url → { number, title, difficulty } via the unofficial graphql api.
-// every gate from docs/research/leetcode-graphql.md; failures never cached and
+// strict gates on every lookup (allowed hosts, slug shape, timeouts); failures never cached and
 // never block manual entry.
 
 import { Redis } from "@upstash/redis";
