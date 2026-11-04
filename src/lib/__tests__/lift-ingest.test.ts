@@ -6,10 +6,9 @@ import type { IngestPlan } from "@/lib/lift/plan";
 
 // a real drizzle instance over an unreachable url: query builders render real
 // sql via toSQL(), while select/batch are stubbed so nothing hits the network
-const { plan, linkWorkout, getWorkoutLinks, state } = vi.hoisted(() => ({
+const { plan, linkWorkout, state } = vi.hoisted(() => ({
   plan: vi.fn(),
   linkWorkout: vi.fn(),
-  getWorkoutLinks: vi.fn(),
   state: { db: null as unknown },
 }));
 
@@ -20,7 +19,6 @@ vi.mock("@/lib/db", async (orig) => ({
 vi.mock("@/lib/lift/plan", () => ({ planShareIngest: (...a: unknown[]) => plan(...a) }));
 vi.mock("@/lib/lift/link", () => ({
   linkWorkout: (...a: unknown[]) => linkWorkout(...a),
-  getWorkoutLinks: (...a: unknown[]) => getWorkoutLinks(...a),
 }));
 
 import { buildIngestBatch, ingestShareText, EMPTY_TEXT } from "@/lib/lift/ingest";
@@ -97,7 +95,6 @@ beforeEach(() => {
   fake.batch = batch.mockResolvedValue([]);
   state.db = fake;
   linkWorkout.mockResolvedValue([]);
-  getWorkoutLinks.mockResolvedValue([]);
 });
 
 describe("buildIngestBatch", () => {
@@ -112,6 +109,13 @@ describe("buildIngestBatch", () => {
     expect(sqls[4]).toContain('"title" = excluded."title"');
     expect(sqls[4]).toContain('"deleted_at" = null');
     expect(sqls[4]).not.toContain('"created_at" = ');
+    // re-shares keep startedLocal fresh but leave linked timing to linkWorkout
+    expect(sqls[4]).toContain('"started_local" = excluded."started_local"');
+    for (const col of ["started_at", "utc_offset_min", "ended_at", "duration_s"]) {
+      expect(sqls[4]).toContain(
+        `"${col}" = case when exists (select 1 from "lift_workout_activities" a where a."workout_id" = "lift_workouts"."id") then "lift_workouts"."${col}" else excluded."${col}" end`
+      );
+    }
     expect(sqls[5]).toMatch(/^delete from "lift_workout_exercises" where "lift_workout_exercises"."workout_id" = \$1$/);
     expect(sqls[6]).toMatch(/^insert into "lift_workout_exercises"/);
     expect(sqls[7]).toMatch(/^insert into "lift_sets"/);
@@ -150,15 +154,50 @@ describe("ingestShareText", () => {
     expect(res.text).toMatch(/watch: not linked yet$/);
   });
 
-  it("short-circuits a byte-identical re-send", async () => {
+  it("still writes a byte-identical re-send, but reports it as a duplicate", async () => {
+    // the upsert sets deleted_at = null, so this is also what un-deletes a soft-deleted workout
     plan.mockReturnValue(fullPlan());
     existingRows = [{ id: "ing_old", workoutId: "share-Slug1", status: "parsed" }];
     const res = await ingestShareText("raw", { source: "telegram" });
-    expect(batch).not.toHaveBeenCalled();
-    expect(linkWorkout).not.toHaveBeenCalled();
-    expect(getWorkoutLinks).toHaveBeenCalledWith("share-Slug1");
+    expect(batch).toHaveBeenCalledOnce();
+    expect(batch.mock.calls[0][0]).toHaveLength(8);
+    expect(linkWorkout).toHaveBeenCalledWith(expect.objectContaining({ id: "share-Slug1" }));
     expect(res).toMatchObject({ status: "duplicate", duplicate: true, ingestId: "ing_old", workoutId: "share-Slug1" });
     expect(res.text).toMatch(/^already logged push day/);
+  });
+
+  it("restores share A after an edited B of the same slug", async () => {
+    // A is seen (its ingest row exists), B overwrote the workout; A again must rewrite it
+    const a = fullPlan();
+    plan.mockReturnValue(a);
+    existingRows = [{ id: a.ingest.id, workoutId: "share-Slug1", status: "parsed" }];
+    await ingestShareText("raw A", { source: "shortcut" });
+    expect(batch).toHaveBeenCalledOnce();
+    const workoutUpsert = (batch.mock.calls[0][0][4] as Sqlable).toSQL();
+    expect(workoutUpsert.sql).toMatch(/^insert into "lift_workouts"/);
+    expect(workoutUpsert.params).toContain("Push Day");
+    expect(workoutUpsert.params).toContain(a.ingest.id);
+  });
+
+  it("logs a previously empty sha once the parser can read it", async () => {
+    plan.mockReturnValue(fullPlan());
+    existingRows = [{ id: "ing_old", workoutId: null, status: "empty" }];
+    const res = await ingestShareText("raw", { source: "api" });
+    expect(batch).toHaveBeenCalledOnce();
+    expect(batch.mock.calls[0][0]).toHaveLength(8);
+    expect(linkWorkout).toHaveBeenCalled();
+    expect(res).toMatchObject({ status: "created", duplicate: false, ingestId: "ing_old", workoutId: "share-Slug1" });
+    expect(res.text).toMatch(/^logged push day/);
+  });
+
+  it("keeps the raw text of an oversized share and says why it was refused", async () => {
+    const reason = "too big to log: 1 exercises / 501 sets (max 100 / 500)";
+    plan.mockReturnValue({ ...emptyPlan(), rejected: reason });
+    const res = await ingestShareText("huge", { source: "api" });
+    expect(batch).toHaveBeenCalledOnce();
+    expect(batch.mock.calls[0][0]).toHaveLength(1);
+    expect(linkWorkout).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ status: "empty", duplicate: false, workoutId: null, text: reason });
   });
 
   it("keeps the raw text of an empty parse and reports it", async () => {
@@ -170,11 +209,12 @@ describe("ingestShareText", () => {
     expect(res).toMatchObject({ status: "empty", duplicate: false, workoutId: null, text: EMPTY_TEXT });
   });
 
-  it("reports a re-sent empty share as empty without writing", async () => {
+  it("reports a re-sent empty share as an empty duplicate (the insert is a no-op)", async () => {
     plan.mockReturnValue(emptyPlan());
     existingRows = [{ id: "ing_old", workoutId: null, status: "empty" }];
     const res = await ingestShareText("hello", { source: "api" });
-    expect(batch).not.toHaveBeenCalled();
-    expect(res).toMatchObject({ status: "empty", duplicate: true, ingestId: "ing_old" });
+    expect(batch).toHaveBeenCalledOnce();
+    expect(batch.mock.calls[0][0]).toHaveLength(1);
+    expect(res).toMatchObject({ status: "empty", duplicate: true, ingestId: "ing_old", text: EMPTY_TEXT });
   });
 });

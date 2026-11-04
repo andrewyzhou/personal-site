@@ -81,6 +81,42 @@ export async function getWorkoutLinks(workoutId: string): Promise<LinkedActivity
   return (await loadLinks(workoutId)).map(toPublic);
 }
 
+/** strength recordings within a day of `startedLocal` that no other live workout has claimed */
+export function candidateRecordingsQuery(db: ReturnType<typeof getDb>, workout: { id: string; startedLocal: string }) {
+  const day = workout.startedLocal.slice(0, 10);
+  return db
+    .select({
+      id: activities.id,
+      sportType: activities.sportType,
+      localDate: activities.localDate,
+      localTime: activities.localTime,
+      elapsedS: activities.elapsedTimeS,
+    })
+    .from(activities)
+    .where(
+      and(
+        inArray(activities.sportType, [...STRENGTH_SPORT_TYPES]),
+        gte(activities.localDate, addDays(day, -1)),
+        lte(activities.localDate, addDays(day, 1)),
+        eq(activities.hidden, false),
+        // a soft-deleted workout's links shouldn't hold a recording hostage
+        notExists(
+          db
+            .select({ one: liftWorkoutActivities.activityId })
+            .from(liftWorkoutActivities)
+            .innerJoin(liftWorkouts, eq(liftWorkouts.id, liftWorkoutActivities.workoutId))
+            .where(
+              and(
+                eq(liftWorkoutActivities.activityId, activities.id),
+                ne(liftWorkoutActivities.workoutId, workout.id),
+                isNull(liftWorkouts.deletedAt)
+              )
+            )
+        )
+      )
+    );
+}
+
 /**
  * auto-link a workout when it has no links yet, then sync its timing columns
  * from whatever is linked. existing links (auto or manual) are left alone.
@@ -90,36 +126,7 @@ export async function linkWorkout(workout: { id: string; startedLocal: string })
   let links = await loadLinks(workout.id);
 
   if (links.length === 0) {
-    const day = workout.startedLocal.slice(0, 10);
-    const rows = await db
-      .select({
-        id: activities.id,
-        sportType: activities.sportType,
-        localDate: activities.localDate,
-        localTime: activities.localTime,
-        elapsedS: activities.elapsedTimeS,
-      })
-      .from(activities)
-      .where(
-        and(
-          inArray(activities.sportType, [...STRENGTH_SPORT_TYPES]),
-          gte(activities.localDate, addDays(day, -1)),
-          lte(activities.localDate, addDays(day, 1)),
-          eq(activities.hidden, false),
-          // a recording already claimed by another workout isn't a candidate
-          notExists(
-            db
-              .select({ one: liftWorkoutActivities.activityId })
-              .from(liftWorkoutActivities)
-              .where(
-                and(
-                  eq(liftWorkoutActivities.activityId, activities.id),
-                  ne(liftWorkoutActivities.workoutId, workout.id)
-                )
-              )
-          )
-        )
-      );
+    const rows = await candidateRecordingsQuery(db, workout);
     const candidates: LinkCandidate[] = rows.map((r) => ({
       id: r.id,
       sportType: r.sportType,
