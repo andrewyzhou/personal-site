@@ -65,6 +65,20 @@ export function validateCleaningEdit(kind: string, params: unknown): ValidatedPa
   }
 }
 
+// the latest crop is the one in effect, so a crop that only sets one side
+// (e.g. an accepted "crop the tail") must carry the other side of the crop
+// already in effect, or accepting it would undo an earlier head crop
+export function combineCrop(edits: EditLike[], proposed: Record<string, unknown>): Record<string, unknown> {
+  const crops = edits.filter((e) => e.kind === "crop");
+  const cur = crops[crops.length - 1]?.params ?? {};
+  const pick = (k: "startS" | "endS") => (isNum(proposed[k]) ? proposed[k] : isNum(cur[k]) ? cur[k] : null);
+  const startS = pick("startS");
+  const endS = pick("endS");
+  // a stale other side that no longer makes a valid window is dropped
+  if (isNum(startS) && isNum(endS) && endS <= startS) return { startS: proposed.startS ?? null, endS: proposed.endS ?? null };
+  return { startS, endS };
+}
+
 export function hasCleaning(edits: EditLike[]): boolean {
   return edits.some((e) => (CLEANING_EDIT_KINDS as readonly string[]).includes(e.kind));
 }

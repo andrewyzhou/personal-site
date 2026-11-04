@@ -51,7 +51,7 @@ import {
   loadPrivacySettings,
   publishedDistance,
 } from "./privacy/settings";
-import { applyCleaning, mergeTargets } from "./cleaning/edits";
+import { applyCleaning, combineCrop, mergeTargets } from "./cleaning/edits";
 import { cleanedStats, hrZoneSeconds, rawStatsOf } from "./cleaning/stats";
 import { DEFAULT_ACTIVITY_SETTINGS, loadActivitySettings } from "./cleaning/settings";
 import { detectSuggestions } from "./cleaning/detect";
@@ -577,7 +577,7 @@ export interface RepublishDeps {
   loadActivitySettings?(): Promise<ActivitySettings>;
   // store detector output (insert-only per fingerprint); when autoApplyMin is
   // set, open suggestions at/above it become edits — returns those edits
-  recordSuggestions?(id: number, suggestions: Suggestion[], autoApplyMin: number | null): Promise<EditInput[]>;
+  recordSuggestions?(id: number, suggestions: Suggestion[], autoApplyMin: number | null, currentEdits?: EditInput[]): Promise<EditInput[]>;
 }
 
 export type RepublishResult =
@@ -733,7 +733,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     // confident ones become edits right away (still reversible)
     if (!opts.dryRun && deps.recordSuggestions) {
       const suggestions = detectSuggestions(track, row.sportType);
-      const accepted = await deps.recordSuggestions(activityId, suggestions, activity.autoApply.enabled ? activity.autoApply.minConfidence : null);
+      const accepted = await deps.recordSuggestions(activityId, suggestions, activity.autoApply.enabled ? activity.autoApply.minConfidence : null, edits);
       if (accepted.length) edits = [...edits, ...accepted].sort((a, b) => a.id - b.id);
     }
 
@@ -876,7 +876,7 @@ export function defaultDeps(): RepublishDeps {
       await db.update(activities).set(set).where(eq(activities.id, id));
     },
     loadActivitySettings,
-    async recordSuggestions(id, suggestions, autoApplyMin) {
+    async recordSuggestions(id, suggestions, autoApplyMin, currentEdits = []) {
       if (!suggestions.length) return [];
       const rows = suggestions.map((s) => ({
         activityId: id,
@@ -898,15 +898,17 @@ export function defaultDeps(): RepublishDeps {
       const created: EditInput[] = [];
       for (const s of open) {
         if (!s.edit || s.confidence < autoApplyMin) continue;
+        // a one-sided crop keeps the other side of the crop already in effect
+        const params = s.edit.kind === "crop" ? combineCrop([...currentEdits, ...created], s.edit.params) : s.edit.params;
         const inserted = await db
           .insert(activityEdits)
-          .values({ activityId: id, kind: s.edit.kind, params: s.edit.params, note: `auto-applied: ${s.summary}` })
+          .values({ activityId: id, kind: s.edit.kind, params, note: `auto-applied: ${s.summary}` })
           .returning({ id: activityEdits.id });
         await db
           .update(activitySuggestions)
           .set({ status: "accepted", editId: inserted[0].id, decidedAt: new Date() })
           .where(and(eq(activitySuggestions.id, s.id), eq(activitySuggestions.status, "open")));
-        created.push({ id: inserted[0].id, kind: s.edit.kind, params: s.edit.params });
+        created.push({ id: inserted[0].id, kind: s.edit.kind, params });
       }
       return created;
     },
