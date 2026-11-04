@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
-import { getDb, activities, activityPhotos } from "@/lib/db";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { getDb, activities, activityPhotos, activitySources } from "@/lib/db";
 import { visibilityOf } from "@/lib/public-activity";
 import EditActivity from "@/components/admin/EditActivity";
 import RouteThumb from "@/components/RouteThumb";
@@ -31,6 +31,13 @@ export default async function AdminEditActivityPage({ params }: { params: Promis
     .where(eq(activityPhotos.activityId, id))
     .orderBy(asc(activityPhotos.position));
 
+  // trim is editable whenever republish has a track to rebuild from
+  const trackSources = await db
+    .select({ id: activitySources.id })
+    .from(activitySources)
+    .where(and(eq(activitySources.activityId, id), inArray(activitySources.kind, ["device-file", "strava-streams"]), isNotNull(activitySources.rawSha256)))
+    .limit(1);
+
   return (
     <div>
       <p style={{ marginBottom: "1rem" }}>
@@ -54,7 +61,7 @@ export default async function AdminEditActivityPage({ params }: { params: Promis
           hrHidden: row.hrHidden,
           trimStartM: row.trimStartM,
           trimEndM: row.trimEndM,
-          hasOriginal: !!row.fitBlobPathname,
+          hasOriginal: !!row.fitBlobPathname || trackSources.length > 0,
           utcOffsetMin: row.utcOffsetMin,
           photos,
         }}
