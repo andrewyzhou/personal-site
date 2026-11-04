@@ -16,3 +16,8 @@ export function registerFlush(flush: Flush): () => void {
 export function flushPendingWrites(): void {
   for (const f of [...flushers]) f();
 }
+
+/** app-state listener: ios may kill a backgrounded app before a debounce fires */
+export function flushOnAppState(state: string): void {
+  if (state === "inactive" || state === "background") flushPendingWrites();
+}

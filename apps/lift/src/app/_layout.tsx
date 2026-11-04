@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View, useColorScheme } from "react-native";
+import { ActivityIndicator, AppState, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { sqlite } from "../db/client";
 import { migrate } from "../db/migrate";
 import { useColors } from "../components/theme";
+import { flushOnAppState } from "../lib/pending";
 
 // migrations run once per js runtime, before any screen touches the db
 let ready: Promise<void> | null = null;
@@ -20,6 +21,12 @@ export default function RootLayout() {
       () => setState("ready"),
       (e: unknown) => setState(e instanceof Error ? e : new Error(String(e)))
     );
+  }, []);
+
+  // a weight typed just before locking the phone must land before ios can kill us
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", flushOnAppState);
+    return () => sub.remove();
   }, []);
 
   if (state !== "ready") {

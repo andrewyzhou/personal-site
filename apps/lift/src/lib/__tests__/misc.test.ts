@@ -3,7 +3,7 @@ import { customToExercise, isCustomId, parseRegions } from "../custom";
 import { createDebouncedCommit } from "../debounce";
 import { decideFinish } from "../finish";
 import { defaultWorkoutTitle, formatElapsed, formatList, humanize } from "../format";
-import { flushPendingWrites, registerFlush } from "../pending";
+import { flushOnAppState, flushPendingWrites, registerFlush } from "../pending";
 import { toUsageMap } from "../usage";
 
 describe("decideFinish", () => {
@@ -86,6 +86,17 @@ describe("pending registry", () => {
     offB();
     expect(a).toHaveBeenCalledTimes(1);
     expect(b).toHaveBeenCalledTimes(2);
+  });
+
+  it("flushes when the app goes inactive or background, not when active", () => {
+    const f = vi.fn();
+    const off = registerFlush(f);
+    flushOnAppState("active");
+    expect(f).not.toHaveBeenCalled();
+    flushOnAppState("inactive");
+    flushOnAppState("background");
+    off();
+    expect(f).toHaveBeenCalledTimes(2);
   });
 });
 
