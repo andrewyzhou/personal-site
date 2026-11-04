@@ -2,7 +2,7 @@
 // scripts): store raw inputs, link them to activities as sources, record edits.
 // all writes are insert-only and idempotent. server-only.
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, activitySources, activityEdits } from "./db";
 import { fitBlobPathname } from "./activities";
 import { unwrapTrackFile, type TrackFileType } from "./fit";
@@ -43,7 +43,8 @@ export async function findActivityIdBySource(provider: SourceProvider, externalI
   const rows = await getDb()
     .select({ activityId: activitySources.activityId })
     .from(activitySources)
-    .where(and(eq(activitySources.provider, provider), eq(activitySources.externalId, externalId)))
+    // split halves carry copies of the parent's source rows: the identity belongs to the parent
+    .where(and(eq(activitySources.provider, provider), eq(activitySources.externalId, externalId), sql`${activitySources.activityId} not in (select id from activities where split_from_id is not null)`))
     .orderBy(desc(activitySources.id))
     .limit(1);
   return rows[0]?.activityId ?? null;

@@ -39,6 +39,28 @@ export interface PrivacySettings {
   defaultTrimM: number;
 }
 
+// cleaning + metrics settings (activity_settings rows; latest wins)
+export interface ActivitySettings {
+  // accept detector suggestions at or above this confidence without asking
+  autoApply: { enabled: boolean; minConfidence: number };
+  // heart rate zones: upper bounds of z1..z4 as fractions of max hr (z5 above)
+  hrMaxBpm: number;
+  hrZonePcts: number[];
+}
+
+// stats straight from the untouched canonical track (device totals when the
+// file has them), kept next to the cleaned published ones
+export interface RawStats {
+  distanceM: number;
+  movingTimeS: number;
+  elapsedTimeS: number;
+  elevGainM: number;
+  avgSpeedMs: number;
+  maxSpeedMs: number;
+  avgHr: number | null;
+  maxHr: number | null;
+}
+
 export const activities = pgTable(
   "activities",
   {
@@ -108,6 +130,12 @@ export const activities = pgTable(
     // PRIVATE: the route as first written by an ingest path (before fog), kept so
     // trackless rows can be fogged now and restored when zones change
     legacyRoute: jsonb("legacy_route").$type<{ polyline: string | null; cardPolyline: string | null; bounds: RouteBounds | null }>(),
+    // cleaning (written by republish): stats of the untouched track, and
+    // seconds per heart-rate zone of the published track (hidden with hr)
+    rawStats: jsonb("raw_stats").$type<RawStats>(),
+    hrZonesS: jsonb("hr_zones_s").$type<number[]>(),
+    // set on the second half of a split: the activity it was split from
+    splitFromId: bigint("split_from_id", { mode: "number" }),
     // last rebuild-job attempt: failing rows go to the back of the queue
     republishAttemptedAt: timestamp("republish_attempted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -240,6 +268,45 @@ export const privacyZones = pgTable("privacy_zones", {
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
+
+// detector output: proposed cleaning edits for the owner to accept or dismiss.
+// insert-only per (activity, detector version, fingerprint); decisions stamp
+// status. accepting creates an activity_edits row (edit_id), so undo = revert it.
+export const activitySuggestions = pgTable(
+  "activity_suggestions",
+  {
+    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    activityId: bigint("activity_id", { mode: "number" })
+      .notNull()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    detectorVersion: integer("detector_version").notNull(),
+    // stable hash of (kind, edit) so re-detection never duplicates
+    fingerprint: text("fingerprint").notNull(),
+    // 'crop-head' | 'crop-tail' | 'cut-vehicle' | 'drop-spikes' | 'no-gps' | 'idle'
+    kind: text("kind").notNull(),
+    confidence: doublePrecision("confidence").notNull(),
+    // the activity_edits row this would create: { kind, params } (null = info only)
+    edit: jsonb("edit").$type<{ kind: string; params: Record<string, unknown> } | null>(),
+    summary: text("summary").notNull(),
+    range: jsonb("range").$type<{ fromS: number; toS: number } | null>(),
+    status: text("status").notNull().default("open"), // 'open' | 'accepted' | 'dismissed'
+    editId: bigint("edit_id", { mode: "number" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+  },
+  (t) => [
+    uniqueIndex("activity_suggestions_fp_idx").on(t.activityId, t.detectorVersion, t.fingerprint),
+    index("activity_suggestions_activity_idx").on(t.activityId, t.status),
+  ]
+);
+
+export const activitySettings = pgTable("activity_settings", {
+  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+  settings: jsonb("settings").$type<ActivitySettings>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+export type ActivitySuggestionRow = typeof activitySuggestions.$inferSelect;
 
 // insert-only; the newest row is in effect (restore = insert an older value)
 export const privacySettings = pgTable("privacy_settings", {

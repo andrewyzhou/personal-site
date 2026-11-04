@@ -21,6 +21,7 @@ import { getAccessToken, isStravaApiEnabled } from "./strava";
 import { invalidateCache } from "./cache";
 import { addActivitySource, findActivityIdBySource, knownExternalIds, storeRawPayload } from "./activity-sources";
 import { republish } from "./republish";
+import { staleMark } from "./privacy/stale";
 
 const API = "https://www.strava.com/api/v3";
 const FETCH_TIMEOUT_MS = 10000;
@@ -305,11 +306,18 @@ export async function syncStravaActivities({ dryRun = false } = {}): Promise<Syn
 }
 
 // strava is where activities get named: its metadata wins over other sources.
-// stats and route are left alone.
+// stats and route are left alone. only this row is touched: split halves
+// (split_from_id = this row) keep their own names and sport. a sport change
+// marks the row stale, since cleaned stats and detection depend on it (the
+// rebuild job republishes it).
 async function setStravaMetadata(rowId: number, detail: StravaDetail): Promise<void> {
-  await getDb()
+  const db = getDb();
+  const current = (await db.select({ sportType: activities.sportType }).from(activities).where(eq(activities.id, rowId)).limit(1))[0];
+  const sportChanged = !!current && current.sportType !== detail.sport_type;
+  await db
     .update(activities)
     .set({
+      ...(sportChanged ? staleMark() : {}),
       name: detail.name || "workout",
       description: detail.description || null,
       sportType: detail.sport_type,
@@ -357,10 +365,22 @@ export async function hideStravaActivity(stravaId: number): Promise<boolean> {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (response.status !== 404) return false;
-  await getDb()
+  const db = getDb();
+  const hidden = await db
     .update(activities)
     .set({ hidden: true, updatedAt: new Date() })
-    .where(eq(activities.externalId, String(stravaId)));
+    .where(eq(activities.externalId, String(stravaId)))
+    .returning({ id: activities.id });
+  // split halves (and halves of halves) are the same recording: hidden too
+  let parents = hidden.map((r) => r.id);
+  for (let depth = 0; parents.length && depth < 10; depth++) {
+    const children = await db
+      .update(activities)
+      .set({ hidden: true, updatedAt: new Date() })
+      .where(inArray(activities.splitFromId, parents))
+      .returning({ id: activities.id });
+    parents = children.map((r) => r.id);
+  }
   await invalidateCache("activities_list", "activities_latest");
   return true;
 }
