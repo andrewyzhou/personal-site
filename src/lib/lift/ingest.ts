@@ -99,8 +99,10 @@ export function buildWorkoutWrites(db: Db, w: WorkoutPlan): BatchItem<"pg">[] {
           workingSets: excluded(t.workingSets),
           volumeKg: excluded(t.volumeKg),
           muscleLoad: excluded(t.muscleLoad),
-          // sharing it again is an explicit "log this", so it un-deletes
+          // sharing it again is an explicit "log this", so it un-deletes. a
+          // phone discard also set status, so that goes back to finished too
           deletedAt: sql`null`,
+          status: sql`'finished'`,
           updatedAt: sql`now()`,
         },
       })

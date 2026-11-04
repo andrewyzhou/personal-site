@@ -7,6 +7,7 @@ import { countLocalWorkouts, getRestoredAt, restoreFromServer } from "../db/rest
 import { setDefaultUnit } from "../db/settings";
 import {
   DEFAULT_SERVER_URL,
+  countRejected,
   countUnsynced,
   getDeviceId,
   getLastSync,
@@ -42,6 +43,7 @@ export default function Settings() {
   const deviceId = useMemo(() => getDeviceId(), []);
   const last = useMemo(() => getLastSync(), [syncing, tick]);
   const unsynced = useMemo(() => countUnsynced(), [version, syncing, tick]);
+  const rejected = useMemo(() => countRejected(), [version, syncing, tick]);
   const restoredAt = useMemo(() => getRestoredAt(), [version, tick]);
 
   useEffect(() => {
@@ -68,10 +70,10 @@ export default function Settings() {
     setUnitState(u);
   };
 
-  const doRestore = async (replace: boolean) => {
+  const doRestore = async (replace: boolean, allowRejected = false) => {
     setRestoring(true);
     try {
-      const r = await restoreFromServer({ replace });
+      const r = await restoreFromServer({ replace, allowRejected });
       Alert.alert("restored", `${r.workouts} workouts, ${r.sets} sets${r.dropped ? `, ${r.dropped} orphans skipped` : ""}`);
     } catch (e) {
       Alert.alert("restore failed", e instanceof Error ? e.message : String(e));
@@ -81,17 +83,35 @@ export default function Settings() {
     }
   };
 
-  const confirmRestore = () => {
+  const confirmRestore = (allowRejected = false) => {
+    const pending = countUnsynced();
+    if (pending > 0) {
+      Alert.alert("sync first", `${pending} unsynced ${pending === 1 ? "change" : "changes"} would be lost. sync, then restore.`);
+      return;
+    }
+    const refused = countRejected();
+    if (refused > 0 && !allowRejected) {
+      // these never reached the server, so the restore can't bring them back
+      Alert.alert(
+        "changes would be lost",
+        `${refused} ${refused === 1 ? "change was" : "changes were"} refused by the server and only exist on this phone. try sync now first; restoring replaces them with the server copy.`,
+        [
+          { text: "cancel", style: "cancel" },
+          { text: "restore anyway", style: "destructive", onPress: () => confirmRestore(true) },
+        ]
+      );
+      return;
+    }
     if (countLocalWorkouts() === 0) {
       Alert.alert("restore from server?", "downloads everything from the server into this phone.", [
         { text: "cancel", style: "cancel" },
-        { text: "restore", onPress: () => void doRestore(false) },
+        { text: "restore", onPress: () => void doRestore(false, allowRejected) },
       ]);
       return;
     }
     Alert.alert("replace local data?", "this phone already has workouts. they will be replaced by the server copy.", [
       { text: "cancel", style: "cancel" },
-      { text: "replace local data", style: "destructive", onPress: () => void doRestore(true) },
+      { text: "replace local data", style: "destructive", onPress: () => void doRestore(true, allowRejected) },
     ]);
   };
 
@@ -159,6 +179,7 @@ export default function Settings() {
         {last ? `${timeOf(last.at)} · ${last.message}` : "never"}
       </Text>
       <Text style={{ color: c.muted }}>{unsynced} unsynced changes</Text>
+      {rejected ? <Text style={{ color: c.danger }}>{rejected} refused by the server</Text> : null}
       {restoredAt ? <Text style={{ color: c.muted }}>restored {timeOf(restoredAt)}</Text> : null}
 
       <Button

@@ -231,7 +231,9 @@ describe("planSync", () => {
       `"name_raw" = case when "lift_workout_exercises"."exercise_id" = excluded."exercise_id" then "lift_workout_exercises"."name_raw" else excluded."name_raw" end`
     );
     expect(sqls[5]).toMatch(/^insert into "lift_sets" .* where "lift_sets"."updated_at" <= excluded."updated_at"$/);
-    expect(sqls[6]).toMatch(/^insert into "lift_sync_log" .* on conflict do nothing$/);
+    // a seq logged as rejected gets its new outcome; an applied one is never rewritten
+    expect(sqls[6]).toMatch(/^insert into "lift_sync_log" .* on conflict \("device_id","seq"\) do update set .* where "lift_sync_log"."rejected" is not null$/);
+    expect(sqls[6]).toContain('"rejected" = excluded."rejected"');
     expect(sqls).toHaveLength(7);
     // the catalog name becomes nameRaw
     expect(render([p.statements[4]])[0].params).toContain("Bench Press (Barbell)");
@@ -249,6 +251,82 @@ describe("planSync", () => {
     expect(sqls[0].params).not.toContain("bw1");
     // only the new seq is logged
     expect(sqls[1].params).toEqual(["device-abc123", muts[1].seq, "bodyweight", "bw2", "insert", null]);
+  });
+
+  it("re-evaluates a previously rejected seq (left out of seenSeqs) and rewrites its log row", () => {
+    // an m1-era insert an older server refused ("payload.utcOffsetMin is missing"), resent after the fix
+    const m1: Partial<WorkoutPayload> = workout();
+    delete m1.utcOffsetMin;
+    delete m1.templateId;
+    const retried = mut("workout", "insert", m1 as WorkoutPayload);
+    const child = mut("workout_exercise", "insert", we());
+    const p = plan([retried, child]);
+    expect(p).toMatchObject({ applied: 2, skipped: 0, rejected: [] });
+    const log = render(p.statements).at(-1)!;
+    expect(log.sql).toMatch(/^insert into "lift_sync_log"/);
+    expect(log.sql).toContain("do update set");
+    expect(log.params).toEqual(expect.arrayContaining([retried.seq, child.seq]));
+  });
+
+  it("recomputes aggregates for workouts a replay touches, so a retry heals a failed recompute", () => {
+    const muts = [mut("set", "update", set()), mut("workout", "update", workout({ id: "w2" })), mut("set", "delete", null, "s9")];
+    const p = plan(
+      muts,
+      emptyState({
+        seenSeqs: new Set(muts.map((m) => m.seq)),
+        workouts: new Set(["w1", "w2", "w3"]),
+        workoutExercises: new Map([["we1", { workoutId: "w1", exerciseId: "bench-press-barbell", tracking: "weight_reps" }]]),
+        sets: new Map([["s9", "w3"]]),
+      })
+    );
+    expect(p).toMatchObject({ applied: 0, skipped: 3, statements: [] });
+    expect(p.touchedWorkoutIds.sort()).toEqual(["w1", "w2", "w3"]);
+    // a replay of a workout that's gone touches nothing
+    const gone = mut("workout", "update", workout({ id: "w404" }));
+    expect(plan([gone], emptyState({ seenSeqs: new Set([gone.seq]) })).touchedWorkoutIds).toEqual([]);
+  });
+
+  it("refuses new exercises and sets in imported workouts, but accepts edits of existing rows", () => {
+    const sw = "strong-Slug1";
+    const state = emptyState({
+      workouts: new Set([sw]),
+      workoutExercises: new Map([[`${sw}:0`, { workoutId: sw, exerciseId: "bench-press-barbell", tracking: "weight_reps" }]]),
+      sets: new Map([[`${sw}:0:0`, sw]]),
+    });
+    const newWe = mut("workout_exercise", "insert", we({ id: "we-new", workoutId: sw }));
+    const newSet = mut("set", "insert", set({ id: "s-new", workoutExerciseId: `${sw}:0` }));
+    const editWe = mut("workout_exercise", "update", we({ id: `${sw}:0`, workoutId: sw, restS: 60 }));
+    const editSet = mut("set", "update", set({ id: `${sw}:0:0`, workoutExerciseId: `${sw}:0`, reps: 6 }));
+    const discard = mut("workout", "update", workout({ id: sw, status: "discarded" }));
+    const p = plan([newWe, newSet, editWe, editSet, discard], state);
+    expect(p.rejected).toEqual([
+      { seq: newWe.seq, reason: `workout ${sw} is an imported workout: exercises can't be added to it` },
+      { seq: newSet.seq, reason: `workout ${sw} is an imported workout: sets can't be added to it` },
+    ]);
+    expect(p.applied).toBe(3);
+    // the phone's status drives the soft delete of an imported workout too; source stays server-owned
+    const w = render(p.statements).find((s) => s.sql.startsWith('insert into "lift_workouts"'))!;
+    expect(w.sql).toContain('"deleted_at" = excluded."deleted_at"');
+    expect(w.sql).not.toContain('"source" = ');
+    expect(workoutRow(workout({ id: sw, status: "discarded" })).deletedAt).toBeInstanceOf(Date);
+    expect(workoutRow(workout({ id: sw, status: "finished" })).deletedAt).toBeNull();
+    // app workouts are unaffected
+    expect(plan([mut("set", "insert", set())], emptyState({ workoutExercises: new Map([["we1", { workoutId: "w1", exerciseId: "bench-press-barbell", tracking: "weight_reps" }]]) })).rejected).toEqual([]);
+  });
+
+  it("after a merge in the same batch, later sets use the merge target's tracking", () => {
+    const cid = "custom-aaaaaaaaaaaa";
+    const state = emptyState({
+      workouts: new Set(["w1"]),
+      workoutExercises: new Map([["we1", { workoutId: "w1", exerciseId: cid, tracking: "weight_reps" }]]),
+      exercises: new Map([[cid, { name: "Ring Dip", tracking: "weight_reps" }]]),
+    });
+    const p = plan([mut("custom_exercise", "update", custom({ mergedInto: "pull-up" })), mut("set", "update", set({ weight: 25 }))], state);
+    expect(p.rejected).toEqual([]);
+    const s = render(p.statements).find((x) => x.sql.startsWith('insert into "lift_sets"'))!;
+    // pull-up is bodyweight-relative: flagged, and no e1rm
+    expect(s.params).toContain(true);
+    expect(s.params).not.toContain(false);
   });
 
   it("rejects bad or orphaned mutations without failing the rest, and logs the reason", () => {
@@ -375,8 +453,14 @@ describe("planSync", () => {
 
   it("archives a custom exercise on delete and only drops it when nothing references it", () => {
     const p = plan([mut("custom_exercise", "delete", null, "custom-aaaaaaaaaaaa")]);
-    const [archive, del] = render(p.statements).map((s) => s.sql);
-    expect(archive).toMatch(/^update "exercises" set "archived" = \$1, "updated_at" = now\(\) where \("exercises"."id" = \$2 and "exercises"."is_custom" = \$3\)$/);
+    const [archiveQ, delQ] = render(p.statements);
+    const [archive, del] = [archiveQ.sql, delQ.sql];
+    // stamped with the mutation's own time (phone clock), and only over an older row
+    expect(archive).toMatch(
+      /^update "exercises" set "archived" = \$1, "updated_at" = \$2 where \("exercises"."id" = \$3 and "exercises"."is_custom" = \$4 and "exercises"."updated_at" <= \$5\)$/
+    );
+    expect(archive).not.toContain("now()");
+    expect(archiveQ.params[1]).toBe(new Date(T0).toISOString());
     expect(del).toMatch(/^delete from "exercises" where \("exercises"."id" = \$1 and "exercises"."is_custom" = \$2 and not exists \(select 1 from "lift_workout_exercises" x/);
     expect(del).toContain('not exists (select 1 from "lift_template_exercises" x');
   });

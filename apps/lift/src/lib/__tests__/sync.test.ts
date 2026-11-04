@@ -1,9 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import { SYNC_PROTOCOL_VERSION, type SyncSnapshot } from "lift-core";
+import { SNAPSHOT_ENTITIES, SNAPSHOT_PAGE_MAX, SYNC_PROTOCOL_VERSION, type SnapshotEntity, type SyncSnapshot } from "lift-core";
 import { backoffDelay } from "../sync/backoff";
-import { buildPushRequest, endpoint, parsePushResponse, planAck, toMutation, type OutboxLike } from "../sync/mutations";
+import {
+  buildPushRequest,
+  endpoint,
+  isRetryableRejection,
+  parsePushResponse,
+  planAck,
+  toMutation,
+  type OutboxLike,
+} from "../sync/mutations";
 import { pushAll, type FetchLike } from "../sync/push";
-import { chunk, fetchSnapshot, parseSnapshot, restorePlan, wipeOrder } from "../sync/snapshot";
+import {
+  chunk,
+  fetchSnapshot,
+  parseSnapshot,
+  parseSnapshotPage,
+  restoreBlocker,
+  restorePlan,
+  wipeOrder,
+} from "../sync/snapshot";
 import { polylinePoints, scalePoints } from "../../components/charts/scale";
 import { formatDuration, formatKg, formatVolume } from "../../components/charts/units";
 
@@ -196,6 +212,51 @@ describe("pushAll", () => {
     expect(f).toHaveBeenCalledTimes(1);
   });
 
+  it("halves the batch on 413 until it fits, then keeps draining", async () => {
+    const s = store(10);
+    const sizes: number[] = [];
+    const f = vi.fn<FetchLike>(async (_url, init) => {
+      const b = JSON.parse(init.body!) as { mutations: { seq: number }[] };
+      sizes.push(b.mutations.length);
+      if (b.mutations.length > 3) return { status: 413, json: async () => ({ ok: false, error: "body too large" }) };
+      return {
+        status: 200,
+        json: async () => ({ ok: true, appliedThrough: b.mutations.at(-1)!.seq, applied: b.mutations.length, skipped: 0, rejected: [] }),
+      };
+    });
+    const r = await pushAll({ ...base, fetch: f, readBatch: s.readBatch, ack: s.ack, maxBatch: 10 });
+    expect(r).toMatchObject({ ok: true, pushed: 10 });
+    expect(sizes).toEqual([10, 5, 2, 2, 2, 2, 2]);
+    expect(s.rows.every((x) => x.syncedAt !== null)).toBe(true);
+  });
+
+  it("gives up when a single row is still too large, without spinning", async () => {
+    const s = store(4);
+    const f = okFetch(() => ({ ok: false, error: "body too large" }), 413);
+    const r = await pushAll({ ...base, fetch: f, readBatch: s.readBatch, ack: s.ack });
+    expect(r).toMatchObject({ ok: false, kind: "too_large", status: 413 });
+    if (!r.ok) expect(r.error).toMatch(/change 1 is too large/);
+    // 4 -> 2 -> 1 -> stop
+    expect(f).toHaveBeenCalledTimes(3);
+    expect(s.rows.every((x) => x.syncedAt === null)).toBe(true);
+  });
+
+  it("surfaces 400, 401 and 5xx as distinct failures", async () => {
+    const cases: [number, unknown, string, RegExp][] = [
+      [400, { ok: false, error: "unsupported protocol (expected 1)" }, "bad_request", /refused the batch: unsupported protocol/],
+      [401, { ok: false, error: "unauthorized" }, "unauthorized", /app token/],
+      [503, {}, "server", /server error 503/],
+    ];
+    for (const [status, body, kind, msg] of cases) {
+      const s = store(2);
+      const f = okFetch(() => body, status);
+      const r = await pushAll({ ...base, fetch: f, readBatch: s.readBatch, ack: s.ack });
+      expect(r).toMatchObject({ ok: false, kind, status });
+      if (!r.ok) expect(r.error).toMatch(msg);
+      expect(f).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it("does nothing without a token or url, and succeeds on an empty outbox", async () => {
     const s = store(0);
     const f = okFetch(() => ({}));
@@ -280,14 +341,108 @@ describe("restore plan", () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
     expect(chunk([], 2)).toEqual([]);
   });
-  it("fetches with bearer and surfaces http errors", async () => {
-    const f = vi.fn<FetchLike>(async () => ({ status: 200, json: async () => snapshot() }));
-    await fetchSnapshot(f, "https://x.org/", "tok");
-    expect(f.mock.calls[0]![0]).toBe("https://x.org/api/lift/sync/snapshot");
+  // a fake paged server over a full snapshot: id order, `after` exclusive
+  function pagedServer(full: SyncSnapshot) {
+    return vi.fn<FetchLike>(async (url) => {
+      const q = new URL(url).searchParams;
+      const entity = q.get("entity") as SnapshotEntity;
+      const limit = Number(q.get("limit"));
+      const after = q.get("after");
+      const all = [...(full[entity] as { id: string }[])].sort((a, b) => (a.id < b.id ? -1 : 1));
+      const rest = after == null ? all : all.filter((r) => r.id > after);
+      const rows = rest.slice(0, limit);
+      const next = rest.length > limit ? rows.at(-1)!.id : null;
+      return { status: 200, json: async () => ({ protocol: SYNC_PROTOCOL_VERSION, entity, rows, next, generatedAt: 7 }) };
+    });
+  }
+
+  it("fetches every entity in fk order with bearer, and surfaces http errors", async () => {
+    const f = pagedServer(snapshot());
+    const snap = await fetchSnapshot(f, "https://x.org/", "tok");
+    expect(f.mock.calls.map((c) => new URL(c[0]).searchParams.get("entity"))).toEqual([...SNAPSHOT_ENTITIES]);
+    expect(f.mock.calls[0]![0]).toBe(`https://x.org/api/lift/sync/snapshot?entity=customExercises&limit=${SNAPSHOT_PAGE_MAX}`);
     expect(f.mock.calls[0]![1].headers.authorization).toBe("Bearer tok");
+    expect(snap.sets.map((s) => s.id).sort()).toEqual(["s1", "s2"]);
+    expect(snap.generatedAt).toBe(7);
     const bad = vi.fn<FetchLike>(async () => ({ status: 401, json: async () => ({}) }));
     await expect(fetchSnapshot(bad, "https://x.org", "tok")).rejects.toThrow(/unauthorized/);
     await expect(fetchSnapshot(f, "https://x.org", "")).rejects.toThrow(/token/);
+  });
+
+  it("pages through large entities and assembles the whole snapshot", async () => {
+    const base = snapshot().sets[0]!;
+    const sets = Array.from({ length: 25 }, (_, i) => ({ ...base, id: `s${String(i).padStart(3, "0")}` }));
+    const full = snapshot({ sets });
+    const f = pagedServer(full);
+    const snap = await fetchSnapshot(f, "https://x.org", "tok", { pageSize: 10 });
+    expect(snap.sets.map((s) => s.id)).toEqual(sets.map((s) => s.id));
+    const setCalls = f.mock.calls.map((c) => new URL(c[0]).searchParams).filter((q) => q.get("entity") === "sets");
+    expect(setCalls.map((q) => q.get("after"))).toEqual([null, "s009", "s019"]);
+    // the assembled snapshot restores like a single-response one did
+    expect(restorePlan(snap).counts).toEqual({ workouts: 1, sets: 25 });
+  });
+
+  it("refuses a page for the wrong entity, a stuck cursor and endless pages", async () => {
+    const wrong = vi.fn<FetchLike>(async () => ({
+      status: 200,
+      json: async () => ({ protocol: SYNC_PROTOCOL_VERSION, entity: "sets", rows: [], next: null, generatedAt: 1 }),
+    }));
+    await expect(fetchSnapshot(wrong, "https://x.org", "tok")).rejects.toThrow(/expected customExercises/);
+    const stuck = vi.fn<FetchLike>(async (url) => ({
+      status: 200,
+      json: async () => ({
+        protocol: SYNC_PROTOCOL_VERSION,
+        entity: new URL(url).searchParams.get("entity"),
+        rows: [{ id: "a" }],
+        next: "a",
+        generatedAt: 1,
+      }),
+    }));
+    await expect(fetchSnapshot(stuck, "https://x.org", "tok")).rejects.toThrow(/cursor/);
+    let n = 0;
+    const endless = vi.fn<FetchLike>(async (url) => ({
+      status: 200,
+      json: async () => ({
+        protocol: SYNC_PROTOCOL_VERSION,
+        entity: new URL(url).searchParams.get("entity"),
+        rows: [{ id: `r${++n}` }],
+        next: `r${n}`,
+        generatedAt: 1,
+      }),
+    }));
+    await expect(fetchSnapshot(endless, "https://x.org", "tok", { maxPages: 5 })).rejects.toThrow(/too many pages/);
+    expect(endless).toHaveBeenCalledTimes(5);
+  });
+
+  it("validates pages", () => {
+    const page = { protocol: SYNC_PROTOCOL_VERSION, entity: "sets", rows: [{ id: "s1" }], next: null, generatedAt: 1 };
+    expect(parseSnapshotPage(page, "sets")).toBeTruthy();
+    expect(() => parseSnapshotPage({ ...page, protocol: 2 }, "sets")).toThrow(/protocol/);
+    expect(() => parseSnapshotPage({ ...page, rows: [{}] }, "sets")).toThrow(/id/);
+    expect(() => parseSnapshotPage({ ...page, next: 5 }, "sets")).toThrow(/next/);
+  });
+});
+
+describe("restore guard", () => {
+  it("blocks on unsynced rows, and on refused rows unless the user agreed", () => {
+    expect(restoreBlocker({ unsynced: 0, rejected: 0 })).toBeNull();
+    expect(restoreBlocker({ unsynced: 2, rejected: 0 })).toMatch(/sync first: 2 unsynced changes/);
+    expect(restoreBlocker({ unsynced: 1, rejected: 0, }, true)).toMatch(/sync first/);
+    expect(restoreBlocker({ unsynced: 0, rejected: 3 })).toMatch(/3 changes were refused/);
+    expect(restoreBlocker({ unsynced: 0, rejected: 1 })).toMatch(/1 change was refused/);
+    expect(restoreBlocker({ unsynced: 0, rejected: 3 }, true)).toBeNull();
+  });
+});
+
+describe("isRetryableRejection", () => {
+  it("matches the server's missing-key and not-found reasons only", () => {
+    expect(isRetryableRejection("payload.utcOffsetMin is missing")).toBe(true);
+    expect(isRetryableRejection("workout m1w not found")).toBe(true);
+    expect(isRetryableRejection("workout exercise m1we not found")).toBe(true);
+    expect(isRetryableRejection("merge target pull-up not found")).toBe(true);
+    expect(isRetryableRejection("payload.completed must be 0 or 1")).toBe(false);
+    expect(isRetryableRejection("bench-press-barbell is a catalog exercise")).toBe(false);
+    expect(isRetryableRejection(null)).toBe(false);
   });
 });
 

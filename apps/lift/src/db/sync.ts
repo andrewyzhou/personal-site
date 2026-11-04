@@ -3,16 +3,17 @@
 
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { and, asc, count, eq, isNull, lte } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { randomUUID } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { db } from "./client";
 import { subscribe } from "./events";
 import { getSetting, setSetting } from "./settings";
-import { outbox, workouts } from "./schema";
+import { kv, outbox, workouts } from "./schema";
 import { backoffDelay } from "../lib/sync/backoff";
-import type { AckPlan, OutboxLike } from "../lib/sync/mutations";
-import { pushAll, type FetchLike, type PushResult } from "../lib/sync/push";
+import { isRetryableRejection, type AckPlan, type OutboxLike } from "../lib/sync/mutations";
+import { chunk } from "../lib/sync/snapshot";
+import { pushAll, type FetchLike, type PushErrorKind, type PushResult } from "../lib/sync/push";
 
 export const DEFAULT_SERVER_URL = "https://www.andrewzhou.org";
 const TOKEN_KEY = "lift.appToken";
@@ -49,6 +50,8 @@ export interface SyncStatus {
   at: number;
   ok: boolean;
   message: string;
+  /** failure class (unauthorized, bad_request, too_large, ...); absent on success */
+  kind?: PushErrorKind;
 }
 
 export function getLastSync(): SyncStatus | null {
@@ -63,6 +66,41 @@ export function getLastSync(): SyncStatus | null {
 
 export function countUnsynced(): number {
   return db.select({ n: count() }).from(outbox).where(isNull(outbox.syncedAt)).get()?.n ?? 0;
+}
+
+/** changes the server refused: marked synced, but they never reached it */
+export function countRejected(): number {
+  return db.select({ n: count() }).from(outbox).where(isNotNull(outbox.rejected)).get()?.n ?? 0;
+}
+
+// bump the suffix when a server fix makes another class of rejections retryable
+const REQUEUE_FLAG = "outboxRequeueV1";
+
+/**
+ * one-time: put rejections the server now accepts back in the queue. older
+ * servers refused payloads from before migration 2 (missing nullable keys)
+ * plus everything that cascaded from them; the server re-evaluates seqs it
+ * logged as rejected, so resending them is safe.
+ */
+export function requeueRetryableRejections(): number {
+  const done = db.select({ value: kv.value }).from(kv).where(eq(kv.key, REQUEUE_FLAG)).get();
+  if (done) return 0;
+  let n = 0;
+  db.transaction((tx) => {
+    const rows = tx
+      .select({ id: outbox.id, rejected: outbox.rejected })
+      .from(outbox)
+      .where(isNotNull(outbox.rejected))
+      .all();
+    const ids = rows.filter((r) => isRetryableRejection(r.rejected)).map((r) => r.id);
+    for (const part of chunk(ids, 500)) {
+      tx.update(outbox).set({ syncedAt: null, rejected: null }).where(inArray(outbox.id, part)).run();
+    }
+    n = ids.length;
+    const at = String(Date.now());
+    tx.insert(kv).values({ key: REQUEUE_FLAG, value: at }).onConflictDoUpdate({ target: kv.key, set: { value: at } }).run();
+  });
+  return n;
 }
 
 function readBatch(limit: number): OutboxLike[] {
@@ -114,12 +152,20 @@ export function isSyncing(): boolean {
 }
 
 function describe(r: PushResult): string {
-  if (!r.ok) return r.pushed ? `${r.error} (pushed ${r.pushed})` : r.error;
+  if (!r.ok) {
+    const code = r.status ? ` (${r.status})` : "";
+    return r.pushed ? `${r.error}${code}, pushed ${r.pushed}` : `${r.error}${code}`;
+  }
   if (r.pushed === 0) return "up to date";
   return r.rejected ? `pushed ${r.pushed}, ${r.rejected} rejected` : `pushed ${r.pushed}`;
 }
 
 async function run(fetchFn: FetchLike): Promise<PushResult> {
+  try {
+    requeueRetryableRejections();
+  } catch {
+    // a failed backfill only means those rows wait; the flag isn't set, so it retries
+  }
   const token = (await getToken()) ?? "";
   const result = await pushAll({
     fetch: fetchFn,
@@ -138,6 +184,7 @@ async function run(fetchFn: FetchLike): Promise<PushResult> {
     nextAllowedAt = now + backoffDelay(failures);
   }
   const status: SyncStatus = { at: now, ok: result.ok, message: describe(result) };
+  if (!result.ok) status.kind = result.kind;
   setSetting("lastSyncResult", JSON.stringify(status));
   if (result.ok) setSetting("lastSyncAt", String(now));
   return result;
@@ -151,6 +198,7 @@ export function syncNow(fetchFn: FetchLike = fetch as unknown as FetchLike): Pro
       (e: unknown): PushResult => ({
         ok: false,
         error: e instanceof Error ? e.message : "sync failed",
+        kind: "protocol",
         pushed: 0,
         applied: 0,
         skipped: 0,
@@ -171,6 +219,8 @@ export function syncNow(fetchFn: FetchLike = fetch as unknown as FetchLike): Pro
 async function autoSync(): Promise<void> {
   try {
     if (inflight || Date.now() < nextAllowedAt) return;
+    // requeued rows count as unsynced, so this runs before the empty check
+    requeueRetryableRejections();
     if (countUnsynced() === 0) return;
     if (!(await getToken())) return;
     await syncNow();

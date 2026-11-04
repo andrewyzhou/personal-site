@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { push, snapshot } = vi.hoisted(() => ({ push: vi.fn(), snapshot: vi.fn() }));
 vi.mock("@/lib/lift/sync/push", () => ({ pushMutations: (...a: unknown[]) => push(...a) }));
-vi.mock("@/lib/lift/sync/snapshot", () => ({ loadSnapshot: () => snapshot() }));
+vi.mock("@/lib/lift/sync/snapshot", async (orig) => ({
+  // the real query parser, a fake loader
+  parseSnapshotQuery: (await orig<typeof import("@/lib/lift/sync/snapshot")>()).parseSnapshotQuery,
+  loadSnapshotPage: (...a: unknown[]) => snapshot(...a),
+}));
 
 import { POST } from "@/app/api/lift/sync/route";
 import { GET } from "@/app/api/lift/sync/snapshot/route";
@@ -91,13 +95,28 @@ describe("POST /api/lift/sync", () => {
 });
 
 describe("GET /api/lift/sync/snapshot", () => {
-  const get = (token: string | null = "tok") =>
-    GET(new Request(`${URL_}/snapshot`, { headers: token ? { authorization: `Bearer ${token}` } : {} }));
+  const PAGE = { protocol: 1, entity: "workouts", rows: [], next: null, generatedAt: 1 };
+  const get = (token: string | null = "tok", qs = "?entity=workouts") =>
+    GET(new Request(`${URL_}/snapshot${qs}`, { headers: token ? { authorization: `Bearer ${token}` } : {} }));
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.LIFT_APP_TOKEN = "tok";
-    snapshot.mockResolvedValue({ protocol: 1, generatedAt: 1, workouts: [] });
+    snapshot.mockResolvedValue(PAGE);
+  });
+
+  it("passes the parsed page query to the loader", async () => {
+    await get("tok", "?entity=sets&after=s-9&limit=50");
+    expect(snapshot).toHaveBeenCalledWith({ entity: "sets", after: "s-9", limit: 50 });
+    await get("tok", "?entity=bodyweights");
+    expect(snapshot).toHaveBeenLastCalledWith({ entity: "bodyweights", after: null, limit: 2000 });
+  });
+
+  it("400s on a missing or unknown entity and an out-of-range limit", async () => {
+    for (const qs of ["", "?entity=nope", "?entity=sets&limit=0", "?entity=sets&limit=2001", "?entity=sets&limit=x", "?entity=sets&after="]) {
+      expect((await get("tok", qs)).status).toBe(400);
+    }
+    expect(snapshot).not.toHaveBeenCalled();
   });
 
   it("requires the app bearer", async () => {
@@ -112,7 +131,7 @@ describe("GET /api/lift/sync/snapshot", () => {
     const res = await get();
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(await res.json()).toEqual({ protocol: 1, generatedAt: 1, workouts: [] });
+    expect(await res.json()).toEqual(PAGE);
   });
 
   it("500s without leaking internals", async () => {

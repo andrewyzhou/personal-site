@@ -51,6 +51,22 @@ describe("pushMutations", () => {
     expect(recompute).toHaveBeenCalledWith(state.db, ["w1"], []);
   });
 
+  it("only counts seqs logged without a rejection as seen, so refused ones get re-evaluated", async () => {
+    batch.mockResolvedValueOnce([[], [], [], [], [], [], []]).mockResolvedValueOnce([]);
+    await pushMutations("device-abc123", [{ seq: 1, raw: raw(1) }]);
+    const seen = (batch.mock.calls[0][0] as Sqlable[])[0].toSQL().sql;
+    expect(seen).toMatch(/from "lift_sync_log" where \(.*"lift_sync_log"."rejected" is null\)$/);
+  });
+
+  it("recomputes aggregates on an all-replay push, so a retry heals a failed recompute", async () => {
+    batch.mockResolvedValueOnce([[{ seq: 1 }], [{ id: "w1" }], [], [], [], [], []]);
+    const res = await pushMutations("device-abc123", [{ seq: 1, raw: raw(1, { op: "update" }) }]);
+    expect(res).toMatchObject({ applied: 0, skipped: 1 });
+    // nothing to write, but the touched workout still gets recomputed
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(recompute).toHaveBeenCalledWith(state.db, ["w1"], []);
+  });
+
   it("propagates a failed write batch so the route can 500 (nothing applied)", async () => {
     batch.mockResolvedValueOnce([[], [], [], [], [], [], []]).mockRejectedValueOnce(new Error("fk violation"));
     await expect(pushMutations("device-abc123", [{ seq: 5, raw: raw(5) }])).rejects.toThrow("fk violation");

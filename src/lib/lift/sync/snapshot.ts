@@ -1,6 +1,11 @@
-import { asc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import {
+  SNAPSHOT_ENTITIES,
+  SNAPSHOT_PAGE_MAX,
   SYNC_PROTOCOL_VERSION,
+  type SnapshotEntity,
+  type SyncSnapshotPage,
   type BodyweightPayload,
   type CustomExercisePayload,
   type Equipment,
@@ -206,47 +211,121 @@ export function buildSnapshot(rows: SnapshotRows, now = new Date(), tz?: string)
   };
 }
 
-export async function loadSnapshot(): Promise<SyncSnapshot> {
+// ---------------------------------------------------------------------------
+// paging: one entity per request, id order, so no response nears the host's
+// response size cap however long the history gets
+
+export interface SnapshotQuery {
+  entity: SnapshotEntity;
+  /** exclusive id cursor; null = from the start */
+  after: string | null;
+  limit: number;
+}
+
+/** ?entity=<key>&after=<id>&limit=<n>, validated */
+export function parseSnapshotQuery(params: URLSearchParams): { ok: true; query: SnapshotQuery } | { ok: false; error: string } {
+  const entity = params.get("entity");
+  if (!entity || !(SNAPSHOT_ENTITIES as readonly string[]).includes(entity)) {
+    return { ok: false, error: `entity must be one of ${SNAPSHOT_ENTITIES.join(", ")}` };
+  }
+  const after = params.get("after");
+  if (after != null && (after.length === 0 || after.length > 128)) return { ok: false, error: "after must be 1..128 chars" };
+  const rawLimit = params.get("limit");
+  const limit = rawLimit == null ? SNAPSHOT_PAGE_MAX : Number(rawLimit);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > SNAPSHOT_PAGE_MAX) {
+    return { ok: false, error: `limit must be 1..${SNAPSHOT_PAGE_MAX}` };
+  }
+  return { ok: true, query: { entity: entity as SnapshotEntity, after, limit } };
+}
+
+/** `payloads` was read with limit + 1, so one extra row means there is a next page */
+export function snapshotPage<K extends SnapshotEntity>(
+  entity: K,
+  payloads: SyncSnapshot[K],
+  limit: number,
+  now = new Date()
+): SyncSnapshotPage<K> {
+  const more = payloads.length > limit;
+  const rows = (more ? payloads.slice(0, limit) : payloads) as SyncSnapshot[K];
+  return {
+    protocol: SYNC_PROTOCOL_VERSION,
+    entity,
+    rows,
+    next: more && rows.length ? rows[rows.length - 1].id : null,
+    generatedAt: ms(now),
+  };
+}
+
+export async function loadSnapshotPage(q: SnapshotQuery, now = new Date()): Promise<SyncSnapshotPage> {
   const db = getDb();
   const w = liftWorkouts;
+  const n = q.limit + 1;
   // soft-deleted strong shares stay hidden; app rows (discarded included) go back as-is
   const visible = or(eq(w.source, "app"), isNull(w.deletedAt));
-  const customIds = db.select({ id: exercises.id }).from(exercises).where(eq(exercises.isCustom, true));
-  const [customExercises, muscles, templateFolders, templates, templateExercises, workouts, wes, sets, bodyweights] =
-    await db.batch([
-      db.select().from(exercises).where(eq(exercises.isCustom, true)).orderBy(asc(exercises.id)),
-      db.select().from(exerciseMuscles).where(inArray(exerciseMuscles.exerciseId, customIds)),
-      db.select().from(liftTemplateFolders).orderBy(asc(liftTemplateFolders.position), asc(liftTemplateFolders.id)),
-      db.select().from(liftTemplates).orderBy(asc(liftTemplates.position), asc(liftTemplates.id)),
-      db
+  const after = (col: PgColumn) => (q.after != null ? gt(col, q.after) : undefined);
+  const page = <K extends SnapshotEntity>(entity: K, payloads: SyncSnapshot[K]) => snapshotPage(entity, payloads, q.limit, now);
+
+  switch (q.entity) {
+    case "customExercises": {
+      const rows = await db
         .select()
-        .from(liftTemplateExercises)
-        .orderBy(asc(liftTemplateExercises.templateId), asc(liftTemplateExercises.position)),
-      db.select().from(w).where(visible).orderBy(asc(w.startedLocal), asc(w.id)),
-      db
-        .select({ we: liftWorkoutExercises })
-        .from(liftWorkoutExercises)
-        .innerJoin(w, eq(w.id, liftWorkoutExercises.workoutId))
-        .where(visible)
-        .orderBy(asc(liftWorkoutExercises.workoutId), asc(liftWorkoutExercises.position)),
-      db
+        .from(exercises)
+        .where(and(eq(exercises.isCustom, true), after(exercises.id)))
+        .orderBy(asc(exercises.id))
+        .limit(n);
+      const muscles = rows.length
+        ? await db
+            .select()
+            .from(exerciseMuscles)
+            .where(inArray(exerciseMuscles.exerciseId, rows.map((r) => r.id)))
+        : [];
+      return page(q.entity, rows.map((r) => customExercisePayload(r, muscles)));
+    }
+    case "templateFolders": {
+      const t = liftTemplateFolders;
+      const rows = await db.select().from(t).where(after(t.id)).orderBy(asc(t.id)).limit(n);
+      return page(q.entity, rows.map(templateFolderPayload));
+    }
+    case "templates": {
+      const t = liftTemplates;
+      const rows = await db.select().from(t).where(after(t.id)).orderBy(asc(t.id)).limit(n);
+      return page(q.entity, rows.map(templatePayload));
+    }
+    case "templateExercises": {
+      const t = liftTemplateExercises;
+      const rows = await db.select().from(t).where(after(t.id)).orderBy(asc(t.id)).limit(n);
+      return page(q.entity, rows.map(templateExercisePayload));
+    }
+    case "workouts": {
+      const rows = await db.select().from(w).where(and(visible, after(w.id))).orderBy(asc(w.id)).limit(n);
+      return page(q.entity, rows.map((r) => workoutPayload(r)));
+    }
+    case "workoutExercises": {
+      const we = liftWorkoutExercises;
+      const rows = await db
+        .select({ we })
+        .from(we)
+        .innerJoin(w, eq(w.id, we.workoutId))
+        .where(and(visible, after(we.id)))
+        .orderBy(asc(we.id))
+        .limit(n);
+      return page(q.entity, rows.map((r) => workoutExercisePayload(r.we)));
+    }
+    case "sets": {
+      const rows = await db
         .select({ s: liftSets })
         .from(liftSets)
         .innerJoin(liftWorkoutExercises, eq(liftWorkoutExercises.id, liftSets.workoutExerciseId))
         .innerJoin(w, eq(w.id, liftWorkoutExercises.workoutId))
-        .where(visible)
-        .orderBy(asc(liftSets.workoutExerciseId), asc(liftSets.position)),
-      db.select().from(liftBodyweights).orderBy(asc(liftBodyweights.measuredAt)),
-    ]);
-  return buildSnapshot({
-    customExercises,
-    muscles,
-    templateFolders,
-    templates,
-    templateExercises,
-    workouts,
-    workoutExercises: wes.map((r) => r.we),
-    sets: sets.map((r) => r.s),
-    bodyweights,
-  });
+        .where(and(visible, after(liftSets.id)))
+        .orderBy(asc(liftSets.id))
+        .limit(n);
+      return page(q.entity, rows.map((r) => setPayload(r.s)));
+    }
+    case "bodyweights": {
+      const t = liftBodyweights;
+      const rows = await db.select().from(t).where(after(t.id)).orderBy(asc(t.id)).limit(n);
+      return page(q.entity, rows.map(bodyweightPayload));
+    }
+  }
 }
