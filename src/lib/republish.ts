@@ -269,7 +269,14 @@ async function buildTrack(ref: TrackRef, row: ActivityRow, deps: RepublishDeps):
   const bytes = await deps.loadRaw(ref.sha256, row);
   if (!bytes) return null;
   if (ref.kind === "device-file") {
-    return canonicalFromDeviceFile(bytes, `${ref.sha256}.${row.fileType ?? "fit"}`, ref.sha256);
+    try {
+      return canonicalFromDeviceFile(bytes, `${ref.sha256}.${row.fileType ?? "fit"}`, ref.sha256);
+    } catch (error) {
+      // indoor/manual exports are gpx shells with no timed points: not a track,
+      // so fall through to the next source instead of failing the activity
+      if ((error as Error).message.includes("could not extract a timed track")) return null;
+      throw error;
+    }
   }
   const detailBytes = ref.kind === "strava-polyline" ? bytes : await deps.loadRaw(ref.detailSha256!, row);
   if (!detailBytes) return null;
