@@ -15,6 +15,20 @@
       "when": 1783405992095,
       "tag": "0001_orange_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793786727509,
+      "tag": "0002_activities_v2_data_layer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793786729613,
+      "tag": "0003_activities_v2_backfill",
+      "breakpoints": true
     }
   ]
 }
