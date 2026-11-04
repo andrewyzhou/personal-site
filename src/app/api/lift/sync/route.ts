@@ -4,6 +4,7 @@ import { BodyTooLarge, readCapped } from "@/lib/lift/sync/http";
 import { pushMutations } from "@/lib/lift/sync/push";
 import { validateEnvelope } from "@/lib/lift/sync/validate";
 import { log } from "@/lib/log";
+import { revalidateLiftPublic } from "@/lib/lift/revalidate";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,7 +37,10 @@ export async function POST(request: Request) {
   if (!envelope.ok) return fail(400, envelope.error);
 
   try {
-    return NextResponse.json(await pushMutations(envelope.deviceId, envelope.mutations));
+    const result = await pushMutations(envelope.deviceId, envelope.mutations);
+    // phone workouts and edits show on the lift-only calendar
+    revalidateLiftPublic();
+    return NextResponse.json(result);
   } catch (error) {
     // nothing was applied; the phone retries the same seqs
     log.error("api:lift/sync", `push from ${envelope.deviceId} failed`, error);

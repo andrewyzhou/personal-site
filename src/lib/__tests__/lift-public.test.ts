@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { PrHit } from "lift-core";
 
 // pr detection lives in lift-core and may throw while it's being built; the
@@ -37,15 +37,19 @@ import {
   isValidLiftId,
   liftCalendarId,
   loadActivityLiftWorkouts,
+  loadLiftCalendar,
   publicLiftCalendarEntry,
+  resolvePublicLiftId,
   safeWorkoutPrs,
   sanitizeMuscleLoad,
   serializeLiftWorkout,
   topRegions,
   type LiftExerciseInput,
+  type LiftOnlyRow,
   type LiftSetInput,
   type LiftWorkoutInput,
 } from "@/lib/lift/public";
+import { isPublicLiftId, publicLiftId } from "@/lib/lift/public-id";
 
 const SECRET = "PRIVATE-NOTE-SENTINEL";
 
@@ -98,6 +102,11 @@ describe("set formatting + grouping", () => {
     expect(g.map((x) => x.label)).toEqual(["3×5 @ 185 lb", "1×3 @ 205 lb"]);
   });
 
+  it("keeps same-weight sets with different reps as their own rows", () => {
+    const g = groupSets([set(0), set(0, { reps: 4 })]);
+    expect(g.map((x) => x.label)).toEqual(["1×5 @ 185 lb", "1×4 @ 185 lb"]);
+  });
+
   it("doesn't merge across kinds or non-adjacent repeats", () => {
     const g = groupSets([set(0), set(0, { kind: "drop" }), set(0)]);
     expect(g.map((x) => x.label)).toEqual(["1×5 @ 185 lb", "1×5 @ 185 lb · drop", "1×5 @ 185 lb"]);
@@ -141,7 +150,8 @@ describe("serializeLiftWorkout", () => {
     expect(w.startTime).toBe("19:18");
     expect(w.workingSets).toBe(5);
     // 3*185*5 + 205*3 + 90*10 = 2775 + 615 + 900 (lb, round-tripped through kg)
-    expect(w.volumeLb).toBe(4290);
+    expect(w.volume).toBe(4290);
+    expect(w.volumeUnit).toBe("lb");
     const [squat, sled] = w.exercises;
     expect(squat.name).toBe("Squat (Barbell)");
     expect(squat.working.map((g) => g.label)).toEqual(["3×5 @ 185 lb", "1×3 @ 205 lb"]);
@@ -153,6 +163,22 @@ describe("serializeLiftWorkout", () => {
     expect(sled.name).toBe("Sled Push");
     expect(w.topRegions.slice(0, 1)).toEqual(["glutes"]);
     expect(w.prs).toEqual([]);
+  });
+
+  it("reports volume in the unit most sets were logged in", () => {
+    const kg = [set(0, { weight: 100, unit: "kg", reps: 5 }), set(0, { weight: 100, unit: "kg", reps: 5 }), set(1, { weight: 45, unit: "lb", reps: 10 })];
+    const w = serializeLiftWorkout(workout(), exercises, kg)!;
+    expect(w.volumeUnit).toBe("kg");
+    // 1000 kg + 45 lb * 10 (204.1 kg)
+    expect(w.volume).toBe(1204);
+    const tie = serializeLiftWorkout(workout(), exercises, [set(0, { weight: 100, unit: "kg" }), set(1)])!;
+    expect(tie.volumeUnit).toBe("lb");
+  });
+
+  it("never carries the internal workout id", () => {
+    const w = serializeLiftWorkout(workout({ id: "strong-caterxeu" }), exercises.map((e) => ({ ...e, id: e.id.replace("abc", "caterxeu") })), [])!;
+    expect(JSON.stringify(w)).not.toContain("caterxeu");
+    expect(w).not.toHaveProperty("id");
   });
 
   it("never publishes notes, even when handed full rows", () => {
@@ -259,7 +285,8 @@ describe("loadActivityLiftWorkouts", () => {
       [],
     );
     const out = await loadActivityLiftWorkouts({ id: 1, hidden: false });
-    expect(out.map((x) => x.id)).toEqual(["strong-abc"]);
+    expect(out.map((x) => x.title)).toEqual(["Full Body B"]);
+    expect(JSON.stringify(out)).not.toContain("strong-abc");
     // the recording header already shows its own coarsened time
     expect(out[0].startTime).toBeNull();
   });
@@ -271,9 +298,52 @@ describe("loadActivityLiftWorkouts", () => {
   });
 });
 
+describe("public ids", () => {
+  const env = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...env, LIFT_PUBLIC_ID_SECRET: "test-secret", AUTH_SECRET: "auth-secret" };
+  });
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it("is a stable 16-char base64url hmac, keyed by the secret", () => {
+    const a = publicLiftId("strong-caterxeu")!;
+    expect(a).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    expect(isPublicLiftId(a)).toBe(true);
+    expect(publicLiftId("strong-caterxeu")).toBe(a);
+    expect(publicLiftId("strong-other")).not.toBe(a);
+    expect(a).not.toContain("caterxeu");
+    process.env.LIFT_PUBLIC_ID_SECRET = "rotated";
+    expect(publicLiftId("strong-caterxeu")).not.toBe(a);
+  });
+
+  it("falls back to AUTH_SECRET, and is off with neither", () => {
+    delete process.env.LIFT_PUBLIC_ID_SECRET;
+    expect(publicLiftId("strong-x")).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    delete process.env.AUTH_SECRET;
+    expect(publicLiftId("strong-x")).toBeNull();
+  });
+});
+
+const ROWS: LiftOnlyRow[] = [
+  { id: "strong-caterxeu", title: "Push", startedLocal: "2026-11-02T19:18", durationS: 3600, workingSets: 6, exerciseCount: 3 },
+  { id: "strong-0123456789abcdef", title: "Pull", startedLocal: "2026-11-01T07:00", durationS: null, workingSets: 1, exerciseCount: 1 },
+  // a 16-char id that looks like a public one must still not resolve as itself
+  { id: "abcdefghijklmnop", title: "Legs", startedLocal: "2026-10-30T07:00", durationS: null, workingSets: 4, exerciseCount: 2 },
+];
+
 describe("calendar entries", () => {
+  const env = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...env, LIFT_PUBLIC_ID_SECRET: "test-secret" };
+  });
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
   it("maps a lift-only workout to a WeightTraining entry with its own page", () => {
-    const e = publicLiftCalendarEntry({ id: "strong-abc", title: "Push", startedLocal: "2026-11-02T19:18", durationS: 3600 }, 15);
+    const e = publicLiftCalendarEntry(ROWS[0], 15)!;
     expect(e).toMatchObject({
       name: "Push",
       type: "WeightTraining",
@@ -283,15 +353,49 @@ describe("calendar entries", () => {
       elapsedTime: 3600,
       averageHeartrate: null,
       description: null,
-      href: "/lifts/strong-abc",
+      href: `/lifts/${publicLiftId("strong-caterxeu")}`,
+      liftSummary: "3 exercises · 6 sets",
     });
     expect(e.id).toBeLessThan(0);
-    expect(publicLiftCalendarEntry({ id: "strong-x", title: "", startedLocal: "2026-11-02T07:00", durationS: null }, 0).duration).toBe(0);
+    // derived from the public id, so it says nothing the href doesn't
+    expect(e.id).toBe(liftCalendarId(publicLiftId("strong-caterxeu")!));
+    expect(publicLiftCalendarEntry(ROWS[1], 0)!.duration).toBe(0);
+    expect(publicLiftCalendarEntry(ROWS[1], 0)!.liftSummary).toBe("1 exercise · 1 set");
+  });
+
+  it("never puts an internal id or share slug in an entry", async () => {
+    const entries = await loadLiftCalendar(async () => ROWS);
+    expect(entries).toHaveLength(3);
+    const json = JSON.stringify(entries);
+    for (const r of ROWS) {
+      expect(json).not.toContain(r.id);
+      expect(json).not.toContain(r.id.replace(/^strong-/, ""));
+    }
+  });
+
+  it("is empty without a secret, rather than leaking ids", async () => {
+    delete process.env.LIFT_PUBLIC_ID_SECRET;
+    delete process.env.AUTH_SECRET;
+    const index = vi.fn(async () => ROWS);
+    expect(await loadLiftCalendar(index)).toEqual([]);
+    expect(index).not.toHaveBeenCalled();
+    expect(publicLiftCalendarEntry(ROWS[0], 0)).toBeNull();
+    expect(await resolvePublicLiftId("abcdefghijklmnop", index)).toBeNull();
+  });
+
+  it("resolves public ids through the index only, never raw internal ids", async () => {
+    const index = async () => ROWS;
+    for (const r of ROWS) {
+      expect((await resolvePublicLiftId(publicLiftId(r.id)!, index))?.id).toBe(r.id);
+      expect(await resolvePublicLiftId(r.id, index)).toBeNull();
+    }
+    expect(await resolvePublicLiftId(publicLiftId("strong-not-lift-only")!, index)).toBeNull();
+    expect(await resolvePublicLiftId("a/b", index)).toBeNull();
   });
 
   it("synthetic ids are stable, negative and distinct", () => {
-    expect(liftCalendarId("strong-abc")).toBe(liftCalendarId("strong-abc"));
-    const ids = new Set(Array.from({ length: 500 }, (_, i) => liftCalendarId(`strong-${i}`)));
+    expect(liftCalendarId("abc")).toBe(liftCalendarId("abc"));
+    const ids = new Set(Array.from({ length: 500 }, (_, i) => liftCalendarId(publicLiftId(`strong-${i}`)!)));
     expect(ids.size).toBe(500);
     for (const id of ids) expect(id).toBeLessThan(0);
   });

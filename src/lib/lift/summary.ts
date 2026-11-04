@@ -1,6 +1,7 @@
 import { LB_PER_KG, e1rm, fromKg, toKg, type LinkRole, type WeightUnit } from "lift-core";
 import type { LiftWarning } from "@/lib/db/lift-schema";
 import type { ExerciseLine, IngestSummary, SetBrief } from "./plan";
+import { publicLiftId } from "./public-id";
 
 // lowercase, human summaries for api responses and the bot reply: a one-liner
 // and a multi-line breakdown. names no outside services on purpose: it's shown to people.
@@ -86,6 +87,17 @@ export function formatIngestSummary(
 }
 
 export const SITE_URL = "https://www.andrewzhou.org";
+
+/** cut to at most `max` utf-16 units with a trailing "…", never splitting a surrogate pair (emoji) */
+export function truncateText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let out = "";
+  for (const ch of Array.from(text)) {
+    if (out.length + ch.length > max - 1) break;
+    out += ch;
+  }
+  return `${out}…`;
+}
 
 // telegram caps a message at 4096; stay under it with room to spare
 export const MAX_DETAILS = 4000;
@@ -182,14 +194,19 @@ export function formatExerciseLine(ex: ExerciseLine, fallback: WeightUnit): stri
   const est = topE1rm(sets, fallback);
   if (est) parts.push(est);
   const line = parts.join(" · ");
-  return line.length > MAX_LINE ? `${line.slice(0, MAX_LINE - 1)}…` : line;
+  return truncateText(line, MAX_LINE);
 }
 
-/** where the reply points: the watch recording when linked, else the lift's own page */
-export function workoutUrl(workoutId: string, links: readonly LinkedActivity[]): string {
-  const rec = links.find((l) => l.role === "primary") ?? links.find((l) => l.role === "overrun");
+/**
+ * where the reply points: the watch recording when linked (any role), else the
+ * lift's own page by its public id. null when there's no safe link to give
+ * (no public id secret), since the internal id must never reach a url.
+ */
+export function workoutUrl(workoutId: string, links: readonly LinkedActivity[]): string | null {
+  const rec = links.find((l) => l.role === "primary") ?? links.find((l) => l.role === "overrun") ?? links[0];
   if (rec) return `${SITE_URL}/activities/${rec.activityId}`;
-  return `${SITE_URL}/lifts/${encodeURIComponent(workoutId)}`;
+  const publicId = publicLiftId(workoutId);
+  return publicId ? `${SITE_URL}/lifts/${publicId}` : null;
 }
 
 function warningLines(warnings: readonly LiftWarning[]): string[] {
@@ -208,11 +225,17 @@ function warningLines(warnings: readonly LiftWarning[]): string[] {
 export function formatIngestDetails(
   summary: IngestSummary,
   links: readonly LinkedActivity[],
-  opts: SummaryOptions & { workoutId: string; warnings?: readonly LiftWarning[] },
+  opts: SummaryOptions & {
+    workoutId: string;
+    warnings?: readonly LiftWarning[];
+    /** links couldn't be read, so a lift-only url might point at a linked workout: leave it out */
+    linksUnknown?: boolean;
+  },
 ): string {
   const head = formatIngestSummary(summary, links, opts);
   // the head already carries the watch status, so the foot is just the link
-  const foot = [workoutUrl(opts.workoutId, links), ...warningLines(opts.warnings ?? [])];
+  const url = opts.linksUnknown ? null : workoutUrl(opts.workoutId, links);
+  const foot = [...(url ? [url] : []), ...warningLines(opts.warnings ?? [])];
   const lines = summary.exercises.map((ex) => formatExerciseLine(ex, summary.unit));
 
   const size = (body: string[]) => [head, ...body, ...foot].join("\n").length;
@@ -224,5 +247,5 @@ export function formatIngestDetails(
   while (shown > 0 && size(body()) > MAX_DETAILS) shown--;
   const text = [head, ...body(), ...foot].join("\n");
   // only absurd warning lists get here; the cap still holds
-  return text.length > MAX_DETAILS ? `${text.slice(0, MAX_DETAILS - 1)}…` : text;
+  return truncateText(text, MAX_DETAILS);
 }

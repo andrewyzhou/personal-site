@@ -5,7 +5,10 @@ import { BODY_FIGURES, MUSCLE_REGION_LABELS, loadIntensity, type BodyFigure as F
 
 const STEPS = 4;
 const mix = (pct: number) => `color-mix(in oklch, var(--theme-text-primary) ${pct}%, transparent)`;
-export const LOAD_FILLS = ["transparent", mix(15), mix(35), mix(60), mix(85)];
+// level 1 at 30% so a lightly worked muscle still reads on the dark theme
+export const LOAD_FILLS = ["transparent", mix(30), mix(50), mix(70), mix(90)];
+// faint edge on every muscle so unworked regions stay visible in both themes
+export const SHAPE_STROKE = mix(28);
 
 // lift-core's helper; same rule inline if it ever throws so the figure still renders
 export function intensity(load: number | undefined): number {
@@ -72,7 +75,7 @@ export default function BodyFigure({
                     key={j}
                     d={s.d}
                     fill={s.region ? LOAD_FILLS[intensity(load[s.region])] : "transparent"}
-                    stroke="var(--theme-divider)"
+                    stroke={SHAPE_STROKE}
                     strokeWidth={0.75}
                     strokeLinejoin="round"
                   />

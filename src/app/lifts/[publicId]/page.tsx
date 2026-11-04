@@ -9,17 +9,18 @@ import { formatClockDuration, formatLocalDateLine, sportIcon, sportLabel } from 
 export const revalidate = 300;
 
 // lift-only workouts: ones linked to a recording live on that recording's page
-// instead, so this 404s for them (and for deleted/discarded/unknown ids)
+// instead, so this 404s for them (and for deleted/discarded/unknown ids). the
+// url segment is the opaque public id; raw workout ids never resolve
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
-  const title = await loadLiftOnlyTitle(id).catch(() => null);
+export async function generateMetadata({ params }: { params: Promise<{ publicId: string }> }): Promise<Metadata> {
+  const { publicId } = await params;
+  const title = await loadLiftOnlyTitle(publicId).catch(() => null);
   return { title: title ? `${title} · lift · andrew zhou` : "lift · andrew zhou" };
 }
 
-export default async function LiftPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const w = await loadLiftOnlyWorkout(id);
+export default async function LiftPage({ params }: { params: Promise<{ publicId: string }> }) {
+  const { publicId } = await params;
+  const w = await loadLiftOnlyWorkout(publicId);
   if (!w) notFound();
 
   const { dateLine, timeLine } = formatLocalDateLine(w.date, w.startTime ?? "00:00");

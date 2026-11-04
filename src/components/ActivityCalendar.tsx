@@ -40,6 +40,13 @@ interface CalendarActivity {
   description: string | null;
   sufferScore: number | null;
   href?: string; // own page (lift-only workouts); no preview fetch
+  liftSummary?: string; // "3 exercises · 6 sets" on lift-only workouts
+}
+
+// lift-only workouts without a watch recording have no duration; "0 min" would be wrong
+function liftMetric(activity: CalendarActivity): string | null {
+  if (!activity.href || activity.duration > 0) return null;
+  return activity.liftSummary || "lift";
 }
 
 interface StoredActivities {
@@ -224,7 +231,7 @@ function StravaActivitySelector({
       <div className="flex flex-col gap-2">
         {activities.map((activity) => {
           const isDurationBased = DURATION_TYPES.includes(activity.type);
-          const metric = isDurationBased ? formatDuration(activity.elapsedTime) : formatDistance(activity.distance);
+          const metric = liftMetric(activity) ?? (isDurationBased ? formatDuration(activity.elapsedTime) : formatDistance(activity.distance));
           return (
             <button
               key={activity.id}
@@ -291,7 +298,8 @@ function StravaActivityDetail({
   }).toLowerCase();
 
   const stats: { label: string; value: string }[] = [];
-  stats.push({ label: "time", value: formatDuration(isDurationBased ? activity.elapsedTime : activity.duration) });
+  const lift = liftMetric(activity);
+  if (!lift) stats.push({ label: "time", value: formatDuration(isDurationBased ? activity.elapsedTime : activity.duration) });
   if (showDistance) stats.push({ label: "distance", value: formatDistance(activity.distance) });
   if (showPace && activity.averageSpeed > 0) stats.push({ label: "avg pace", value: formatPace(activity.averageSpeed) });
   if (showSpeed && activity.averageSpeed > 0) stats.push({ label: "avg speed", value: formatSpeed(activity.averageSpeed) });
@@ -319,6 +327,7 @@ function StravaActivityDetail({
           <span className="font-sans text-gray text-xs">{formatTimeOfDay(activity.startTime)}</span>
         </div>
       </div>
+      {lift && <p className="font-sans text-gray text-sm mb-4">{lift}</p>}
       {activity.description && (
         <p className="font-sans text-gray text-sm mb-4 leading-relaxed">{activity.description}</p>
       )}

@@ -11,7 +11,7 @@ const fetchMock = vi.fn();
 const DETAILS = [
   "logged push day · wed nov 4 · 1 exercise · 2 sets · 1,850 lb · watch: not linked yet",
   "bench press (barbell): 2×5 @ 185 lb · top e1rm 216 lb",
-  "watch: not linked yet · https://www.andrewzhou.org/lifts/strong-x",
+  "https://www.andrewzhou.org/lifts/q2W8vN0aZk1pL4xE",
 ].join("\n");
 
 function update(body: unknown, secret: string | null = "hook-secret"): Request {
@@ -102,6 +102,16 @@ describe("POST /api/lift/telegram", () => {
     ingest.mockResolvedValueOnce({ status: "duplicate", workoutId: "strong-x", text: "already logged push day" });
     await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
     expect(sentBodies()[0].text).toBe("already logged push day");
+  });
+
+  it("caps a long reply without splitting an emoji", async () => {
+    const details = "a" + "\u{1F4AA}".repeat(3000);
+    ingest.mockResolvedValueOnce({ status: "created", workoutId: "strong-x", text: "x", details });
+    await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
+    const sent: string = sentBodies()[0].text;
+    expect(sent.length).toBeLessThanOrEqual(4000);
+    expect(sent.endsWith("\u{1F4AA}…")).toBe(true);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(sent)).toBe(false);
   });
 
   it("reads captions and edited messages", async () => {

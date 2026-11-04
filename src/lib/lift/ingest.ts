@@ -13,7 +13,8 @@ import {
   type LiftWarning,
 } from "@/lib/db";
 import { log } from "@/lib/log";
-import { linkWorkout } from "./link";
+import { getWorkoutLinks, linkWorkout } from "./link";
+import { revalidateLiftPublic } from "./revalidate";
 import {
   pickEditTarget,
   planStrongIngest,
@@ -25,7 +26,7 @@ import {
   type PlanOptions,
   type WorkoutPlan,
 } from "./plan";
-import { formatIngestDetails, formatIngestSummary, type LinkedActivity } from "./summary";
+import { formatIngestDetails, formatIngestSummary, workoutUrl, type LinkedActivity } from "./summary";
 
 /** 'updated': an edited re-share rewrote a workout that was already logged */
 export type IngestStatus = "created" | "updated" | "duplicate" | "empty";
@@ -166,14 +167,104 @@ export async function loadMergeRedirects(db: Db, ids: readonly string[]): Promis
   return followMergeChains(ids, lookup);
 }
 
-async function safeLinks(fn: () => Promise<LinkedActivity[]>, workoutId: string): Promise<LinkedActivity[]> {
+/** links after linking; `known` false when even reading them failed (the reply then leaves the url out) */
+async function safeLinks(
+  fn: () => Promise<LinkedActivity[]>,
+  workoutId: string
+): Promise<{ links: LinkedActivity[]; known: boolean }> {
   try {
-    return await fn();
+    return { links: await fn(), known: true };
   } catch (error) {
     // the workout is already saved; linking retries on the daily cron
     log.error("lift:ingest", `linking ${workoutId} failed`, error);
-    return [];
   }
+  try {
+    // it may already be linked from before; a lift-only url for a linked workout would 404
+    return { links: await getWorkoutLinks(workoutId), known: true };
+  } catch (error) {
+    log.error("lift:ingest", `reading links for ${workoutId} failed`, error);
+    return { links: [], known: false };
+  }
+}
+
+/** existing links as they are; only an unlinked workout gets a linking attempt (which bumps updated_at) */
+async function currentLinks(workout: { id: string; startedLocal: string }): Promise<LinkedActivity[]> {
+  const links = await getWorkoutLinks(workout.id);
+  return links.length ? links : linkWorkout(workout);
+}
+
+// an app edit within this long of the ingest is the ingest's own write (and linking right after)
+export const APP_EDIT_GRACE_MS = 60_000;
+
+type Stamp = Date | string | null | undefined;
+
+export interface EditGuard {
+  id: string;
+  title: string;
+  deletedAt: Stamp;
+  createdAt: Stamp;
+  updatedAt: Stamp;
+  /** created_at of the workout's latest ingest */
+  ingestAt: Stamp;
+  /** newest link's created_at: linking bumps updated_at too */
+  linkedAt: Stamp;
+  /** newest updated_at over its exercises and sets (the phone bumps these, not the workout, on set edits) */
+  childAt: Stamp;
+}
+
+function ms(v: Stamp): number | null {
+  if (v == null) return null;
+  const t = v instanceof Date ? v.getTime() : Date.parse(v);
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * true when the workout changed in the app after its last ingest: a share then
+ * must not overwrite it. the workout row's own updated_at only counts when it
+ * isn't explained by a later link.
+ */
+export function editedInApp(g: EditGuard): boolean {
+  const base = ms(g.ingestAt) ?? ms(g.createdAt);
+  if (base === null) return false;
+  const after = (v: Stamp) => {
+    const t = ms(v);
+    return t !== null && t > base + APP_EDIT_GRACE_MS;
+  };
+  if (after(g.childAt)) return true;
+  if (!after(g.updatedAt)) return false;
+  const linked = ms(g.linkedAt);
+  return linked === null || ms(g.updatedAt)! > linked + APP_EDIT_GRACE_MS;
+}
+
+export function editGuardQuery(db: Db, workoutId: string) {
+  const ts = (q: SQL) => q.mapWith(liftWorkouts.updatedAt);
+  return db
+    .select({
+      id: liftWorkouts.id,
+      title: liftWorkouts.title,
+      deletedAt: liftWorkouts.deletedAt,
+      createdAt: liftWorkouts.createdAt,
+      updatedAt: liftWorkouts.updatedAt,
+      ingestAt: ts(sql`(select i."created_at" from "lift_ingests" i where i."id" = "lift_workouts"."latest_ingest_id")`),
+      linkedAt: ts(sql`(select max(a."created_at") from "lift_workout_activities" a where a."workout_id" = "lift_workouts"."id")`),
+      childAt: ts(sql`greatest(
+        (select max(e."updated_at") from "lift_workout_exercises" e where e."workout_id" = "lift_workouts"."id"),
+        (select max(s."updated_at") from "lift_sets" s join "lift_workout_exercises" e on e."id" = s."workout_exercise_id" where e."workout_id" = "lift_workouts"."id")
+      )`),
+    })
+    .from(liftWorkouts)
+    .where(eq(liftWorkouts.id, workoutId))
+    .limit(1);
+}
+
+export async function loadEditGuard(db: Db, workoutId: string): Promise<EditGuard | null> {
+  const rows: unknown[] = await editGuardQuery(db, workoutId);
+  // re-checked by id so only that workout's stamps ever decide
+  return (rows as EditGuard[]).find((r) => r.id === workoutId) ?? null;
+}
+
+export function keptEditsWarning(title: string, workoutId: string): LiftWarning {
+  return { line: 0, message: `kept your app edits for ${title.toLowerCase()}; re-share ignored`, text: workoutId };
 }
 
 /**
@@ -249,12 +340,19 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
     .limit(1);
 
   let updated = false;
+  // set when this share must not rewrite the workout: the raw ingest row is still kept
+  let keep: { kind: "duplicate" } | { kind: "app-edits"; title: string } | null = null;
   if (plan.workout) {
     const plannedId = plan.workout.workout.id;
     let target: string | undefined;
+    const extraWarnings: LiftWarning[] = [];
     if (existing?.workoutId) {
       // the same bytes land where they did last time (an edit may have moved them)
       target = existing.workoutId;
+      // byte-identical and still live: nothing to rewrite, and rewriting would undo phone edits.
+      // a soft-deleted or missing workout still gets rewritten (sharing again un-deletes it)
+      const guard = await loadEditGuard(db, target);
+      if (guard && guard.deletedAt == null) keep = { kind: "duplicate" };
     } else {
       const share: EditLookup = {
         plannedId,
@@ -267,17 +365,27 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
       if (pick.kind === "existing") {
         target = pick.workoutId;
         updated = !pick.deleted;
+        if (!pick.deleted) {
+          const guard = await loadEditGuard(db, target);
+          if (guard && guard.deletedAt == null && editedInApp(guard)) {
+            keep = { kind: "app-edits", title: guard.title };
+            extraWarnings.push(keptEditsWarning(guard.title, target));
+          }
+        }
       } else if (pick.kind === "ambiguous") {
-        plan = replan({ extraWarnings: [ambiguousWarning(pick.workoutIds)] });
+        extraWarnings.push(ambiguousWarning(pick.workoutIds));
       }
     }
-    if (target && target !== plannedId) plan = replan({ workoutId: target });
+    const moved = target !== undefined && target !== plannedId;
+    if (moved || extraWarnings.length) {
+      plan = replan({ ...(moved ? { workoutId: target } : {}), ...(extraWarnings.length ? { extraWarnings } : {}) });
+    }
   }
 
-  // the batch is idempotent, so a seen sha still writes: that un-deletes a
-  // soft-deleted workout, restores A after an edited B, and lets an old
-  // 'empty' ingest log once the parser learns to read it
-  await db.batch(buildIngestBatch(db, plan));
+  // a seen sha with a live workout only re-inserts its (no-op) ingest row; otherwise
+  // the batch upserts the workout: that un-deletes a soft-deleted one and lets an
+  // old 'empty' ingest log once the parser learns to read it
+  await db.batch(buildIngestBatch(db, keep ? { ...plan, workout: null } : plan));
   const ingestId = existing?.id ?? plan.ingest.id;
 
   if (!plan.workout || !plan.summary) {
@@ -297,11 +405,30 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
 
   const workout = plan.workout.workout;
   // an old 'empty' row for this sha never logged anything, so this is new
-  const duplicate = Boolean(existing?.workoutId);
+  const duplicate = Boolean(existing?.workoutId) || keep !== null;
   if (duplicate) updated = false;
   const status: IngestStatus = duplicate ? "duplicate" : updated ? "updated" : "created";
-  const links = await safeLinks(() => linkWorkout(workout), workout.id);
-  log.info("lift:ingest", `${ingestId} -> ${workout.id} (${links.length} links, ${status})`);
+  // untouched workouts keep their links as they are, so updated_at only moves on a real link
+  const { links, known } = await safeLinks(() => (keep ? currentLinks(workout) : linkWorkout(workout)), workout.id);
+  if (!keep) revalidateLiftPublic();
+  log.info("lift:ingest", `${ingestId} -> ${workout.id} (${links.length} links, ${status}${keep ? `, kept ${keep.kind}` : ""})`);
+
+  if (keep?.kind === "app-edits") {
+    const text = keptEditsWarning(keep.title, workout.id).message;
+    const url = known ? workoutUrl(workout.id, links) : null;
+    return {
+      status,
+      duplicate,
+      ingestId,
+      workoutId: workout.id,
+      summary: plan.summary,
+      text,
+      details: [text, ...(url ? [url] : [])].join("\n"),
+      links,
+      warnings: plan.warnings,
+    };
+  }
+
   const fmt = { duplicate, updated };
   return {
     status,
@@ -310,7 +437,12 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
     workoutId: workout.id,
     summary: plan.summary,
     text: formatIngestSummary(plan.summary, links, fmt),
-    details: formatIngestDetails(plan.summary, links, { ...fmt, workoutId: workout.id, warnings: plan.warnings }),
+    details: formatIngestDetails(plan.summary, links, {
+      ...fmt,
+      workoutId: workout.id,
+      warnings: plan.warnings,
+      linksUnknown: !known,
+    }),
     links,
     warnings: plan.warnings,
   };

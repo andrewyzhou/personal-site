@@ -10,7 +10,7 @@ export function liftStats(w: PublicLiftWorkout): { label: string; value: string 
     { label: w.exercises.length === 1 ? "exercise" : "exercises", value: String(w.exercises.length) },
     { label: w.workingSets === 1 ? "working set" : "working sets", value: String(w.workingSets) },
   ];
-  if (w.volumeLb > 0) stats.push({ label: "volume", value: `${w.volumeLb.toLocaleString("en-US")} lb` });
+  if (w.volume > 0) stats.push({ label: "volume", value: `${w.volume.toLocaleString("en-US")} ${w.volumeUnit}` });
   if (w.prs.length > 0) stats.push({ label: w.prs.length === 1 ? "pr" : "prs", value: String(w.prs.length) });
   return stats;
 }

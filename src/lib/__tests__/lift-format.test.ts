@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { publicLiftId } from "@/lib/lift/public-id";
 import { addDays, localToUtc, safeTimezone, utcToLocal } from "@/lib/lift/time";
 import {
   MAX_DETAILS,
+  truncateText,
   formatExerciseLine,
   formatIngestDetails,
   formatIngestSummary,
@@ -122,6 +124,14 @@ function brief(over: Partial<SetBrief> = {}): SetBrief {
 const lb = (weight: number, reps: number) => brief({ weight, unit: "lb", reps });
 
 describe("lift details text", () => {
+  const env = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...env, LIFT_PUBLIC_ID_SECRET: "test-secret" };
+  });
+  afterEach(() => {
+    process.env = { ...env };
+  });
+  const liftUrl = (id: string) => `https://www.andrewzhou.org/lifts/${publicLiftId(id)}`;
   const plan = planStrongIngest(FULL_BODY_B, { source: "telegram", timezone: "America/Los_Angeles" });
   const summary = plan.summary!;
   const WEIGHTS: LinkedActivity = { ...PRIMARY, activityId: 16712345678, localTime: "19:16" };
@@ -134,9 +144,31 @@ describe("lift details text", () => {
         "squat (barbell): 2×5 @ 185 lb · top e1rm 216 lb",
         "deadlift (barbell): 185×5, 185×4 lb · top e1rm 216 lb",
         "bicep curl (dumbbell): 35×6, 35×7 lb · top e1rm 43 lb",
-        "https://www.andrewzhou.org/lifts/strong-caterxeu",
+        liftUrl("strong-caterxeu"),
       ].join("\n")
     );
+  });
+
+  it("never puts the internal id or share slug in the reply", () => {
+    const text = formatIngestDetails(summary, [], { workoutId: "strong-caterxeu", warnings: plan.warnings });
+    expect(text).not.toContain("caterxeu");
+    expect(text).toContain("/lifts/");
+  });
+
+  it("leaves the lift link out when there's no public id secret", () => {
+    delete process.env.LIFT_PUBLIC_ID_SECRET;
+    delete process.env.AUTH_SECRET;
+    expect(workoutUrl("strong-caterxeu", [])).toBeNull();
+    const text = formatIngestDetails(summary, [], { workoutId: "strong-caterxeu" });
+    expect(text).not.toContain("/lifts/");
+    expect(text).not.toContain("caterxeu");
+    // a linked one still points at its recording
+    expect(workoutUrl("strong-caterxeu", [WEIGHTS])).toBe("https://www.andrewzhou.org/activities/16712345678");
+  });
+
+  it("leaves the link out when the links couldn't be read", () => {
+    const text = formatIngestDetails(summary, [], { workoutId: "strong-caterxeu", linksUnknown: true });
+    expect(text).not.toMatch(/https:/);
   });
 
   it("links the watch recording when there is one, and says updated for an edit", () => {
@@ -149,11 +181,30 @@ describe("lift details text", () => {
     expect(text.toLowerCase()).not.toMatch(/strava|garmin|intervals/);
   });
 
-  it("points an overrun at its recording and anything else at the lift page", () => {
+  it("points any linked recording at its page, preferring primary then overrun", () => {
     expect(workoutUrl("strong-x", [{ ...PRIMARY, role: "overrun", activityId: 5 }])).toBe(
       "https://www.andrewzhou.org/activities/5"
     );
-    expect(workoutUrl("strong-x", [{ ...PRIMARY, role: "duplicate" }])).toBe("https://www.andrewzhou.org/lifts/strong-x");
+    // a lift-only url for a linked workout would 404, so even a duplicate link wins
+    expect(workoutUrl("strong-x", [{ ...PRIMARY, role: "duplicate", activityId: 7 }])).toBe("https://www.andrewzhou.org/activities/7");
+    expect(
+      workoutUrl("strong-x", [
+        { ...PRIMARY, role: "continuation", activityId: 8 },
+        { ...PRIMARY, role: "primary", activityId: 9 },
+      ])
+    ).toBe("https://www.andrewzhou.org/activities/9");
+    expect(workoutUrl("strong-x", [])).toBe(liftUrl("strong-x"));
+  });
+
+  it("truncates without splitting an emoji", () => {
+    expect(truncateText("abc", 3)).toBe("abc");
+    expect(truncateText("abcd", 3)).toBe("ab…");
+    // "a" + 💪 (two utf-16 units) + "b": cutting at 3 must not keep half the emoji
+    const cut = truncateText("a\u{1F4AA}b", 3);
+    expect(cut).toBe("a…");
+    expect(cut.length).toBeLessThanOrEqual(3);
+    expect(truncateText("\u{1F4AA}".repeat(10), 7)).toBe("\u{1F4AA}".repeat(3) + "…");
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(truncateText("x\u{1F4AA}".repeat(50), 100))).toBe(false);
   });
 
   it("counts skipped lines and keeps planner notes", () => {
@@ -206,7 +257,7 @@ describe("lift details text", () => {
     const more = lines.find((l) => /^\+\d+ more$/.test(l))!;
     const shown = lines.filter((l) => l.startsWith("exercise number")).length;
     expect(shown + Number(more.slice(1, -5))).toBe(100);
-    expect(lines.at(-1)).toBe("https://www.andrewzhou.org/lifts/w");
+    expect(lines.at(-1)).toBe(liftUrl("w"));
   });
 });
 

@@ -14,7 +14,7 @@ function req(body: BodyInit | null, headers: Record<string, string> = {}, token:
   return new Request(URL_, { method: "POST", body, headers: h });
 }
 
-const DETAILS = "logged push day\nbench press (barbell): 2×5 @ 185 lb · top e1rm 216 lb\nwatch: not linked yet · https://www.andrewzhou.org/lifts/strong-x";
+const DETAILS = "logged push day\nbench press (barbell): 2×5 @ 185 lb · top e1rm 216 lb\nwatch: not linked yet · https://www.andrewzhou.org/lifts/q2W8vN0aZk1pL4xE";
 
 function result(status: "created" | "updated" | "duplicate" | "empty") {
   const empty = "no exercises found in that text, so nothing was logged";

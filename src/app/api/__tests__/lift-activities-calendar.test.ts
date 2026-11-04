@@ -16,7 +16,7 @@ vi.mock("@/lib/db", () => ({ getDb: vi.fn(), activities: {} }));
 import { GET } from "@/app/api/activities/route";
 
 const run = { id: 1, name: "run", type: "Run", date: "2026-07-01", startTime: "07:00" };
-const lift = { id: -42, name: "Push", type: "WeightTraining", date: "2026-07-02", startTime: "18:00", href: "/lifts/strong-x" };
+const lift = { id: -42, name: "Push", type: "WeightTraining", date: "2026-07-02", startTime: "18:00", href: "/lifts/q2W8vN0aZk1pL4xE", liftSummary: "3 exercises · 6 sets" };
 
 beforeEach(() => {
   getCachedData.mockReset();
