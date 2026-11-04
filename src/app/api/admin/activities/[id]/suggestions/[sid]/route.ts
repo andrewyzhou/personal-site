@@ -12,7 +12,8 @@
 // 409 already decided the other way, or information-only (no edit) · 500
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { decideSuggestion, getSuggestion, insertEdit, revertEditOnce } from "@/lib/cleaning/load";
+import { decideSuggestion, getSuggestion, insertEdit, listEdits, revertEditOnce } from "@/lib/cleaning/load";
+import { combineCrop } from "@/lib/cleaning/edits";
 import { DIRECT_EDIT_KINDS, parseEditBody } from "@/lib/cleaning/plan";
 import type { ActivitySuggestionRow } from "@/lib/db";
 import { bad, failure, parseId, readJson, republishAll, type Ctx } from "../../cleaning/shared";
@@ -50,7 +51,9 @@ export async function POST(request: Request, { params }: Ctx<"id" | "sid">) {
     if (!s.edit) return bad("this suggestion is information only", 409);
     const edit = parseEditBody(s.edit.kind, s.edit.params, DIRECT_EDIT_KINDS);
     if (typeof edit === "string") return bad(`stored edit is invalid: ${edit}`);
-    const editId = await insertEdit(id, edit.kind, edit.params, `accepted: ${s.summary}`);
+    // a one-sided crop keeps the other side of the crop already in effect
+    const params = edit.kind === "crop" ? combineCrop((await listEdits(id)).filter((e) => !e.revertedAt), edit.params) : edit.params;
+    const editId = await insertEdit(id, edit.kind, params, `accepted: ${s.summary}`);
     if (!(await decideSuggestion(sid, "accepted", editId))) {
       // decided concurrently (e.g. auto-apply): drop ours, report theirs
       await revertEditOnce(editId);
