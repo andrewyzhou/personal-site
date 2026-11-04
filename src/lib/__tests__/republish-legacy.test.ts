@@ -66,7 +66,7 @@ describe("legacy column list", () => {
   it("is the schema minus the v2 + privacy columns", () => {
     const all = getTableColumns(activities);
     const legacy = legacyActivityColumns();
-    expect(Object.keys(legacy)).toHaveLength(Object.keys(all).length - 12);
+    expect(Object.keys(legacy)).toHaveLength(Object.keys(all).length - 14);
     expect(legacy).not.toHaveProperty("processingVersion");
     expect(legacy).not.toHaveProperty("publishedInputsHash");
     expect(legacy).not.toHaveProperty("canonicalTrackKey");
@@ -151,7 +151,7 @@ describe("partially migrated databases", () => {
     .map((c) => c.name)
     .filter((n) => ![
       "map_hidden", "hr_hidden", "published_local_time", "published_start_utc", "fog_events",
-      "fog_shapes", "track_bbox", "needs_republish", "republish_attempted_at",
+      "fog_shapes", "track_bbox", "needs_republish", "republish_attempted_at", "stale_marked_at", "legacy_route",
     ].includes(n));
 
   it("selects only the columns that exist", () => {
@@ -159,7 +159,7 @@ describe("partially migrated databases", () => {
     expect(Object.keys(cols)).toContain("processingVersion");
     expect(Object.keys(cols)).not.toContain("mapHidden");
     expect(Object.values(cols).map((c) => c!.name).sort()).toEqual([...at0004].sort());
-    expect(missingActivityColumns(at0004)).toHaveLength(9);
+    expect(missingActivityColumns(at0004)).toHaveLength(11);
     expect(missingActivityColumns(Object.values(getTableColumns(activities)).map((c) => c.name))).toEqual([]);
   });
 

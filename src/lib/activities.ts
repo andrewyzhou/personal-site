@@ -160,12 +160,26 @@ export type InsertOutcome =
   | { inserted: false; id: number } // dedupe conflict — existing row
   | { inserted: false; id: null }; // conflict but existing row unreadable
 
+// a new row never goes public with an unfogged route: the route an ingest path
+// computed is kept privately (legacy_route) and only republish — which applies
+// the privacy zones — writes the public route columns
+export function withheldRoute(values: NewActivityRow): NewActivityRow {
+  if (!values.polyline && !values.cardPolyline && !values.bounds) return values;
+  return {
+    ...values,
+    legacyRoute: { polyline: values.polyline ?? null, cardPolyline: values.cardPolyline ?? null, bounds: values.bounds ?? null },
+    polyline: null,
+    cardPolyline: null,
+    bounds: null,
+  };
+}
+
 // insert-only, conflict-do-nothing, enforced at the write path so a re-import can never overwrite a row
 export async function insertActivity(values: NewActivityRow): Promise<InsertOutcome> {
   const db = getDb();
   const rows = await db
     .insert(activities)
-    .values(values)
+    .values(withheldRoute(values))
     .onConflictDoNothing({ target: activities.dedupeKey })
     .returning({ id: activities.id });
   if (rows.length > 0) {

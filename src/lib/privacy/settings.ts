@@ -6,7 +6,8 @@ import { getDb, privacySettings, type PrivacySettings } from "../db";
 import { DEFAULT_PRIVACY_TRIM_M } from "../activities";
 
 export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
-  distance: { mode: "include-rounded", roundToM: 100 },
+  // visible-only: total minus visible would otherwise measure the hidden path
+  distance: { mode: "visible-only", roundToM: 100 },
   coarsenStartMin: 0,
   defaultTrimM: DEFAULT_PRIVACY_TRIM_M,
 };

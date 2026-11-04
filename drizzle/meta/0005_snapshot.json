@@ -1,5 +1,5 @@
 {
-  "id": "215806f2-3772-4a6a-ad30-832733f304b6",
+  "id": "99cf5f24-bb99-4f59-802b-f757d2530692",
   "prevId": "0076b567-ba45-4e72-b9dc-86ebd3cf9b6e",
   "version": "7",
   "dialect": "postgresql",
@@ -310,6 +310,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "stale_marked_at": {
+          "name": "stale_marked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "legacy_route": {
+          "name": "legacy_route",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "republish_attempted_at": {
           "name": "republish_attempted_at",
