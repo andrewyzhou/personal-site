@@ -186,6 +186,7 @@ function synthTrack(n = 600): CanonicalTrack {
 }
 
 const at = (h: number, m = 0) => new Date(Date.UTC(2026, 9, 1, h, m));
+const T0 = Date.UTC(2026, 9, 1, 8); // synthTrack's startEpochMs (the anchor)
 
 function addActivity(id: number, over: Record<string, unknown> = {}) {
   db.activities.set(id, {
@@ -324,12 +325,15 @@ describe("preview", () => {
     expect(cropped.preview.stats.distanceM).toBeLessThan(base.preview.stats.distanceM * 0.7);
     expect(cropped.preview.polyline).not.toBe(base.preview.polyline);
 
-    // an active crop is part of the baseline; a proposed crop after it wins
+    // an active crop is part of the baseline; crops intersect, so a wider
+    // proposed crop changes nothing and a narrower one narrows
     addEdit(5, "crop", { startS: 300, endS: null });
     const withActive = await (await preview(req({ edits: [] }), id5)).json();
     expect(withActive.preview.stats.distanceM).toBeCloseTo(cropped.preview.stats.distanceM);
     const wider = await (await preview(req({ edits: [{ kind: "crop", params: { startS: 100, endS: null } }] }), id5)).json();
-    expect(wider.preview.stats.distanceM).toBeGreaterThan(withActive.preview.stats.distanceM);
+    expect(wider.preview.stats.distanceM).toBeCloseTo(withActive.preview.stats.distanceM);
+    const narrower = await (await preview(req({ edits: [{ kind: "crop", params: { startS: null, endS: 450 } }] }), id5)).json();
+    expect(narrower.preview.stats.distanceM).toBeLessThan(withActive.preview.stats.distanceM);
 
     const noGps = await (await preview(req({ edits: [{ kind: "no-gps", params: {} }] }), id5)).json();
     expect(noGps.preview).toMatchObject({ polyline: null, cardPolyline: null, bounds: null });
@@ -428,7 +432,7 @@ describe("suggestions", () => {
     sug();
     const j = await (await act("accept")).json();
     expect(j).toMatchObject({ ok: true, unchanged: false, suggestion: { id: 1, status: "accepted", editId: expect.any(Number) }, republished: { 5: "published" } });
-    expect(db.edits).toEqual([expect.objectContaining({ id: j.suggestion.editId, kind: "crop", params: { startS: 30, endS: null }, note: "accepted: standing at the start" })]);
+    expect(db.edits).toEqual([expect.objectContaining({ id: j.suggestion.editId, kind: "crop", params: { startS: 30, endS: null, anchorEpochMs: T0 }, note: "accepted: standing at the start" })]);
     expect(db.suggestions[0].decidedAt).toBeInstanceOf(Date);
     expect(republish).toHaveBeenCalledWith(5);
 
@@ -490,12 +494,13 @@ describe("split", () => {
     expect(child.bounds ?? null).toBeNull();
     expect(db.sources.filter((s) => s.activityId === j.childId).map((s) => s.rawSha256)).toEqual(db.sources.filter((s) => s.activityId === 5).map((s) => s.rawSha256));
     expect(active(j.childId).map((e) => [e.kind, e.params])).toEqual([
-      ["crop", { startS: 300, endS: 550 }],
+      ["crop", { startS: 300, endS: 550, anchorEpochMs: T0 }],
       ["trim", { startM: 50, endM: 80 }],
     ]);
     const parentNew = active(5).filter((e) => e.id !== trim).slice(1);
+    // crops intersect: the earlier 20–550 crop keeps the start
     expect(parentNew.map((e) => [e.kind, e.params])).toEqual([
-      ["crop", { startS: 20, endS: 300 }],
+      ["crop", { startS: null, endS: 300, anchorEpochMs: T0 }],
       ["split", { childId: j.childId, atS: 300, parentCropEditId: parentNew[0].id }],
     ]);
     expect(j.parentCropEditId).toBe(parentNew[0].id);
@@ -644,9 +649,11 @@ describe("merge", () => {
     expect(await (await revert(req({}), ctx({ id: "5", editId: String(m.mergeEditId) }))).json()).toMatchObject({ reverted: [] });
   });
 
-  it("revert restores wasHidden=true, and works from the absorbed side's marker", async () => {
+  it("revert restores wasHidden=true (merges made before privacy was checked), and works from the absorbed side's marker", async () => {
     db.activities.get(6)!.hidden = true;
-    const m = await (await doMerge(6)).json();
+    const markerEditId = addEdit(6, "merged-into", { intoActivityId: 5, wasHidden: true });
+    const mergeEditId = addEdit(5, "merge", { withActivityId: 6 });
+    const m = { markerEditId, mergeEditId };
     const res = await revert(req({}), ctx({ id: "6", editId: String(m.markerEditId) }));
     expect(await res.json()).toMatchObject({ ok: true, reverted: [m.mergeEditId, m.markerEditId] });
     expect(db.activities.get(6)!.hidden).toBe(true);
@@ -668,6 +675,144 @@ describe("merge", () => {
     expect(res2.reverted).toEqual([]);
     expect(active(5).map((e) => e.id)).toEqual([m2.mergeEditId]);
     expect(db.activities.get(6)!.hidden).toBe(true);
+  });
+});
+
+describe("anchors", () => {
+  it("crop, cut and drop-points get the canonical start; no-gps doesn't", async () => {
+    for (const [kind, params] of [["crop", { startS: 10, endS: null }], ["cut", { fromS: 50, toS: 60 }], ["drop-points", { ts: [12] }], ["no-gps", {}]] as const) {
+      const j = await (await postEdit(req({ kind, params }), id5)).json();
+      const stored = db.edits.find((e) => e.id === j.editId)!.params as Record<string, unknown>;
+      if (kind === "no-gps") expect(stored).toEqual({});
+      else expect(stored.anchorEpochMs).toBe(T0);
+    }
+  });
+
+  it("a client-sent anchor is replaced by the current track's", async () => {
+    const j = await (await postEdit(req({ kind: "cut", params: { fromS: 50, toS: 60, anchorEpochMs: 123 } }), id5)).json();
+    expect(db.edits.find((e) => e.id === j.editId)!.params).toEqual({ fromS: 50, toS: 60, anchorEpochMs: T0 });
+  });
+});
+
+describe("route-only tracks", () => {
+  const NO_TIMED = "this activity has no timed track (route only)";
+  beforeEach(() => db.tracks.set(5, { ...synthTrack(), syntheticTime: true }));
+
+  it("GET flags it", async () => {
+    expect(await (await getCleaning(req(), id5)).json()).toMatchObject({ ok: true, trackStatus: "ok", syntheticTime: true });
+  });
+
+  it("edits, preview, suggestion accept, split and merge are refused with 422", async () => {
+    for (const res of [
+      await postEdit(req({ kind: "no-gps" }), id5),
+      await postEdit(req({ kind: "crop", params: { startS: 10, endS: null } }), id5),
+      await preview(req({ edits: [] }), id5),
+      await split(req({ atS: 300 }), id5),
+    ]) {
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toMatch(NO_TIMED);
+    }
+    db.suggestions.push({ id: 1, activityId: 5, detectorVersion: 1, kind: "no-gps", confidence: 0.8, edit: { kind: "no-gps", params: {} }, summary: "s", range: null, status: "open", editId: null, createdAt: new Date(), decidedAt: null });
+    expect((await decide(req({ action: "accept" }), ctx({ id: "5", sid: "1" }))).status).toBe(422);
+    expect(db.suggestions[0].status).toBe("open");
+    addActivity(6, { startDateUtc: at(9) });
+    const m = await merge(req({ otherId: 6 }), id5);
+    expect(m.status).toBe(422);
+    expect((await m.json()).error).toMatch(NO_TIMED);
+    expect(db.edits).toHaveLength(0);
+    expect(db.activities.size).toBe(2);
+  });
+});
+
+describe("split boundaries", () => {
+  it("a parent takes nothing after its split; a child nothing before it", async () => {
+    const s = await (await split(req({ atS: 300 }), id5)).json();
+    db.tracks.set(s.childId, synthTrack()); // same sources, same track
+    const before = db.edits.length;
+    // parent
+    expect((await postEdit(req({ kind: "crop", params: { startS: null, endS: 400 } }), id5)).status).toBe(409);
+    expect((await postEdit(req({ kind: "crop", params: { startS: 350, endS: null } }), id5)).status).toBe(409);
+    expect((await postEdit(req({ kind: "cut", params: { fromS: 250, toS: 350 } }), id5)).status).toBe(409);
+    // child
+    const childCtx = ctx({ id: String(s.childId) });
+    expect((await postEdit(req({ kind: "crop", params: { startS: 100, endS: null } }), childCtx)).status).toBe(409);
+    expect((await postEdit(req({ kind: "cut", params: { fromS: 250, toS: 350 } }), childCtx)).status).toBe(409);
+    expect(db.edits).toHaveLength(before);
+    // inside their own halves: fine
+    expect((await postEdit(req({ kind: "crop", params: { startS: 20, endS: null } }), id5)).status).toBe(200);
+    expect((await postEdit(req({ kind: "cut", params: { fromS: 400, toS: 450 } }), childCtx)).status).toBe(200);
+  });
+
+  it("suggestion accept is refused the same way", async () => {
+    await split(req({ atS: 300 }), id5);
+    db.suggestions.push({ id: 1, activityId: 5, detectorVersion: 1, kind: "crop-tail", confidence: 0.8, edit: { kind: "crop", params: { startS: null, endS: 500 } }, summary: "tail", range: { fromS: 500, toS: 599 }, status: "open", editId: null, createdAt: new Date(), decidedAt: null });
+    expect((await decide(req({ action: "accept" }), ctx({ id: "5", sid: "1" }))).status).toBe(409);
+    expect(db.suggestions[0].status).toBe("open");
+  });
+
+  it("after the split is undone the parent can be cropped past it again", async () => {
+    const s = await (await split(req({ atS: 300 }), id5)).json();
+    await revert(req({}), ctx({ id: "5", editId: String(s.markerEditId) }));
+    expect((await postEdit(req({ kind: "crop", params: { startS: null, endS: 400 } }), id5)).status).toBe(200);
+  });
+
+  it("a split can't be undone while its half has an activity merged into it", async () => {
+    const s = await (await split(req({ atS: 300 }), id5)).json();
+    addEdit(s.childId, "merge", { withActivityId: 77 }); // made before merges refused split halves
+    const res = await revert(req({}), ctx({ id: "5", editId: String(s.markerEditId) }));
+    expect(res.status).toBe(409);
+    expect(db.activities.get(s.childId)!.hidden).toBe(false);
+    expect(active(5).map((e) => e.kind)).toEqual(["crop", "split"]);
+  });
+
+  it("a child's start crop can't be reverted while only an end crop would remain", async () => {
+    const s = await (await split(req({ atS: 300 }), id5)).json();
+    db.tracks.set(s.childId, synthTrack());
+    const childCtx = (editId: number) => ctx({ id: String(s.childId), editId: String(editId) });
+    const startCrop = active(s.childId)[0].id;
+    const j = await (await postEdit(req({ kind: "crop", params: { startS: null, endS: 500 } }), ctx({ id: String(s.childId) }))).json();
+    expect((await revert(req({}), childCtx(startCrop))).status).toBe(409);
+    expect((await revert(req({}), childCtx(j.editId))).status).toBe(200);
+  });
+});
+
+describe("merge refusals", () => {
+  beforeEach(() => addActivity(6, { startDateUtc: at(9) }));
+  const doMerge = (otherId: number, id = "5") => merge(req({ otherId }), ctx({ id }));
+
+  it("an absorbed activity more private than the target", async () => {
+    db.activities.get(6)!.hidden = true;
+    expect(await (await doMerge(6)).json()).toMatchObject({ ok: false, error: expect.stringMatching(/private/) });
+    db.activities.get(6)!.hidden = false;
+    db.activities.get(6)!.mapHidden = true;
+    expect((await doMerge(6)).status).toBe(409);
+    db.activities.get(5)!.mapHidden = true;
+    db.activities.get(6)!.hrHidden = true;
+    expect(await (await doMerge(6)).json()).toMatchObject({ ok: false, error: expect.stringMatching(/heart rate/) });
+    db.activities.get(5)!.hrHidden = true;
+    expect((await doMerge(6)).status).toBe(200);
+  });
+
+  it("split parents, on either side", async () => {
+    addEdit(6, "split", { childId: 40, atS: 100, parentCropEditId: 1 });
+    expect((await doMerge(6)).status).toBe(409);
+    expect(db.edits.filter((e) => e.kind === "merge" || e.kind === "merged-into")).toHaveLength(0);
+  });
+
+  it("crops at the joint, with a hint", async () => {
+    const c = addEdit(5, "crop", { startS: null, endS: 500 });
+    const r = await (await doMerge(6)).json();
+    expect(r).toMatchObject({ ok: false, error: expect.stringMatching(/undo the crop first, or merge before cropping/) });
+    db.edits.find((e) => e.id === c)!.revertedAt = new Date();
+    addEdit(6, "crop", { startS: 30, endS: null });
+    expect((await doMerge(6)).status).toBe(409);
+    expect(db.activities.get(6)!.hidden).toBe(false);
+  });
+
+  it("503 when a side's track can't be read", async () => {
+    db.tracks.set(6, "unavailable");
+    expect((await doMerge(6)).status).toBe(503);
+    expect(db.edits).toHaveLength(0);
   });
 });
 

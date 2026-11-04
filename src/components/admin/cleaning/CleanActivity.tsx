@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatMiles, sportLabel } from "@/lib/activity-format";
 import {
   boundsOfSegments,
+  cropWidens,
   currentCrop,
   fmtAt,
   fmtOffset,
@@ -14,6 +15,7 @@ import {
   positionAt,
   removedBands,
   segmentsInRange,
+  trimEffect,
   trimParams,
   type EditRow,
   type Range,
@@ -137,7 +139,7 @@ export default function CleanActivity({ id, name, sportType, utcOffsetMin }: Pro
         return p.suggestion.edit ? [p.suggestion.edit] : [];
       case "split":
         // what stays on this activity: everything up to the split point
-        return [{ kind: "crop", params: trimParams(crop, "end", p.atS) }];
+        return [{ kind: "crop", params: trimParams("end", p.atS) }];
       case "merge":
         return [{ kind: "merge", params: { withActivityId: p.otherId } }];
     }
@@ -235,8 +237,14 @@ export default function CleanActivity({ id, name, sportType, utcOffsetMin }: Pro
     );
   }
 
-  const canAct = !busy && !pending && !!track;
+  const canAct = !busy && !pending && !!track && !data.syntheticTime;
   const cursorValid = cursorS > 0 && cursorS < duration;
+  // crops only narrow: a trim outside the current window needs an undo first
+  const startTrim = trimEffect(crop, "start", cursorS);
+  const endTrim = trimEffect(crop, "end", cursorS);
+  const trimHint = (e: "narrows" | "widens" | "empty") =>
+    e === "widens" ? "already cropped past here — undo the crop in history to widen" : e === "empty" ? "would leave nothing" : undefined;
+  const selectionWidens = !!selection && cropWidens(crop, selection.fromS, selection.toS);
 
   return (
     <div className="flex flex-col" style={{ gap: "16px" }}>
@@ -270,7 +278,11 @@ export default function CleanActivity({ id, name, sportType, utcOffsetMin }: Pro
       </div>
 
       {!track ? (
-        <p className="font-sans text-gray text-sm italic">no stored track for this activity — nothing to clean</p>
+        <p className="font-sans text-gray text-sm italic">
+          {data.trackStatus === "unavailable"
+            ? "the original file can't be read right now — try again later"
+            : "no stored track for this activity — nothing to clean"}
+        </p>
       ) : (
         <>
           <CleanMap
@@ -315,25 +327,33 @@ export default function CleanActivity({ id, name, sportType, utcOffsetMin }: Pro
             )}
           </p>
 
+          {data.syntheticTime && (
+            <p className="font-sans text-gray text-sm italic">
+              this activity has no timed track (route only) — crops, cuts, split and merge need real timestamps
+            </p>
+          )}
           <div className="flex flex-wrap" style={{ gap: "12px" }}>
             <button
               className={smallBtn}
               disabled={!canAct || !selection}
+              title={selectionWidens ? "crops only narrow — the part outside the current crop stays cropped" : undefined}
               onClick={() => selection && startPending({ type: "edit", label: `crop to ${fmtRange(selection.fromS, selection.toS, ctx)}`, edit: { kind: "crop", params: { startS: selection.fromS, endS: selection.toS } } })}
             >
               crop to selection
             </button>
             <button
               className={smallBtn}
-              disabled={!canAct || !cursorValid}
-              onClick={() => startPending({ type: "edit", label: `trim start at ${fmtAt(cursorS, ctx)}`, edit: { kind: "crop", params: trimParams(crop, "start", cursorS) } })}
+              disabled={!canAct || !cursorValid || startTrim !== "narrows"}
+              title={trimHint(startTrim)}
+              onClick={() => startPending({ type: "edit", label: `trim start at ${fmtAt(cursorS, ctx)}`, edit: { kind: "crop", params: trimParams("start", cursorS) } })}
             >
               trim start here
             </button>
             <button
               className={smallBtn}
-              disabled={!canAct || !cursorValid}
-              onClick={() => startPending({ type: "edit", label: `trim end at ${fmtAt(cursorS, ctx)}`, edit: { kind: "crop", params: trimParams(crop, "end", cursorS) } })}
+              disabled={!canAct || !cursorValid || endTrim !== "narrows"}
+              title={trimHint(endTrim)}
+              onClick={() => startPending({ type: "edit", label: `trim end at ${fmtAt(cursorS, ctx)}`, edit: { kind: "crop", params: trimParams("end", cursorS) } })}
             >
               trim end here
             </button>
@@ -362,6 +382,13 @@ export default function CleanActivity({ id, name, sportType, utcOffsetMin }: Pro
               drop gps
             </button>
           </div>
+
+          {crop && (
+            <p className="font-sans text-gray text-xs italic">
+              crops stack and only narrow{crop.startS !== null ? ` · keeping from ${fmtAt(crop.startS, ctx)}` : ""}
+              {crop.endS !== null ? ` · keeping until ${fmtAt(crop.endS, ctx)}` : ""} — undo a crop in history to widen
+            </p>
+          )}
 
           {mergeOpen && !pending && (
             <div className="flex flex-col" style={{ gap: "8px" }}>

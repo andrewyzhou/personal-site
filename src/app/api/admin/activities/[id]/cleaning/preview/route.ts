@@ -6,11 +6,12 @@
 // 200 { ok: true, preview: { polyline, cardPolyline, bounds,
 //        stats: { distanceM, movingTimeS, elapsedTimeS, elevGainM, avgSpeedMs, maxSpeedMs, avgHr, maxHr,
 //                 avgCadence, avgWatts, maxWatts, kilojoules, trimStartM, trimEndM, hrZonesS } } }
-// 400 bad id / body / edit · 401 · 404 · 422 no track · 503 track unreadable · 500
+// 400 bad id / body / edit · 401 · 404 · 422 no track / route-only track ·
+// 503 track unreadable · 500
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getActivity, loadPublishContext, loadTrackForRow } from "@/lib/cleaning/load";
-import { parseProposedEdits, pickStats } from "@/lib/cleaning/plan";
+import { parseProposedEdits, pickStats, syntheticRefusal } from "@/lib/cleaning/plan";
 import { defaultDeps, publishTrack } from "@/lib/republish";
 import { bad, effectiveEdits, failure, parseId, readJson, type Ctx } from "../shared";
 
@@ -34,6 +35,8 @@ export async function POST(request: Request, { params }: Ctx) {
     const load = await loadTrackForRow(row, deps);
     if (load.status === "no-track") return bad("no track stored for this activity", 422);
     if (load.status !== "ok") return bad("track is unreadable right now", 503);
+    const synthetic = syntheticRefusal(load.track);
+    if (synthetic) return bad(synthetic.error, synthetic.status);
     const edits = [...(await effectiveEdits(row)), ...proposed];
     const ctx = await loadPublishContext(row, load.track, edits, deps);
     if (ctx === "unavailable") return bad("a merged activity's track is unreadable right now", 503);

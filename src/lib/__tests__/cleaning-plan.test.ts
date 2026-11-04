@@ -19,6 +19,14 @@ import {
   splitCrops,
   splitDedupeKey,
   splitRefusal,
+  splitRevertRefusal,
+  findSplitCrop,
+  withAnchor,
+  syntheticRefusal,
+  ownCleaning,
+  splitBounds,
+  boundaryRefusal,
+  NO_TIMED_TRACK,
   DIRECT_EDIT_KINDS,
 } from "../cleaning/plan";
 import { createHash } from "crypto";
@@ -115,9 +123,17 @@ describe("crops and range", () => {
     { id: 3, kind: "crop", params: { startS: 20, endS: 500 } },
   ];
 
-  it("currentCrop is the latest, optionally skipping one", () => {
+  it("currentCrop is the intersection of active crops, optionally skipping one", () => {
     expect(currentCrop(edits)).toEqual({ id: 3, startS: 20, endS: 500 });
     expect(currentCrop(edits, 3)).toEqual({ id: 1, startS: 10, endS: null });
+    // a later, wider crop never widens the window
+    const narrowFirst = [
+      { id: 1, kind: "crop", params: { startS: 100, endS: 400 } },
+      { id: 2, kind: "crop", params: { startS: 50, endS: null } },
+      { id: 3, kind: "crop", params: { startS: null, endS: 450 } },
+    ];
+    expect(currentCrop(narrowFirst)).toEqual({ id: 3, startS: 100, endS: 400 });
+    expect(currentCrop(narrowFirst, 1)).toEqual({ id: 3, startS: 50, endS: 450 });
     expect(currentCrop([])).toBeNull();
     expect(latestOf(edits, "trim")?.id).toBe(2);
   });
@@ -134,9 +150,71 @@ describe("crops and range", () => {
     expect(cleanedRange(tr, [{ id: 1, kind: "crop", params: { startS: 1000, endS: null } }])).toBeNull();
   });
 
-  it("splitCrops: parent keeps its start, child keeps the parent's end", () => {
-    expect(splitCrops({ id: 3, startS: 20, endS: 500 }, 300)).toEqual({ parent: { startS: 20, endS: 300 }, child: { startS: 300, endS: 500 } });
+  it("splitCrops: parent only gets the new end (its crops intersect), child keeps the parent's end", () => {
+    expect(splitCrops({ id: 3, startS: 20, endS: 500 }, 300)).toEqual({ parent: { startS: null, endS: 300 }, child: { startS: 300, endS: 500 } });
     expect(splitCrops(null, 300)).toEqual({ parent: { startS: null, endS: 300 }, child: { startS: 300, endS: null } });
+  });
+
+  it("findSplitCrop finds the end-only crop an interrupted split left", () => {
+    const list = [
+      { id: 1, kind: "crop", params: { startS: 20, endS: 300 } },
+      { id: 2, kind: "crop", params: { startS: null, endS: 300 } },
+    ];
+    expect(findSplitCrop(list, 300)?.id).toBe(2);
+    expect(findSplitCrop(list, 301)).toBeNull();
+  });
+
+  it("withAnchor stamps the canonical start on timed kinds only", () => {
+    expect(withAnchor("crop", { startS: 1, endS: null }, 5000)).toEqual({ startS: 1, endS: null, anchorEpochMs: 5000 });
+    expect(withAnchor("cut", { fromS: 1, toS: 2 }, 5000)).toMatchObject({ anchorEpochMs: 5000 });
+    expect(withAnchor("drop-points", { ts: [1] }, 5000)).toMatchObject({ anchorEpochMs: 5000 });
+    expect(withAnchor("no-gps", {}, 5000)).toEqual({});
+    expect(withAnchor("crop", { startS: 1, endS: null }, null)).toEqual({ startS: 1, endS: null });
+  });
+
+  it("syntheticRefusal: route-only tracks get 422", () => {
+    expect(syntheticRefusal({ syntheticTime: true })).toEqual({ ok: false, status: 422, error: NO_TIMED_TRACK });
+    expect(syntheticRefusal({ syntheticTime: false })).toBeNull();
+    expect(syntheticRefusal(null)).toBeNull();
+  });
+
+  it("ownCleaning keeps a merged part's cleaning only", () => {
+    const list = [
+      { id: 1, kind: "crop", params: {} }, { id: 2, kind: "merge", params: {} }, { id: 3, kind: "merged-into", params: {} },
+      { id: 4, kind: "trim", params: {} }, { id: 5, kind: "cut", params: {} }, { id: 6, kind: "split", params: {} },
+    ];
+    expect(ownCleaning(list).map((e) => e.id)).toEqual([1, 5]);
+  });
+});
+
+describe("split boundaries", () => {
+  const marker = { id: 9, kind: "split", params: { childId: 20, atS: 300, parentCropEditId: 8 } };
+
+  it("splitBounds: a parent ends at its split, a child starts at its parent's marker", () => {
+    expect(splitBounds(7, [marker], null)).toEqual({ maxS: 300, minS: null });
+    expect(splitBounds(20, [], [marker])).toEqual({ maxS: null, minS: 300 });
+    expect(splitBounds(21, [], [marker])).toEqual({ maxS: null, minS: null });
+  });
+
+  it("boundaryRefusal: nothing past the split on either side", () => {
+    const parent = { maxS: 300, minS: null };
+    const child = { maxS: null, minS: 300 };
+    const crop = (startS: number | null, endS: number | null) => ({ kind: "crop", params: { startS, endS } });
+    const cut = (fromS: number, toS: number) => ({ kind: "cut", params: { fromS, toS } });
+    expect(boundaryRefusal(crop(10, 200), parent)).toBeNull();
+    expect(boundaryRefusal(crop(10, null), parent)).toBeNull();
+    expect(boundaryRefusal(crop(null, 400), parent)?.status).toBe(409);
+    expect(boundaryRefusal(crop(300, null), parent)?.status).toBe(409);
+    expect(boundaryRefusal(cut(100, 200), parent)).toBeNull();
+    expect(boundaryRefusal(cut(250, 350), parent)?.status).toBe(409);
+    expect(boundaryRefusal(crop(350, null), child)).toBeNull();
+    expect(boundaryRefusal(crop(null, 500), child)).toBeNull();
+    expect(boundaryRefusal(crop(200, null), child)?.status).toBe(409);
+    expect(boundaryRefusal(crop(null, 300), child)?.status).toBe(409);
+    expect(boundaryRefusal(cut(250, 350), child)?.status).toBe(409);
+    expect(boundaryRefusal(cut(350, 400), child)).toBeNull();
+    expect(boundaryRefusal({ kind: "drop-points", params: { ts: [900] } }, parent)).toBeNull();
+    expect(boundaryRefusal(crop(null, 400), { maxS: null, minS: null })).toBeNull();
   });
 });
 
@@ -172,8 +250,42 @@ describe("split", () => {
 
 describe("planMerge", () => {
   const at = (h: number) => new Date(Date.UTC(2026, 9, 1, h));
-  const side = (id: number, h: number, edits: { id: number; kind: string; params: Record<string, unknown> }[] = [], splitFromId: number | null = null) =>
-    ({ row: { id, startDateUtc: at(h), splitFromId }, edits });
+  type E = { id: number; kind: string; params: Record<string, unknown> };
+  const side = (id: number, h: number, edits: E[] = [], splitFromId: number | null = null, over: Partial<{ hidden: boolean; mapHidden: boolean; hrHidden: boolean; syntheticTime: boolean }> = {}) =>
+    ({ row: { id, startDateUtc: at(h), splitFromId, hidden: over.hidden ?? false, mapHidden: over.mapHidden ?? false, hrHidden: over.hrHidden ?? false }, edits, syntheticTime: over.syntheticTime });
+
+  it("refuses an absorbed activity more private than the target", () => {
+    expect(planMerge(side(1, 8), side(2, 9, [], null, { hidden: true }))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/private/) });
+    expect(planMerge(side(1, 8), side(2, 9, [], null, { mapHidden: true }))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/map/) });
+    expect(planMerge(side(1, 8), side(2, 9, [], null, { hrHidden: true }))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/heart rate/) });
+    // as private as the target, or the target more private: fine
+    expect(planMerge(side(1, 8, [], null, { mapHidden: true, hrHidden: true }), side(2, 9, [], null, { mapHidden: true, hrHidden: true }))).toMatchObject({ ok: true });
+    expect(planMerge(side(1, 8, [], null, { hidden: true }), side(2, 9))).toMatchObject({ ok: true });
+    // resuming our own half-finished merge: the absorbed one is hidden by us
+    const marker = { id: 5, kind: "merged-into", params: { intoActivityId: 1, wasHidden: false } };
+    expect(planMerge(side(1, 8), side(2, 9, [marker], null, { hidden: true }))).toMatchObject({ ok: true, markerId: 5 });
+  });
+
+  it("refuses split halves and split parents on either side", () => {
+    expect(planMerge(side(1, 8, [], 30), side(2, 9))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/split half/) });
+    expect(planMerge(side(1, 8), side(2, 9, [], 30))).toMatchObject({ ok: false, status: 409 });
+    const split = { id: 6, kind: "split", params: { childId: 40, atS: 100 } };
+    expect(planMerge(side(1, 8, [split]), side(2, 9))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/was split/) });
+    expect(planMerge(side(1, 8), side(2, 9, [split]))).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("refuses route-only tracks with 422", () => {
+    expect(planMerge(side(1, 8, [], null, { syntheticTime: true }), side(2, 9))).toMatchObject({ ok: false, status: 422, error: expect.stringMatching(/no timed track/) });
+    expect(planMerge(side(1, 8), side(2, 9, [], null, { syntheticTime: true }))).toMatchObject({ ok: false, status: 422 });
+  });
+
+  it("refuses crops that cut the joint: the target's end or the absorbed one's start", () => {
+    const crop = (startS: number | null, endS: number | null) => ({ id: 7, kind: "crop", params: { startS, endS } });
+    expect(planMerge(side(1, 8, [crop(null, 500)]), side(2, 9))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/end cropped.*undo the crop first, or merge before cropping/) });
+    expect(planMerge(side(1, 8), side(2, 9, [crop(30, null)]))).toMatchObject({ ok: false, status: 409, error: expect.stringMatching(/start cropped/) });
+    // the outer ends are fine
+    expect(planMerge(side(1, 8, [crop(30, null)]), side(2, 9, [crop(null, 500)]))).toMatchObject({ ok: true });
+  });
 
   it("always merges the later one into the earlier one", () => {
     expect(planMerge(side(1, 8), side(2, 9))).toMatchObject({ ok: true, targetId: 1, absorbedId: 2, alreadyMerged: false });
@@ -221,5 +333,17 @@ describe("revertRefusal", () => {
     const two = [...only, { id: 9, kind: "crop", params: { startS: 320, endS: null } }];
     expect(revertRefusal(two[1], two, { isSplitChild: true })).toBeNull();
     expect(revertRefusal(only[0], only, { isSplitChild: false })).toBeNull();
+    // an end-only crop doesn't keep the half starting at the split
+    const endOnly = [...only, { id: 10, kind: "crop", params: { startS: null, endS: 500 } }];
+    expect(revertRefusal(endOnly[0], endOnly, { isSplitChild: true, splitAtS: 300 })?.status).toBe(409);
+    expect(revertRefusal(endOnly[1], endOnly, { isSplitChild: true, splitAtS: 300 })).toBeNull();
+    // a remaining start before the split isn't enough
+    const early = [...only, { id: 11, kind: "crop", params: { startS: 100, endS: null } }];
+    expect(revertRefusal(early[0], early, { isSplitChild: true, splitAtS: 300 })?.status).toBe(409);
+  });
+
+  it("a split can't be undone while its half has an activity merged into it", () => {
+    expect(splitRevertRefusal([{ id: 1, kind: "merge", params: { withActivityId: 4 } }])?.status).toBe(409);
+    expect(splitRevertRefusal([{ id: 1, kind: "crop", params: { startS: 1, endS: null } }])).toBeNull();
   });
 });

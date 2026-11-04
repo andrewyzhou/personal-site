@@ -2,11 +2,12 @@
 // canonical track: idle stretches, vehicle segments, forgot-to-stop tails,
 // late-start heads, gps spikes and indoor gps drift. every edit proposed here
 // passes validateCleaningEdit; confidence is calibrated so that only clear-cut
-// cases reach the auto-apply threshold (0.9 by default).
+// cases reach the auto-apply threshold (0.9 by default), and never for sports
+// outside the speed table.
 
 import { haversineM } from "../geo";
 import type { CanonicalTrack } from "../canonical-track";
-import { sportLimits, type SportLimits } from "./sport";
+import { SNOW_SPORTS, isKnownSport, sportLimits, type SportLimits } from "./sport";
 import type { Suggestion } from "./types";
 
 const GAP_S = 10; // longer steps are recording gaps (auto-pause, lost signal)
@@ -40,6 +41,9 @@ const SPIKE_MIN_M = 100;
 
 const DRIFT_MIN_S = 10 * 60;
 const DRIFT_MAX_P90 = 1.4; // m/s, 90th percentile of 10 s displacement speed
+
+// sports without real speed limits never reach the auto-apply threshold
+const UNKNOWN_SPORT_MAX_CONF = 0.89;
 
 // running sports: walking isn't the activity (forgot-to-stop tails walk home)
 const WALK_MAX: Record<string, number> = { Run: 1.9, TrailRun: 1.9, VirtualRun: 1.9 };
@@ -564,6 +568,7 @@ export function detectSuggestions(track: CanonicalTrack, sportType: string): Sug
   // polyline-only tracks have made-up timestamps: nothing to say about speed
   if (n < 10 || track.syntheticTime) return [];
   const lim = sportLimits(sportType);
+  const known = isKnownSport(sportType);
   const out: Suggestion[] = [];
 
   const spikes = findSpikes(track, lim);
@@ -592,7 +597,11 @@ export function detectSuggestions(track: CanonicalTrack, sportType: string): Sug
     let head: Suggestion | undefined;
     let tail: Suggestion | undefined;
     const cuts: Suggestion[] = [];
-    const vehicles = VIRTUAL.has(sportType) ? [] : vehicleCandidates(steps, lim, sportType, track.columns.ele);
+    // the generic limits can't tell a vehicle from the sport (lifts, ski runs,
+    // paddling downstream), so vehicle detection needs a known sport
+    const vehicles = VIRTUAL.has(sportType) || !known
+      ? []
+      : vehicleCandidates(steps, lim, sportType, track.columns.ele).filter((s) => !(SNOW_SPORTS.has(sportType) && s.kind === "cut-vehicle"));
     for (const s of [...vehicles, ...edgeCandidates(steps, track, sportType)]) {
       if (s.kind === "crop-head") head = better(head, s);
       else if (s.kind === "crop-tail") tail = better(tail, s);
@@ -606,6 +615,8 @@ export function detectSuggestions(track: CanonicalTrack, sportType: string): Sug
     const excluded = [head, tail, ...kept].filter((s): s is Suggestion => !!s).map((s) => s.range!);
     out.push(...idleCandidates(steps, sportType, excluded));
   }
+
+  if (!known) for (const s of out) s.confidence = Math.min(s.confidence, UNKNOWN_SPORT_MAX_CONF);
 
   return out.sort((a, b) =>
     (a.range?.fromS ?? 0) - (b.range?.fromS ?? 0) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));

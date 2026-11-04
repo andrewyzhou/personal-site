@@ -1,18 +1,20 @@
 // POST /api/admin/activities/[id]/edits { kind, params, note? }
 // records one cleaning edit, then republishes. kinds: crop | cut | drop-points |
 // no-gps (merge and split have their own routes). an edit the published
-// columns can't reflect is reverted again (never left active).
+// columns can't reflect is reverted again (never left active). crop, cut and
+// drop-points get anchorEpochMs (the canonical track's start) added.
 //
 // 200 { ok: true, editId: number, status: RepublishResult["status"] }
-// 400 bad id / body / params · 401 · 404 · 422 no track (edit reverted) ·
-// 503 track unreadable (edit reverted) · 500 (edit reverted)
+// 400 bad id / body / params · 401 · 404 · 409 crop/cut past a live split
+// boundary · 422 no track / route-only track · 503 track unreadable ·
+// 500 (edit reverted)
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getActivity, insertEdit, revertEditOnce } from "@/lib/cleaning/load";
 import { DIRECT_EDIT_KINDS, parseEditBody } from "@/lib/cleaning/plan";
 import { republish } from "@/lib/republish";
 import { log } from "@/lib/log";
-import { bad, parseId, readJson, refreshCaches, type Ctx } from "../cleaning/shared";
+import { bad, guardCleaningEdit, parseId, readJson, refreshCaches, type Ctx } from "../cleaning/shared";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -37,7 +39,9 @@ export async function POST(request: Request, { params }: Ctx) {
   try {
     const row = await getActivity(id);
     if (!row) return bad("not found", 404);
-    editId = await insertEdit(id, edit.kind, edit.params, note);
+    const guard = await guardCleaningEdit(row, edit);
+    if (!guard.ok) return guard.response;
+    editId = await insertEdit(id, edit.kind, guard.params, note);
     const result = await republish(id);
     if (result.status === "no-source" || result.status === "not-found") {
       await revertEditOnce(editId);

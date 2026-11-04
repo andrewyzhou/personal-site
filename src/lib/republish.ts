@@ -13,7 +13,7 @@
 // server-only.
 
 import { createHash } from "crypto";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import {
   getDb,
   activities,
@@ -51,7 +51,8 @@ import {
   loadPrivacySettings,
   publishedDistance,
 } from "./privacy/settings";
-import { applyCleaning, combineCrop, mergeTargets } from "./cleaning/edits";
+import { CLEANING_EDIT_KINDS, applyCleaning, effectiveCropWindow, mergeTargets, type MergedPart } from "./cleaning/edits";
+import { isKnownSport } from "./cleaning/sport";
 import { cleanedStats, hrZoneSeconds, rawStatsOf } from "./cleaning/stats";
 import { DEFAULT_ACTIVITY_SETTINGS, loadActivitySettings } from "./cleaning/settings";
 import { detectSuggestions } from "./cleaning/detect";
@@ -168,7 +169,7 @@ export function inputsHash(input: {
   processingVersion?: number;
   activity?: ActivitySettings;
   sportType?: string;
-  merged?: TrackRef[];
+  merged?: { ref: TrackRef; edits: EditInput[] }[];
 }): string {
   const payload = {
     processingVersion: input.processingVersion ?? PROCESSING_VERSION,
@@ -284,12 +285,13 @@ export const PUBLIC_COLUMN_NAMES: readonly (keyof PublicColumns)[] = [
 ];
 
 const ADDITIVE_COLUMNS = new Set<keyof PublicColumns>(["hrZonesS"]);
+const CLEANING_KINDS = new Set<string>(CLEANING_EDIT_KINDS);
 
 export interface PublishContext {
   zones: ZoneInput[];
   settings: PrivacySettings;
   activity?: ActivitySettings; // hr zones (none without)
-  merged?: CanonicalTrack[]; // tracks of activities merged into this one
+  merged?: MergedPart[]; // activities merged into this one, with their own edits
   sportType?: string; // the activity's (owner-set) sport; defaults to the track's
 }
 
@@ -380,10 +382,16 @@ export function publishTrack(
   edits: EditInput[],
   ctx: PublishContext = { zones: [], settings: DEFAULT_PRIVACY_SETTINGS }
 ): PublishedTrack {
-  const cleaning = applyCleaning(rawTrack, edits, ctx.merged ?? []);
+  // a polyline-only track has made-up timestamps: cleaning can't be timed on
+  // it, so it is published untouched (the admin api refuses such edits too)
+  const cleaningEdits = rawTrack.syntheticTime ? edits.filter((e) => !CLEANING_KINDS.has(e.kind)) : edits;
+  const trim = resolveTrim(edits, hasGps(rawTrack), ctx.settings.defaultTrimM);
+  // every merged recording keeps the privacy trim at its own ends too
+  const cleaning = applyCleaning(rawTrack, cleaningEdits, rawTrack.syntheticTime ? [] : ctx.merged ?? [], {
+    boundaryTrim: trim,
+  });
   const track = cleaning.track;
   const parsed = canonicalToParsed(track);
-  const trim = resolveTrim(edits, hasGps(track), ctx.settings.defaultTrimM);
   const zeroTrim = trim.startM === 0 && trim.endM === 0;
   const { kept, keptCum } = zeroTrim
     ? { kept: parsed.records, keptCum: parsed.cumDist }
@@ -577,7 +585,15 @@ export interface RepublishDeps {
   loadActivitySettings?(): Promise<ActivitySettings>;
   // store detector output (insert-only per fingerprint); when autoApplyMin is
   // set, open suggestions at/above it become edits — returns those edits
-  recordSuggestions?(id: number, suggestions: Suggestion[], autoApplyMin: number | null, currentEdits?: EditInput[]): Promise<EditInput[]>;
+  recordSuggestions?(
+    id: number,
+    suggestions: Suggestion[],
+    autoApplyMin: number | null,
+    currentEdits?: EditInput[],
+    anchorEpochMs?: number
+  ): Promise<EditInput[]>;
+  // flag another activity for rebuild (merge targets of an absorbed activity)
+  markStale?(id: number): Promise<void>;
 }
 
 export type RepublishResult =
@@ -659,13 +675,17 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
 
   const activity = deps.loadActivitySettings ? await deps.loadActivitySettings() : DEFAULT_ACTIVITY_SETTINGS;
   // activities merged into this one: their best track source is an input too
-  const merges: { id: number; row: ActivityRow; ref: TrackRef }[] = [];
+  const merges: { id: number; row: ActivityRow; ref: TrackRef; edits: EditInput[] }[] = [];
   for (const otherId of mergeTargets(edits)) {
     if (otherId === activityId) continue;
     const other = await deps.loadActivity(otherId);
     const ref = other ? trackCandidates(await deps.loadSources(otherId))[0] : undefined;
-    if (other && ref) merges.push({ id: otherId, row: other, ref });
+    // the absorbed activity's own cleaning applies to its part
+    const own = other && ref ? (await deps.loadEdits(otherId)).filter((e) => CLEANING_KINDS.has(e.kind) && e.kind !== "merge") : [];
+    if (other && ref) merges.push({ id: otherId, row: other, ref, edits: own });
   }
+  // an absorbed activity whose inputs changed makes its target stale
+  const mergedInto = edits.filter((e) => e.kind === "merged-into").map((e) => Number(e.params.intoActivityId)).filter((n) => Number.isInteger(n) && n > 0);
 
   const best = candidates[0] ?? null;
   // the route a trackless row publishes from: kept privately the first time
@@ -681,7 +701,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       photos,
       activity,
       sportType: row.sportType,
-      merged: merges.map((m) => m.ref),
+      merged: merges.map((m) => ({ ref: m.ref, edits: m.edits })),
     });
   const bestHash = hashFor(best, row.trackBbox ?? null);
   if (!opts.force && row.publishedInputsHash === bestHash && row.processingVersion === PROCESSING_VERSION) {
@@ -719,25 +739,30 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     if (!track) continue;
 
     // merged activities' tracks (a merge whose track can't be read waits)
-    const merged: CanonicalTrack[] = [];
+    const merged: MergedPart[] = [];
     for (const m of merges) {
       const t = await buildTrack(m.ref, m.row, deps);
       if (t === "unavailable") {
         await fogCurrentRoute();
         return { status: "source-unavailable", id: activityId, hash: bestHash, track: m.ref };
       }
-      if (t) merged.push(t);
+      if (t) merged.push({ track: t, edits: m.edits });
     }
 
-    // detector suggestions on the untouched track; with auto-apply on, the
-    // confident ones become edits right away (still reversible)
-    if (!opts.dryRun && deps.recordSuggestions) {
-      const suggestions = detectSuggestions(track, row.sportType);
-      const accepted = await deps.recordSuggestions(activityId, suggestions, activity.autoApply.enabled ? activity.autoApply.minConfidence : null, edits);
+    // detector suggestions on the untouched track, kept only where they still
+    // apply (inside the crop window in effect). with auto-apply on, confident
+    // ones become edits right away (still reversible) — never for sports
+    // without real speed limits, and never on route-only tracks
+    if (!opts.dryRun && deps.recordSuggestions && !track.syntheticTime) {
+      const { lo, hi } = effectiveCropWindow(edits, track);
+      const suggestions = detectSuggestions(track, row.sportType).filter((s) => !s.range || (s.range.toS > lo && s.range.fromS < hi));
+      const knownSport = isKnownSport(row.sportType);
+      const autoMin = activity.autoApply.enabled && knownSport ? activity.autoApply.minConfidence : null;
+      const accepted = await deps.recordSuggestions(activityId, suggestions, autoMin, edits, track.startEpochMs);
       if (accepted.length) edits = [...edits, ...accepted].sort((a, b) => a.id - b.id);
     }
 
-    const bbox = boundsOfTracks([track, ...merged]);
+    const bbox = boundsOfTracks([track, ...merged.map((m) => m.track)]);
     const zones = relevantZones(allZones, bbox);
     const hash = hashFor(ref, bbox);
     const published = publishTrack(track, edits, { zones, settings, activity, merged, sportType: row.sportType });
@@ -762,6 +787,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       canonicalTrackKey: stored ? key : null,
       updatedAt: new Date(),
     }, startedAt);
+    if (deps.markStale) for (const target of mergedInto) await deps.markStale(target);
     return { status: "published", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: stored ? key : null, pins };
   }
 
@@ -876,7 +902,10 @@ export function defaultDeps(): RepublishDeps {
       await db.update(activities).set(set).where(eq(activities.id, id));
     },
     loadActivitySettings,
-    async recordSuggestions(id, suggestions, autoApplyMin, currentEdits = []) {
+    async markStale(id) {
+      await db.update(activities).set({ needsRepublish: true, staleMarkedAt: new Date() }).where(eq(activities.id, id));
+    },
+    async recordSuggestions(id, suggestions, autoApplyMin, _currentEdits, anchorEpochMs) {
       if (!suggestions.length) return [];
       const rows = suggestions.map((s) => ({
         activityId: id,
@@ -891,24 +920,40 @@ export function defaultDeps(): RepublishDeps {
       // insert-only: a dismissed or accepted suggestion keeps its decision
       await db.insert(activitySuggestions).values(rows).onConflictDoNothing();
       if (autoApplyMin === null) return [];
-      const open = await db
+      const all = await db
         .select()
         .from(activitySuggestions)
-        .where(and(eq(activitySuggestions.activityId, id), eq(activitySuggestions.detectorVersion, DETECTOR_VERSION), eq(activitySuggestions.status, "open")));
+        .where(eq(activitySuggestions.activityId, id))
+        .orderBy(asc(activitySuggestions.id));
+      // never re-apply what the owner already decided on (any detector
+      // version), or an equal edit they reverted
+      const editKey = (e: { kind: string; params: Record<string, unknown> } | null) =>
+        e ? stableStringify({ kind: e.kind, params: Object.fromEntries(Object.entries(e.params).filter(([k]) => k !== "anchorEpochMs")) }) : "";
+      const decided = new Set(all.filter((s) => s.status !== "open").map((s) => editKey(s.edit)));
+      const reverted = await db
+        .select({ kind: activityEdits.kind, params: activityEdits.params })
+        .from(activityEdits)
+        .where(and(eq(activityEdits.activityId, id), isNotNull(activityEdits.revertedAt)));
+      for (const r of reverted) decided.add(editKey(r));
       const created: EditInput[] = [];
-      for (const s of open) {
-        if (!s.edit || s.confidence < autoApplyMin) continue;
-        // a one-sided crop keeps the other side of the crop already in effect
-        const params = s.edit.kind === "crop" ? combineCrop([...currentEdits, ...created], s.edit.params) : s.edit.params;
+      for (const s of all) {
+        if (s.detectorVersion !== DETECTOR_VERSION || s.status !== "open") continue;
+        if (!s.edit || s.confidence < autoApplyMin || decided.has(editKey(s.edit))) continue;
+        // claim the suggestion first: an admin decision that got there first wins
+        const claimed = await db
+          .update(activitySuggestions)
+          .set({ status: "accepted", decidedAt: new Date() })
+          .where(and(eq(activitySuggestions.id, s.id), eq(activitySuggestions.status, "open")))
+          .returning({ id: activitySuggestions.id });
+        if (!claimed.length) continue;
+        const params = anchorEpochMs ? { ...s.edit.params, anchorEpochMs } : s.edit.params;
         const inserted = await db
           .insert(activityEdits)
           .values({ activityId: id, kind: s.edit.kind, params, note: `auto-applied: ${s.summary}` })
           .returning({ id: activityEdits.id });
-        await db
-          .update(activitySuggestions)
-          .set({ status: "accepted", editId: inserted[0].id, decidedAt: new Date() })
-          .where(and(eq(activitySuggestions.id, s.id), eq(activitySuggestions.status, "open")));
+        await db.update(activitySuggestions).set({ editId: inserted[0].id }).where(eq(activitySuggestions.id, s.id));
         created.push({ id: inserted[0].id, kind: s.edit.kind, params });
+        decided.add(editKey(s.edit));
       }
       return created;
     },

@@ -29,8 +29,8 @@ import { DEFAULT_PRIVACY_SETTINGS } from "../privacy/settings";
 import { staleMark } from "../privacy/stale";
 import { DEFAULT_ACTIVITY_SETTINGS } from "./settings";
 import { DETECTOR_VERSION } from "./types";
-import { mergeTargets, type EditLike } from "./edits";
-import { MERGE_WINDOW_MS } from "./plan";
+import { mergeTargets, type EditLike, type MergedPart } from "./edits";
+import { MERGE_WINDOW_MS, ownCleaning } from "./plan";
 
 // ---------------------------------------------------------------------------
 // tracks
@@ -71,7 +71,7 @@ export async function loadPublishContext(
     deps.loadSettings ? deps.loadSettings() : Promise.resolve(DEFAULT_PRIVACY_SETTINGS),
     deps.loadActivitySettings ? deps.loadActivitySettings() : Promise.resolve(DEFAULT_ACTIVITY_SETTINGS),
   ]);
-  const merged: CanonicalTrack[] = [];
+  const merged: MergedPart[] = [];
   for (const otherId of mergeTargets(edits)) {
     if (otherId === row.id) continue;
     const other = await deps.loadActivity(otherId);
@@ -80,9 +80,10 @@ export async function loadPublishContext(
     if (!ref) continue;
     const t = await buildTrack(ref, other, deps);
     if (t === "unavailable") return "unavailable";
-    if (t) merged.push(t);
+    // the absorbed activity's own cleaning applies to its part (like republish)
+    if (t) merged.push({ track: t, edits: ownCleaning(await deps.loadEdits(otherId)) });
   }
-  const zones = relevantZones(allZones, boundsOfTracks([track, ...merged]));
+  const zones = relevantZones(allZones, boundsOfTracks([track, ...merged.map((m) => m.track)]));
   return { zones, settings, activity, merged, sportType: row.sportType };
 }
 

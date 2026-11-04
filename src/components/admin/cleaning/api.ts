@@ -42,9 +42,13 @@ export interface MergeCandidate {
   sportType: string;
 }
 
+export type TrackStatus = "ok" | "no-track" | "unavailable";
+
 export interface CleaningData {
+  trackStatus: TrackStatus;
   track: CleaningTrack | null;
   startEpochMs: number;
+  syntheticTime: boolean; // route-only track: nothing time-based can be edited
   published: Published;
   rawStats: RawStats | null;
   edits: EditRow[];
@@ -84,8 +88,10 @@ const base = (id: number) => `/api/admin/activities/${id}`;
 export async function getCleaning(id: number): Promise<CleaningData> {
   const j = await call(`${base(id)}/cleaning`, "GET");
   return {
+    trackStatus: j.trackStatus === "ok" || j.trackStatus === "unavailable" ? j.trackStatus : "no-track",
     track: j.track ?? null,
     startEpochMs: Number(j.startEpochMs) || 0,
+    syntheticTime: j.syntheticTime === true,
     published: j.published ?? { polyline: null, cardPolyline: null, bounds: null, distanceM: null, movingTimeS: null, elapsedTimeS: null, elevGainM: null, avgSpeedMs: null, avgHr: null, maxHr: null, hrZonesS: null },
     rawStats: j.rawStats ?? null,
     edits: j.edits ?? [],

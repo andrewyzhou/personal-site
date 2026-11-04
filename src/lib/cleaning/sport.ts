@@ -23,3 +23,12 @@ const BY_SPORT: Record<string, SportLimits> = {
 export function sportLimits(sportType: string): SportLimits {
   return BY_SPORT[sportType] ?? OTHER;
 }
+
+// sports with real limits (foot, ride, swim); everything else gets the
+// generic fallback, which is too loose to act on automatically
+export function isKnownSport(sportType: string): boolean {
+  return Object.prototype.hasOwnProperty.call(BY_SPORT, sportType);
+}
+
+// lifts, chairs and gravity: fast stretches here are the sport, not a car
+export const SNOW_SPORTS: ReadonlySet<string> = new Set(["AlpineSki", "BackcountrySki", "Snowboard", "NordicSki"]);
