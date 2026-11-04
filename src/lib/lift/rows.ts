@@ -1,12 +1,10 @@
-import { createHash } from "node:crypto";
-import { normalizeName, type Exercise, type ParsedSet } from "lift-core";
+import { customExerciseId, normalizeName, type Exercise, type ParsedSet } from "lift-core";
 import type { NewExerciseAliasRow, NewExerciseMuscleRow, NewExerciseRow } from "@/lib/db/lift-schema";
 
 // pure row builders shared by the ingest planner and the seed script
 
-export function sha256Hex(text: string): string {
-  return createHash("sha256").update(text, "utf8").digest("hex");
-}
+// the phone derives the same ids, so both sides use lift-core's pure hash
+export { customExerciseId, nameKey, sha256Hex } from "lift-core";
 
 export interface ExerciseRows {
   exercise: NewExerciseRow;
@@ -41,16 +39,6 @@ export function catalogExerciseRows(ex: Exercise): ExerciseRows {
     aliases: [...aliases.values()],
     muscles: [...muscles.values()],
   };
-}
-
-/** stable hash key for a printed name */
-export function nameKey(name: string): string {
-  // normalizeName keeps only latin letters and digits, so "Жим лёжа" and "深蹲" would both be ""
-  return normalizeName(name) || name.normalize("NFKC").toLowerCase().trim();
-}
-
-export function customExerciseId(name: string): string {
-  return `custom-${sha256Hex(nameKey(name)).slice(0, 12)}`;
 }
 
 // share text prints equipment as a trailing parenthetical: "Curl (Cable)"

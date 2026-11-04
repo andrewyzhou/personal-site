@@ -7,7 +7,18 @@ import { DatabaseSync } from "node:sqlite";
 import { getTableConfig, type SQLiteTable } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS, SCHEMA_VERSION, pendingMigrations } from "../../db/migrations";
-import { customExercises, outbox, sets, workoutExercises, workouts } from "../../db/schema";
+import {
+  bodyweights,
+  customExercises,
+  kv,
+  outbox,
+  sets,
+  templateExercises,
+  templateFolders,
+  templates,
+  workoutExercises,
+  workouts,
+} from "../../db/schema";
 
 function migrated(): DatabaseSync {
   const db = new DatabaseSync(":memory:");
@@ -38,7 +49,18 @@ describe("migrations", () => {
     expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
   });
 
-  it.each([workouts, workoutExercises, sets, customExercises, outbox] as SQLiteTable[])(
+  it.each([
+    workouts,
+    workoutExercises,
+    sets,
+    customExercises,
+    outbox,
+    templateFolders,
+    templates,
+    templateExercises,
+    bodyweights,
+    kv,
+  ] as SQLiteTable[])(
     "matches the drizzle schema",
     (table) => {
       const db = migrated();

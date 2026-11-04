@@ -108,6 +108,8 @@ describe("buildIngestBatch", () => {
     expect(sqls[4]).toMatch(/^insert into "lift_workouts" .* on conflict \("id"\) do update set /);
     expect(sqls[4]).toContain('"title" = excluded."title"');
     expect(sqls[4]).toContain('"deleted_at" = null');
+    // a phone discard set status too; a re-share brings it back as finished
+    expect(sqls[4]).toContain(`"status" = 'finished'`);
     expect(sqls[4]).not.toContain('"created_at" = ');
     // re-shares keep startedLocal fresh but leave linked timing to linkWorkout
     expect(sqls[4]).toContain('"started_local" = excluded."started_local"');

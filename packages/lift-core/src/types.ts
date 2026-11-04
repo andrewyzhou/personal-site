@@ -64,6 +64,8 @@ export interface ParsedWorkout {
   /** last path segment of the link, used as an idempotency key */
   linkSlug: string | null;
   warnings: ParseWarning[];
+  /** workout length in seconds when the source has it (the csv export); share text has none */
+  durationS?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +182,8 @@ export interface LinkCandidate {
   elapsedS: number;
 }
 
-export type LinkRole = "primary" | "duplicate" | "continuation";
+/** overrun: the workout started inside a recording that began well before it (watch left running) */
+export type LinkRole = "primary" | "duplicate" | "continuation" | "overrun";
 
 export interface ActivityLink {
   activityId: number;

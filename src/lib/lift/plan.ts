@@ -1,6 +1,7 @@
 import {
   computeMuscleLoad,
   e1rm,
+  getExercise,
   isWorkingSet,
   parseShareText,
   resolveExerciseName,
@@ -22,13 +23,13 @@ import type {
   NewLiftWorkoutExerciseRow,
   NewLiftWorkoutRow,
 } from "@/lib/db/lift-schema";
-import { catalogExerciseRows, customExerciseRows, nameKey, sha256Hex } from "./rows";
+import { catalogExerciseRows, customExerciseRows, nameKey, sha256Hex, type ExerciseRows } from "./rows";
 import { liftTimezone, localToUtc, utcToLocal } from "./time";
 
 // pure ingest planning: raw share text in, every row the ingest writes out.
 // no db access here, so the whole mapping is unit-testable.
 
-export type IngestSource = "shortcut" | "telegram" | "api";
+export type IngestSource = "shortcut" | "telegram" | "api" | "workout-csv";
 
 export interface PlanOptions {
   source: IngestSource;
@@ -36,6 +37,23 @@ export interface PlanOptions {
   now?: Date;
   /** defaults to LIFT_TIMEZONE */
   timezone?: string;
+  /** custom exercise id -> id it was merged into (chains already followed) */
+  redirects?: ReadonlyMap<string, string>;
+}
+
+export interface ParsedWorkoutPlanOptions {
+  workoutId: string;
+  ingestId: string;
+  /** lift_workouts.source */
+  workoutSource: string;
+  shareSlug: string | null;
+  now?: Date;
+  timezone?: string;
+  redirects?: ReadonlyMap<string, string>;
+  /** known workout length (csv exports have it); sets endedAt too */
+  durationS?: number | null;
+  /** warnings found while planning are appended here */
+  warnings: LiftWarning[];
 }
 
 export interface ExerciseLine {
@@ -166,6 +184,25 @@ export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan 
   };
   if (!hasWorkout) return { sha256, ingest, workout: null, summary: null, parsed, warnings, rejected };
 
+  const { workout, summary } = planParsedWorkout(parsed, {
+    workoutId,
+    ingestId,
+    workoutSource: "share-text",
+    shareSlug: slug,
+    now: opts.now,
+    timezone: opts.timezone,
+    redirects: opts.redirects,
+    warnings,
+  });
+  return { sha256, ingest, workout, summary, parsed, warnings, rejected: null };
+}
+
+/** every row one parsed workout writes; shared by the share-text ingest and the csv import */
+export function planParsedWorkout(
+  parsed: ParsedWorkout,
+  opts: ParsedWorkoutPlanOptions
+): { workout: WorkoutPlan; summary: IngestSummary } {
+  const { workoutId, ingestId, warnings } = opts;
   const tz = opts.timezone ?? liftTimezone();
   let startedLocal = parsed.startedLocal;
   if (!startedLocal) {
@@ -173,6 +210,7 @@ export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan 
     warnings.push({ line: 0, message: "no workout date found; using the time it was received", text: "" });
   }
   const utc = localToUtc(startedLocal, tz);
+  const durationS = opts.durationS != null && opts.durationS > 0 ? Math.round(opts.durationS) : null;
 
   const exerciseRows = new Map<string, NewExerciseRow>();
   const aliasRows = new Map<string, NewExerciseAliasRow>();
@@ -183,12 +221,22 @@ export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan 
   const resolvedIds: { id: string; custom: boolean }[] = [];
 
   parsed.exercises.forEach((pe, i) => {
-    const catalog = resolveExerciseName(pe.name);
-    const rows = catalog ? catalogExerciseRows(catalog) : customExerciseRows(pe.name, pe.sets);
-    const exId = rows.exercise.id;
-    exerciseRows.set(exId, rows.exercise);
-    for (const a of rows.aliases) aliasRows.set(`${a.exerciseId}\u0000${a.normalized}`, a);
-    for (const m of rows.muscles) muscleRows.set(`${m.exerciseId}\u0000${m.region}`, m);
+    let catalog = resolveExerciseName(pe.name);
+    let rows: ExerciseRows | null = catalog ? catalogExerciseRows(catalog) : customExerciseRows(pe.name, pe.sets);
+    let exId = rows.exercise.id;
+    // a custom exercise merged into another one logs against the target
+    const target = catalog ? undefined : opts.redirects?.get(exId);
+    if (target) {
+      exId = target;
+      catalog = getExercise(target);
+      // a custom target already exists (that's how the redirect was found)
+      rows = catalog ? catalogExerciseRows(catalog) : null;
+    }
+    if (rows) {
+      exerciseRows.set(exId, rows.exercise);
+      for (const a of rows.aliases) aliasRows.set(`${a.exerciseId}\u0000${a.normalized}`, a);
+      for (const m of rows.muscles) muscleRows.set(`${m.exerciseId}\u0000${m.region}`, m);
+    }
     resolvedIds.push({ id: exId, custom: !catalog });
 
     const weId = `${workoutId}:${i}`;
@@ -219,12 +267,12 @@ export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan 
     startedLocal,
     startedAt: utc?.date ?? null,
     utcOffsetMin: utc?.utcOffsetMin ?? null,
-    endedAt: null,
-    durationS: null,
+    endedAt: utc && durationS != null ? new Date(utc.date.getTime() + durationS * 1000) : null,
+    durationS,
     notes: joinNotes(parsed.notes),
-    source: "share-text",
+    source: opts.workoutSource,
     latestIngestId: ingestId,
-    shareSlug: slug,
+    shareSlug: opts.shareSlug,
     workingSets: totals.workingSets,
     volumeKg: round(totals.volumeKg, 2),
     muscleLoad: normalizedLoad,
@@ -253,8 +301,6 @@ export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan 
   };
 
   return {
-    sha256,
-    ingest,
     workout: {
       workout,
       exercises: [...exerciseRows.values()],
@@ -264,8 +310,5 @@ export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan 
       sets,
     },
     summary,
-    parsed,
-    warnings,
-    rejected: null,
   };
 }

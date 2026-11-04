@@ -1,0 +1,11 @@
+Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE,Extra Column
+2024-01-02 06:00:00,Morning,30m,Deadlift (Barbell),1,315,3,0,0,,,,ignored
+2024-01-02 06:00:00,Morning,30m,Deadlift (Barbell),Rest Timer,0,0,0,90,,,,
+2024-01-02 06:00:00,Morning,30m,Deadlift (Barbell),X9,315,3,0,0,,,,
+2024-01-02 06:00:00,Morning,30m,Deadlift (Barbell),2,abc,3,0,0,,,,
+2024-01-02 06:00:00,Morning,30m,Deadlift (Barbell),3,0,0,0,0,,,,
+
+2024-01-02 06:00:00,Morning,30m,,1,100,5,0,0,,,,
+not a date,Mystery,soon,Curl (Dumbbell),1,30,10,0,0,,,,
+2024-01-02 06:00:00,Morning,30m,Row (Barbell),1,185,8,0,0,,,15,
+2024-01-02 06:00:00,Morning,30m,Deadlift (Barbell),4,335,1,0,0,,,,
