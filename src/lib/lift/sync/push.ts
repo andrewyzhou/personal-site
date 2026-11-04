@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { SyncPushResponse } from "lift-core";
 import { getDb } from "@/lib/db";
 import {
@@ -26,7 +26,10 @@ export async function loadSyncState(db: Db, deviceId: string, refs: SyncRefs): P
     db
       .select({ seq: liftSyncLog.seq })
       .from(liftSyncLog)
-      .where(and(eq(liftSyncLog.deviceId, deviceId), inArray(liftSyncLog.seq, ids(refs.seqs, 0)))),
+      // a seq the server refused isn't done: an app update may resend it to be re-evaluated
+      .where(
+        and(eq(liftSyncLog.deviceId, deviceId), inArray(liftSyncLog.seq, ids(refs.seqs, 0)), isNull(liftSyncLog.rejected))
+      ),
     db.select({ id: liftWorkouts.id }).from(liftWorkouts).where(inArray(liftWorkouts.id, ids(refs.workoutIds, ""))),
     db
       .select({

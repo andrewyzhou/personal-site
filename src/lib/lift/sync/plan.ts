@@ -1,9 +1,10 @@
-import { and, eq, getTableColumns, sql, type SQL } from "drizzle-orm";
+import { and, eq, getTableColumns, lte, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
   e1rm,
   getExercise,
+  isImportedWorkoutId,
   toKg,
   type BodyweightPayload,
   type CustomExercisePayload,
@@ -54,6 +55,7 @@ type Db = ReturnType<typeof getDb>;
 
 /** what the up-front select found for ids the request references */
 export interface SyncState {
+  /** seqs already applied for this device. seqs logged as rejected are left out, so a replay re-evaluates them */
   seenSeqs: ReadonlySet<number>;
   workouts: ReadonlySet<string>;
   workoutExercises: ReadonlyMap<string, { workoutId: string; exerciseId: string; tracking: string | null }>;
@@ -183,7 +185,9 @@ export function workoutRow(p: WorkoutPayload, tz?: string): NewLiftWorkoutRow & 
     source: "app",
     status: p.status,
     templateId: p.templateId,
-    // discarded workouts hide like a soft-deleted workout share; un-discarding clears it
+    // discarded workouts hide like a soft-deleted workout share; un-discarding clears it.
+    // imported workouts follow the same rule: the phone's status drives deletedAt
+    // (discarded -> set, finished -> cleared), while source stays server-owned
     deletedAt: p.status === "discarded" ? date(p.updatedAt) : null,
     createdAt: date(p.createdAt),
     updatedAt: date(p.updatedAt),
@@ -411,9 +415,13 @@ export function planSync(
 
   function upsertWorkoutExercise(p: WorkoutExercisePayload): Outcome {
     if (!live.workouts.has(p.workoutId)) return { reject: `workout ${p.workoutId} not found` };
+    const before = live.workoutExercises.get(p.id);
+    // a re-share replaces an imported workout's contents, so phone additions would vanish
+    if (!before && isImportedWorkoutId(p.workoutId)) {
+      return { reject: `workout ${p.workoutId} is an imported workout: exercises can't be added to it` };
+    }
     const name = exerciseName(p.exerciseId);
     if (name == null) return { reject: `exercise ${p.exerciseId} not found` };
-    const before = live.workoutExercises.get(p.id);
     if (before) touched.add(before.workoutId);
     touched.add(p.workoutId);
     live.workoutExercises.set(p.id, {
@@ -445,8 +453,11 @@ export function planSync(
   function upsertSet(p: SetPayload): Outcome {
     const parent = live.workoutExercises.get(p.workoutExerciseId);
     if (!parent) return { reject: `workout exercise ${p.workoutExerciseId} not found` };
-    touched.add(parent.workoutId);
     const before = live.sets.get(p.id);
+    if (!before && isImportedWorkoutId(parent.workoutId)) {
+      return { reject: `workout ${parent.workoutId} is an imported workout: sets can't be added to it` };
+    }
+    touched.add(parent.workoutId);
     if (before) touched.add(before);
     live.sets.set(p.id, parent.workoutId);
     const bodyweight = parent.tracking != null && BODYWEIGHT_TRACKING.has(parent.tracking);
@@ -512,23 +523,27 @@ export function planSync(
           .where(and(eq(t.te.exerciseId, p.id), merged))
       );
       for (const [weId, we] of live.workoutExercises) {
-        if (we.exerciseId === p.id) live.workoutExercises.set(weId, { ...we, exerciseId: p.mergedInto });
+        // later sets in this batch must see the target's tracking (bodyweight flag)
+        if (we.exerciseId === p.id) {
+          live.workoutExercises.set(weId, { ...we, exerciseId: p.mergedInto, tracking: exerciseTracking(p.mergedInto) });
+        }
       }
     }
     return { statements };
   }
 
-  function deleteCustomExercise(id: string): Outcome {
+  function deleteCustomExercise(id: string, at: number): Outcome {
     if (getExercise(id)) return { reject: `${id} is a catalog exercise` };
     live.exercises.delete(id);
     const unreferenced = sql`not exists (select 1 from "lift_workout_exercises" x where x."exercise_id" = ${id}) and not exists (select 1 from "lift_template_exercises" x where x."exercise_id" = ${id})`;
     return {
       statements: [
         // history still points at it: archive instead of breaking the fk
+        // stamped with the phone's clock so lww keeps comparing phone times
         db
           .update(t.ex)
-          .set({ archived: true, updatedAt: sql`now()` })
-          .where(and(eq(t.ex.id, id), eq(t.ex.isCustom, true))),
+          .set({ archived: true, updatedAt: date(at) })
+          .where(and(eq(t.ex.id, id), eq(t.ex.isCustom, true), lte(t.ex.updatedAt, date(at)))),
         db.delete(t.ex).where(and(eq(t.ex.id, id), eq(t.ex.isCustom, true), unreferenced)),
       ],
     };
@@ -591,7 +606,7 @@ export function planSync(
           return { statements: [db.delete(t.s).where(eq(t.s.id, m.id))] };
         }
         case "custom_exercise":
-          return deleteCustomExercise(m.id);
+          return deleteCustomExercise(m.id, m.at);
         case "template_folder":
           // templates keep existing; the fk sets their folder_id null
           live.folders.delete(m.id);
@@ -649,10 +664,28 @@ export function planSync(
     }
   }
 
+  // workouts a mutation affects, without planning any write: replays still
+  // get their aggregates recomputed, so a retry heals a recompute that failed
+  const touchedBy = (m: SyncMutation): string | null => {
+    if (m.entity === "workout") return m.op === "delete" ? null : m.id;
+    if (m.entity === "workout_exercise") {
+      return m.op === "delete"
+        ? (live.workoutExercises.get(m.id)?.workoutId ?? null)
+        : (m.payload as WorkoutExercisePayload).workoutId;
+    }
+    if (m.entity === "set") {
+      if (m.op === "delete") return live.sets.get(m.id) ?? null;
+      return live.workoutExercises.get((m.payload as SetPayload).workoutExerciseId)?.workoutId ?? null;
+    }
+    return null;
+  };
+
   for (const prep of prepared) {
     appliedThrough = Math.max(appliedThrough, prep.seq);
     if (state.seenSeqs.has(prep.seq)) {
       skipped++;
+      const wid = prep.result.ok ? touchedBy(prep.result.mutation) : null;
+      if (wid && live.workouts.has(wid)) touched.add(wid);
       continue;
     }
     const entity = typeof prep.raw.entity === "string" ? prep.raw.entity.slice(0, 64) : "?";
@@ -682,7 +715,25 @@ export function planSync(
     if (muscles.length) statements.push(db.insert(exerciseMuscles).values(muscles).onConflictDoNothing());
   }
   statements.push(...body);
-  if (logRows.length) statements.push(db.insert(liftSyncLog).values(logRows).onConflictDoNothing());
+  if (logRows.length) {
+    statements.push(
+      db
+        .insert(liftSyncLog)
+        .values(logRows)
+        .onConflictDoUpdate({
+          target: [liftSyncLog.deviceId, liftSyncLog.seq],
+          // a re-evaluated rejection records its new outcome; applied rows stay as they were
+          set: {
+            entity: sql.raw(`excluded."entity"`),
+            entityId: sql.raw(`excluded."entity_id"`),
+            op: sql.raw(`excluded."op"`),
+            rejected: sql.raw(`excluded."rejected"`),
+            appliedAt: sql`now()`,
+          },
+          setWhere: sql`${liftSyncLog.rejected} is not null`,
+        })
+    );
+  }
 
   return {
     statements,

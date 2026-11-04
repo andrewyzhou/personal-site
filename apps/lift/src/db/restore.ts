@@ -1,7 +1,7 @@
 // reinstall restore: replace local tables with the server snapshot. rows come
 // from the server, so no outbox rows are written for them.
 
-import { count, eq } from "drizzle-orm";
+import { count, eq, isNotNull, isNull, type SQL } from "drizzle-orm";
 import type { SyncEntity } from "lift-core";
 import { db } from "./client";
 import { notify } from "./events";
@@ -9,6 +9,7 @@ import {
   bodyweights,
   customExercises,
   kv,
+  outbox,
   sets,
   templateExercises,
   templateFolders,
@@ -16,8 +17,8 @@ import {
   workoutExercises,
   workouts,
 } from "./schema";
-import { countUnsynced, getServerUrl, getToken } from "./sync";
-import { chunk, fetchSnapshot, restorePlan, wipeOrder } from "../lib/sync/snapshot";
+import { countRejected, countUnsynced, getServerUrl, getToken } from "./sync";
+import { chunk, fetchSnapshot, restoreBlocker, restorePlan, wipeOrder } from "../lib/sync/snapshot";
 import type { FetchLike } from "../lib/sync/push";
 
 const TABLES = {
@@ -48,11 +49,16 @@ export interface RestoreResult {
 }
 
 export async function restoreFromServer(
-  options: { replace?: boolean; fetch?: FetchLike } = {}
+  options: {
+    replace?: boolean;
+    /** the user agreed to lose changes the server refused */
+    allowRejected?: boolean;
+    fetch?: FetchLike;
+  } = {}
 ): Promise<RestoreResult> {
-  // pending changes would be wiped before reaching the server
-  const unsynced = countUnsynced();
-  if (unsynced > 0) throw new Error(`sync first: ${unsynced} unsynced changes`);
+  // pending (or refused) changes would be wiped before reaching the server
+  const blocked = restoreBlocker({ unsynced: countUnsynced(), rejected: countRejected() }, options.allowRejected);
+  if (blocked) throw new Error(blocked);
   if (countLocalWorkouts() > 0 && !options.replace) throw new Error("local data exists");
 
   const token = (await getToken()) ?? "";
@@ -60,10 +66,16 @@ export async function restoreFromServer(
   const plan = restorePlan(snapshot);
 
   db.transaction((tx) => {
-    // re-check inside the transaction: a workout could have started meanwhile
+    // re-check inside the transaction: the fetch takes a while, and a workout
+    // or an edit could have landed meanwhile
+    const n = (where: SQL) => tx.select({ n: count() }).from(outbox).where(where).get()?.n ?? 0;
+    const again = restoreBlocker({ unsynced: n(isNull(outbox.syncedAt)), rejected: n(isNotNull(outbox.rejected)) }, options.allowRejected);
+    if (again) throw new Error(again);
     if (!options.replace && (tx.select({ n: count() }).from(workouts).get()?.n ?? 0) > 0) {
       throw new Error("local data exists");
     }
+    // the server copy supersedes the refused changes the user chose to drop
+    if (options.allowRejected) tx.delete(outbox).where(isNotNull(outbox.rejected)).run();
     for (const entity of wipeOrder(plan)) tx.delete(TABLES[entity]).run();
     for (const step of plan.steps) {
       // ~15 columns per row keeps each statement well under sqlite's variable limit

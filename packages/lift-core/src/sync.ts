@@ -181,7 +181,7 @@ export interface SyncPushResponse {
   rejected: { seq: number; reason: string }[];
 }
 
-/** GET /api/lift/sync/snapshot (bearer LIFT_APP_TOKEN): everything, for reinstall restore */
+/** everything, for a reinstall restore. the phone assembles it from snapshot pages. */
 export interface SyncSnapshot {
   protocol: typeof SYNC_PROTOCOL_VERSION;
   generatedAt: number;
@@ -194,4 +194,43 @@ export interface SyncSnapshot {
   workoutExercises: WorkoutExercisePayload[];
   sets: SetPayload[];
   bodyweights: BodyweightPayload[];
+}
+
+/** snapshot keys in fk order: parents before children, so a restore can insert in this order */
+export const SNAPSHOT_ENTITIES = [
+  "customExercises",
+  "templateFolders",
+  "templates",
+  "templateExercises",
+  "workouts",
+  "workoutExercises",
+  "sets",
+  "bodyweights",
+] as const satisfies readonly (keyof SyncSnapshot)[];
+export type SnapshotEntity = (typeof SNAPSHOT_ENTITIES)[number];
+
+/** max rows per snapshot page; keeps every response well under the host's ~4.5mb cap */
+export const SNAPSHOT_PAGE_MAX = 2000;
+
+/**
+ * GET /api/lift/sync/snapshot?entity=<key>&after=<id>&limit=<n> (bearer LIFT_APP_TOKEN).
+ * rows come in id order after the `after` cursor (omitted = from the start);
+ * `next` is the cursor for the following page, null on the last one.
+ */
+export interface SyncSnapshotPage<K extends SnapshotEntity = SnapshotEntity> {
+  protocol: typeof SYNC_PROTOCOL_VERSION;
+  entity: K;
+  rows: SyncSnapshot[K];
+  next: string | null;
+  generatedAt: number;
+}
+
+/**
+ * workouts that came from share text or a csv import ("share-" and "workout-csv-" ids).
+ * the phone treats them as read-only history: the server refuses new exercises
+ * or sets in them, since a re-share replaces their contents wholesale. the
+ * phone's status still drives their soft delete (discarded hides, finished shows).
+ */
+export function isImportedWorkoutId(id: string): boolean {
+  return id.startsWith("share-");
 }

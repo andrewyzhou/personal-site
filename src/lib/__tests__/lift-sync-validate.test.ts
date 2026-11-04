@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SYNC_MAX_BATCH } from "lift-core";
-import { validateEnvelope, validateMutation } from "@/lib/lift/sync/validate";
+import { PAYLOAD_SHAPES, nullableKeys, validateEnvelope, validateMutation } from "@/lib/lift/sync/validate";
 
 const T = 1_793_000_000_000;
 const ts = { createdAt: T, updatedAt: T };
@@ -58,6 +58,35 @@ const workout = {
 };
 
 const m = (entity: string, op: string, payload: unknown, id = "w1") => ({ seq: 1, entity, op, id, payload, at: T });
+const without = (o: Record<string, unknown>, ...keys: string[]) => Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k)));
+
+describe("older app payloads", () => {
+  it("reads every absent nullable key as null and passes it on as null", () => {
+    const res = validateMutation(m("workout", "insert", without(workout, "utcOffsetMin", "templateId", "endedAt", "notes")));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.mutation.payload).toMatchObject({ utcOffsetMin: null, templateId: null, endedAt: null, notes: null });
+  });
+
+  it("covers the m1-era columns of every entity, and only nullable ones", () => {
+    expect(nullableKeys(PAYLOAD_SHAPES.workout)).toEqual(expect.arrayContaining(["utcOffsetMin", "templateId"]));
+    expect(nullableKeys(PAYLOAD_SHAPES.workout_exercise)).toContain("restS");
+    expect(nullableKeys(PAYLOAD_SHAPES.custom_exercise)).toEqual(["mergedInto"]);
+    for (const shape of Object.values(PAYLOAD_SHAPES)) {
+      for (const key of ["id", "createdAt", "updatedAt"]) expect(nullableKeys(shape)).not.toContain(key);
+    }
+    expect(nullableKeys(PAYLOAD_SHAPES.set)).not.toContain("completed");
+  });
+
+  it("an m1 custom exercise without mergedInto is accepted, required keys stay strict", () => {
+    const old = { id: "custom-x", name: "Belt Squat", equipment: "other", tracking: "weight_reps", primary: "[]", secondary: "[]", archived: 0, ...ts };
+    const ok = validateMutation(m("custom_exercise", "insert", old, "custom-x"));
+    expect(ok).toMatchObject({ ok: true, mutation: { payload: { mergedInto: null } } });
+    expect(validateMutation(m("custom_exercise", "insert", without(old, "archived"), "custom-x"))).toEqual({
+      ok: false,
+      reason: "payload.archived is missing",
+    });
+  });
+});
 
 describe("validateMutation", () => {
   it("accepts a valid upsert and a valid delete", () => {
@@ -78,7 +107,8 @@ describe("validateMutation", () => {
     ["missing payload", m("workout", "insert", null), "payload.must be an object"],
     ["id mismatch", m("workout", "insert", { ...workout, id: "w2" }), "payload.id does not match id"],
     ["missing field", m("workout", "insert", { ...workout, notes: undefined }), "payload.notes must be a string"],
-    ["absent field", m("workout", "insert", Object.fromEntries(Object.entries(workout).filter(([k]) => k !== "notes"))), "payload.notes is missing"],
+    ["absent required field", m("workout", "insert", without(workout, "title")), "payload.title is missing"],
+    ["absent required timestamp", m("workout", "insert", without(workout, "updatedAt")), "payload.updatedAt is missing"],
     ["bad status", m("workout", "insert", { ...workout, status: "paused" }), "payload.status must be one of active, finished, discarded"],
     ["float ms", m("workout", "insert", { ...workout, startedAt: 1.5 }), "payload.startedAt must be an integer"],
     ["iso date instead of ms", m("workout", "insert", { ...workout, updatedAt: "2026-11-04" }), "payload.updatedAt must be an integer"],

@@ -83,6 +83,15 @@ export function planAck(sentSeqs: readonly number[], res: SyncPushResponse): Ack
   return { syncedThrough: through, rejected, progressed: true };
 }
 
+/**
+ * rejections an older server gave that a newer one accepts: payloads from
+ * before a nullable column existed ("payload.restS is missing") and the
+ * children that cascaded from them ("workout w1 not found").
+ */
+export function isRetryableRejection(reason: string | null): boolean {
+  return reason != null && /(?:is missing|not found)$/.test(reason);
+}
+
 /** "https://x.org/" + "/api/lift/sync" -> "https://x.org/api/lift/sync"; null for non-http urls */
 export function endpoint(base: string, path: string): string | null {
   const b = base.trim().replace(/\/+$/, "");

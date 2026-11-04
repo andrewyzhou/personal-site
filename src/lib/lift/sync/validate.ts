@@ -62,10 +62,14 @@ export function validateEnvelope(body: unknown): EnvelopeResult {
 // field checks: each returns an error message or null
 type Check = (v: unknown) => string | null;
 
-const nullable =
-  (check: Check): Check =>
-  (v) =>
-    v === null ? null : check(v);
+// nullable checks are remembered so a missing key can read as null
+const NULLABLE = new WeakSet<Check>();
+
+const nullable = (check: Check): Check => {
+  const c: Check = (v) => (v === null ? null : check(v));
+  NULLABLE.add(c);
+  return c;
+};
 
 const text =
   (max = MAX_TEXT, min = 0): Check =>
@@ -96,15 +100,33 @@ const oneOf =
 
 type Shape = Record<string, Check>;
 
+/** which keys of `shape` this object lacks but may treat as null */
+export function nullableKeys(shape: Shape): string[] {
+  return Object.entries(shape)
+    .filter(([, check]) => NULLABLE.has(check))
+    .map(([key]) => key);
+}
+
 function checkShape(obj: unknown, shape: Shape): string | null {
   if (!isObject(obj)) return "must be an object";
   // unknown keys are ignored so a newer app column doesn't reject every push
   for (const [key, check] of Object.entries(shape)) {
-    if (!(key in obj)) return `${key} is missing`;
+    // older app builds predate some nullable columns: absent reads as null
+    if (!(key in obj)) {
+      if (NULLABLE.has(check)) continue;
+      return `${key} is missing`;
+    }
     const err = check(obj[key]);
     if (err) return `${key} ${err}`;
   }
   return null;
+}
+
+/** copy with every absent nullable key set to null, so mappers never see undefined */
+function withNulls(obj: Record<string, unknown>, shape: Shape): Record<string, unknown> {
+  const out = { ...obj };
+  for (const [key, check] of Object.entries(shape)) if (!(key in out) && NULLABLE.has(check)) out[key] = null;
+  return out;
 }
 
 const jsonArray =
@@ -277,9 +299,10 @@ export function validateMutation(raw: Record<string, unknown>): MutationResult {
       mutation: { seq: raw.seq as number, entity: entity as SyncEntity, id: mid, op, payload: null, at: raw.at as number },
     };
   }
-  const shapeErr = checkShape(raw.payload, PAYLOAD_SHAPES[entity as SyncEntity]);
+  const shape = PAYLOAD_SHAPES[entity as SyncEntity];
+  const shapeErr = checkShape(raw.payload, shape);
   if (shapeErr) return { ok: false, reason: `payload.${shapeErr}` };
-  const payload = raw.payload as Record<string, unknown>;
+  const payload = withNulls(raw.payload as Record<string, unknown>, shape);
   if (payload.id !== mid) return { ok: false, reason: "payload.id does not match id" };
   if (entity === "custom_exercise" && payload.mergedInto === mid) {
     return { ok: false, reason: "an exercise can't be merged into itself" };
