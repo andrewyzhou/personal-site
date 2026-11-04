@@ -20,7 +20,7 @@ function normalizeLines(text: string): string[] {
   return text
     .replace(ZERO_WIDTH_RE, "")
     .replace(ODD_SPACE_RE, " ")
-    .split(/\r\n|\r|\n/)
+    .split(/\r*\n|\r+/)
     .map((l) => l.replace(/ {2,}/g, " ").trim());
 }
 
