@@ -3,6 +3,8 @@ import createMDX from "@next/mdx";
 
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
+  // workspace package shipped as typescript source
+  transpilePackages: ["lift-core"],
   // cs180 portfolio lives in its own repo (andrewyzhou/cs180) on github pages;
   // proxy it under /cs180 so it shares this domain. next strips trailing
   // slashes before rewrites run, so extensionless page urls must map to their
