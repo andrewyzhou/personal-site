@@ -102,6 +102,12 @@ export const activities = pgTable(
     trackBbox: jsonb("track_bbox").$type<RouteBounds>(),
     // set by zone/settings/photo edits; the rebuild job republishes and clears it
     needsRepublish: boolean("needs_republish").notNull().default(false),
+    // when an edit last marked this row stale; republish only clears
+    // needs_republish if nothing marked it after the republish started
+    staleMarkedAt: timestamp("stale_marked_at", { withTimezone: true, mode: "date" }),
+    // PRIVATE: the route as first written by an ingest path (before fog), kept so
+    // trackless rows can be fogged now and restored when zones change
+    legacyRoute: jsonb("legacy_route").$type<{ polyline: string | null; cardPolyline: string | null; bounds: RouteBounds | null }>(),
     // last rebuild-job attempt: failing rows go to the back of the queue
     republishAttemptedAt: timestamp("republish_attempted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),

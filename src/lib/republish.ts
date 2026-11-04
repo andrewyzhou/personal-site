@@ -13,7 +13,7 @@
 // server-only.
 
 import { createHash } from "crypto";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import {
   getDb,
   activities,
@@ -33,10 +33,10 @@ import {
   localDateTime,
 } from "./activities";
 import { boundsOf, computeStats, haversineM, rdpReduce, trimByDistance } from "./geo";
-import { encodeMultiPolyline } from "./polyline";
+import { decodeMultiPolyline, encodeMultiPolyline } from "./polyline";
 import {
   applyFog,
-  publicZoneShape,
+  segmentTouchesPolygon,
   relevantZones,
   zonesContaining,
   type FogSample,
@@ -278,11 +278,73 @@ export interface PublishedTrack {
 
 // reduce each visible run to a share of the point budget. one run reduces
 // exactly like the pre-fog pipeline did (identical output without zones).
-function reduceSegments(runs: [number, number][][], maxPoints: number): [number, number][][] {
+// simplification drops points, and a new straight chord could cut through a
+// zone the raw samples went around: put the skipped raw points back for any
+// such chord (consecutive raw points never cross a zone — applyFog splits there)
+function zoneSafeReduce(run: [number, number][], maxPoints: number, zones: ZoneInput[]): [number, number][] {
+  const reduced = rdpReduce(run, maxPoints);
+  if (zones.length === 0 || reduced.length === run.length) return reduced;
+  const index = new Map(run.map((p, i) => [p, i]));
+  const out: [number, number][] = [reduced[0]];
+  for (let k = 1; k < reduced.length; k++) {
+    const a = reduced[k - 1];
+    const b = reduced[k];
+    if (zones.some((z) => segmentTouchesPolygon(a, b, z.polygon))) {
+      const ia = index.get(a)!;
+      const ib = index.get(b)!;
+      for (let i = ia + 1; i < ib; i++) out.push(run[i]);
+    }
+    out.push(b);
+  }
+  return out;
+}
+
+// reduce each visible run to a share of the point budget. one run reduces
+// exactly like the pre-fog pipeline did (identical output without zones).
+function reduceSegments(runs: [number, number][][], maxPoints: number, zones: ZoneInput[] = []): [number, number][][] {
   const usable = runs.filter((r) => r.length >= 2);
-  if (usable.length === 1) return [rdpReduce(usable[0], maxPoints)];
+  if (usable.length === 1) return [zoneSafeReduce(usable[0], maxPoints, zones)];
   const total = usable.reduce((n, r) => n + r.length, 0);
-  return usable.map((r) => rdpReduce(r, Math.max(2, Math.floor((maxPoints * r.length) / total))));
+  return usable.map((r) => zoneSafeReduce(r, Math.max(2, Math.floor((maxPoints * r.length) / total)), zones));
+}
+
+// what is published about the fog: one total, in 5-minute steps. no entry or
+// exit points (the route ends already show where it goes in), no per-zone
+// shapes, no per-event durations — each would help locate what's hidden.
+export function publishedFogEvents(events: FogEvent[]): FogEvent[] | null {
+  if (events.length === 0) return null;
+  const total = events.reduce((s, e) => s + e.durationS, 0);
+  return [{ entry: null, exit: null, durationS: Math.max(300, Math.round(total / 300) * 300) }];
+}
+
+// fog applied to an already-published route (trackless rows, or a track that
+// can't be read right now): points have no time, so only the route changes
+export function fogStoredRoute(
+  route: { polyline: string | null; cardPolyline: string | null; bounds: RouteBounds | null },
+  zones: ZoneInput[]
+): { polyline: string | null; cardPolyline: string | null; bounds: RouteBounds | null; fogged: boolean } {
+  if (zones.length === 0 || !route.polyline) return { ...route, fogged: false };
+  let fogged = false;
+  const fogLine = (encoded: string | null): [number, number][][] => {
+    if (!encoded) return [];
+    const runs: [number, number][][] = [];
+    for (const seg of decodeMultiPolyline(encoded)) {
+      const r = applyFog(seg.map(([lat, lng], i) => ({ lat, lng, t: i })), zones);
+      if (r.events.length) fogged = true;
+      for (const s of r.segments) if (s.length >= 2) runs.push(s.map((p) => [p.lat, p.lng]));
+    }
+    return runs;
+  };
+  const detail = fogLine(route.polyline);
+  const card = fogLine(route.cardPolyline);
+  if (!fogged) return { ...route, fogged: false };
+  const pts = detail.flat();
+  return {
+    polyline: detail.length ? encodeMultiPolyline(detail) : null,
+    cardPolyline: card.length ? encodeMultiPolyline(card) : null,
+    bounds: pts.length >= 2 ? boundsOf(pts) : null,
+    fogged: true,
+  };
 }
 
 // deterministic: same track + edits + zones + settings → identical output
@@ -319,13 +381,12 @@ export function publishTrack(
   let cardPolyline: string | null = null;
   let bounds: RouteBounds | null = null;
   if (visiblePoints >= 2) {
-    const detail = reduceSegments(runs, DETAIL_POLYLINE_MAX_POINTS);
+    const detail = reduceSegments(runs, DETAIL_POLYLINE_MAX_POINTS, ctx.zones);
     polyline = encodeMultiPolyline(detail);
-    cardPolyline = encodeMultiPolyline(reduceSegments(runs, CARD_POLYLINE_MAX_POINTS));
+    cardPolyline = encodeMultiPolyline(reduceSegments(runs, CARD_POLYLINE_MAX_POINTS, ctx.zones));
     bounds = boundsOf(detail.flat());
   }
 
-  const touched = ctx.zones.filter((z) => fog.touchedZoneIds.includes(z.id));
   const columns = {
     ...stats,
     kilojoules: track.kilojoules,
@@ -334,8 +395,8 @@ export function publishTrack(
     bounds,
     trimStartM: Math.max(0, trim.startM),
     trimEndM: Math.max(0, trim.endM),
-    fogEvents: fogged ? fog.events : null,
-    fogShapes: touched.length ? touched.map((z) => publicZoneShape(z.polygon)) : null,
+    fogEvents: publishedFogEvents(fog.events),
+    fogShapes: null, // zone shapes are never published (the shape would reveal the place)
     ...resolveOverrides(edits),
   } as PublicColumns;
   return { columns, visible: fog.segments };
@@ -428,7 +489,9 @@ export interface RepublishDeps {
   loadZones(): Promise<ZoneInput[]>; // enabled, not archived
   loadRaw(sha256: string, row: ActivityRow): Promise<Uint8Array | null>;
   storeDerived(key: string, bytes: Uint8Array): Promise<boolean>; // false when no private store
-  writeColumns(id: number, values: Record<string, unknown>): Promise<void>;
+  // startedAt: when needsRepublish is cleared, keep it set if the row was
+  // marked stale after this time (an edit raced the republish)
+  writeColumns(id: number, values: Record<string, unknown>, startedAt?: Date): Promise<void>;
   recordEdit?(id: number, kind: string, params: Record<string, unknown>, note: string): Promise<number>;
   // optional so read-only/legacy deps keep working: defaults, no photos
   loadSettings?(): Promise<PrivacySettings>;
@@ -491,6 +554,8 @@ async function buildTrack(
 
 export async function republish(activityId: number, opts: RepublishOptions = {}): Promise<RepublishResult> {
   const deps = opts.deps ?? defaultDeps();
+  // an edit that marks the row stale after this point keeps it pending
+  const startedAt = new Date();
   const row = await deps.loadActivity(activityId);
   if (!row) return { status: "not-found", id: activityId };
 
@@ -512,23 +577,43 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
   }
 
   const best = candidates[0] ?? null;
-  // only zones that can touch the track count (trackless: none), so a zone
-  // edit elsewhere never marks this activity stale
+  // the route a trackless row publishes from: kept privately the first time
+  const storedRoute = row.legacyRoute ?? { polyline: row.polyline, cardPolyline: row.cardPolyline, bounds: row.bounds };
+  // only zones that can touch the activity count, so a zone edit elsewhere
+  // never marks it stale (trackless rows: zones near their stored route)
   const hashFor = (track: TrackRef | null, bbox: RouteBounds | null) =>
-    inputsHash({ track, edits, zones: track ? relevantZones(allZones, bbox) : [], settings, photos });
+    inputsHash({ track, edits, zones: relevantZones(allZones, track ? bbox : storedRoute.bounds), settings, photos });
   const bestHash = hashFor(best, row.trackBbox ?? null);
   if (!opts.force && row.publishedInputsHash === bestHash && row.processingVersion === PROCESSING_VERSION) {
-    if (row.needsRepublish && !opts.dryRun) await deps.writeColumns(activityId, { needsRepublish: false });
+    if (row.needsRepublish && !opts.dryRun) await deps.writeColumns(activityId, { needsRepublish: false }, startedAt);
     return { status: "fresh", id: activityId, hash: bestHash };
   }
   const start = publishedStart(row, settings);
 
+  // fail closed: when the track can't be rebuilt right now, the route already
+  // published still gets the current zones applied (it only ever loses points)
+  const fogCurrentRoute = async () => {
+    if (opts.dryRun) return;
+    const current = { polyline: row.polyline, cardPolyline: row.cardPolyline, bounds: row.bounds };
+    const f = fogStoredRoute(current, relevantZones(allZones, current.bounds));
+    if (f.fogged) {
+      await deps.writeColumns(activityId, { polyline: f.polyline, cardPolyline: f.cardPolyline, bounds: f.bounds, fogShapes: null, updatedAt: new Date() });
+    }
+  };
+
   // best source first; skip sources that hold no track, but stop (write
-  // nothing) when a better source's bytes can't be read — publishing a worse
-  // track over it would silently replace device data
+  // nothing but fog) when a better source's bytes can't be read — publishing
+  // a worse track over it would silently replace device data
   for (const ref of candidates) {
-    const track = await buildTrack(ref, row, deps);
+    let track: Awaited<ReturnType<typeof buildTrack>>;
+    try {
+      track = await buildTrack(ref, row, deps);
+    } catch (error) {
+      await fogCurrentRoute();
+      throw error;
+    }
     if (track === "unavailable") {
+      await fogCurrentRoute();
       return { status: "source-unavailable", id: activityId, hash: bestHash, track: ref };
     }
     if (!track) continue;
@@ -554,24 +639,36 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       publishedInputsHash: hash,
       canonicalTrackKey: stored ? key : null,
       updatedAt: new Date(),
-    });
+    }, startedAt);
     return { status: "published", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: stored ? key : null, pins };
   }
 
   // trackless (manual entries, gym sessions, file-less api rows not yet
-  // snapshotted): route/stat columns are left exactly as they are; only the
-  // published start and bookkeeping are written, and no photo gets a pin
+  // snapshotted): stats are left exactly as they are; the route they came with
+  // (kept privately) is published with the current zones applied, so adding a
+  // zone fogs it and removing one restores it. no photo gets a pin.
   if (!opts.dryRun) {
     if (deps.writePhotoPins && photos.length) {
       await deps.writePhotoPins(activityId, computePhotoPins(photos, null, [], []));
     }
+    const f = fogStoredRoute(storedRoute, relevantZones(allZones, storedRoute.bounds));
     await deps.writeColumns(activityId, {
       ...start,
+      ...(storedRoute.polyline
+        ? {
+            legacyRoute: storedRoute,
+            polyline: f.polyline,
+            cardPolyline: f.cardPolyline,
+            bounds: f.bounds,
+            fogEvents: null, // no timestamps: nothing to say about time in the fog
+            fogShapes: null,
+          }
+        : {}),
       needsRepublish: false,
       processingVersion: PROCESSING_VERSION,
       publishedInputsHash: bestHash,
       updatedAt: new Date(),
-    });
+    }, startedAt);
   }
   return { status: "no-source", id: activityId, hash: bestHash };
 }
@@ -649,8 +746,12 @@ export function defaultDeps(): RepublishDeps {
       await getRawStore().putDerived(key, bytes, "application/gzip");
       return true;
     },
-    async writeColumns(id, values) {
-      await db.update(activities).set(values).where(eq(activities.id, id));
+    async writeColumns(id, values, startedAt) {
+      const set: Record<string, unknown> = { ...values };
+      if (values.needsRepublish === false && startedAt) {
+        set.needsRepublish = sql`(${activities.staleMarkedAt} is not null and ${activities.staleMarkedAt} > ${startedAt.toISOString()}::timestamptz)`;
+      }
+      await db.update(activities).set(set).where(eq(activities.id, id));
     },
     async recordEdit(id, kind, params, note) {
       const rows = await db

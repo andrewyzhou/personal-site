@@ -182,10 +182,16 @@ describe("publishTrack with a zone (leak checks)", () => {
     for (const [lat, lng] of [[b.minLat, b.minLng], [b.maxLat, b.maxLng]]) expect(pointInPolygon(lat, lng, zone.polygon)).toBe(false);
   });
 
-  it("emits fog events + the public shape, and rounds the distance", () => {
-    expect(fogged.columns.fogEvents!.length).toBeGreaterThan(0);
-    expect(fogged.columns.fogShapes).toEqual([publicZoneShape(zone.polygon)]);
-    expect(fogged.columns.distanceM % 100).toBe(0);
+  it("publishes only one coarse fog total: no shapes, no edge points, visible distance", () => {
+    const ev = fogged.columns.fogEvents!;
+    expect(ev).toHaveLength(1);
+    expect(ev[0]).toMatchObject({ entry: null, exit: null });
+    expect(ev[0].durationS % 300).toBe(0);
+    expect(fogged.columns.fogShapes).toBeNull();
+    expect(fogged.columns.distanceM).toBeLessThan(plain.distanceM);
+    // the rounded policy is still available as a setting
+    const rounded = computePublicColumns(track, [], { zones: [zone], settings: { ...settings, distance: { mode: "include-rounded", roundToM: 100 } } });
+    expect(rounded.distanceM % 100).toBe(0);
     expect(plain.fogEvents).toBeNull();
     expect(plain.polyline!.includes(" ")).toBe(false);
     expect(fogged.columns.polyline!.includes(" ")).toBe(true);

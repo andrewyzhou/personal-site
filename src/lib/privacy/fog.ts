@@ -121,8 +121,20 @@ export function boundsIntersect(a: RouteBounds, b: RouteBounds): boolean {
 }
 
 // zones whose bounds overlap the track's: the only ones that can affect it
-export function relevantZones(zones: ZoneInput[], trackBbox: RouteBounds | null): ZoneInput[] {
-  if (!trackBbox) return zones;
+// how far beyond a track's bounds a zone still counts as touching it: photo
+// pins snap up to 75 m from the route and the edge buffer is 15 m
+export const RELEVANCE_MARGIN_M = 100;
+
+export function expandBounds(b: RouteBounds, metres: number): RouteBounds {
+  const dLat = metres / 110540;
+  const midLat = (b.minLat + b.maxLat) / 2;
+  const dLng = metres / (111320 * Math.max(0.01, Math.cos((midLat * Math.PI) / 180)));
+  return { minLat: b.minLat - dLat, maxLat: b.maxLat + dLat, minLng: b.minLng - dLng, maxLng: b.maxLng + dLng };
+}
+
+export function relevantZones(zones: ZoneInput[], trackBboxRaw: RouteBounds | null): ZoneInput[] {
+  if (!trackBboxRaw) return zones;
+  const trackBbox = expandBounds(trackBboxRaw, RELEVANCE_MARGIN_M);
   return zones.filter((z) => {
     const zb = polygonBounds(z.polygon);
     return zb !== null && boundsIntersect(zb, trackBbox);

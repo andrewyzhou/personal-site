@@ -109,6 +109,8 @@ function row(over: Partial<ActivityRow> = {}): ActivityRow {
     trackBbox: { minLat: 37.0, minLng: -123, maxLat: 38, maxLng: -122 },
     needsRepublish: false,
     republishAttemptedAt: null,
+    staleMarkedAt: null,
+    legacyRoute: null,
     createdAt: new Date("2026-07-06T15:00:00Z"),
     updatedAt: new Date("2026-07-06T15:00:00Z"),
     ...over,
