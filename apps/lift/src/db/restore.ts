@@ -5,6 +5,7 @@ import { count, eq, isNotNull, isNull, type SQL } from "drizzle-orm";
 import type { SyncEntity } from "lift-core";
 import { db } from "./client";
 import { notify } from "./events";
+import { clearPriorBests } from "./prs";
 import {
   bodyweights,
   customExercises,
@@ -57,7 +58,11 @@ export function dismissRestoreOffer(): void {
   db.insert(kv).values({ key: OFFER_DISMISSED, value: at }).onConflictDoUpdate({ target: kv.key, set: { value: at } }).run();
 }
 
-/** home's one-tap restore: only for an empty db with a token that survived a reinstall */
+/**
+ * home's one-tap restore: an empty db plus any saved token, whether it
+ * survived a reinstall in the keychain or was typed into settings afterwards
+ * (android and new phones; see the keychain note on getToken)
+ */
 export async function checkRestoreOffer(): Promise<boolean> {
   const dismissed = db.select({ value: kv.value }).from(kv).where(eq(kv.key, OFFER_DISMISSED)).get();
   const base = {
@@ -119,6 +124,8 @@ export async function restoreFromServer(
     const at = String(Date.now());
     tx.insert(kv).values({ key: "restoredAt", value: at }).onConflictDoUpdate({ target: kv.key, set: { value: at } }).run();
   });
+  // every table was replaced, so cached bests are stale; clear before screens re-read
+  clearPriorBests();
   notify();
   return { ...plan.counts, dropped: plan.dropped };
 }

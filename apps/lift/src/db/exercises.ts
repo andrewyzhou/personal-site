@@ -3,6 +3,7 @@ import { EXERCISES, customExerciseId, getExercise, type Equipment, type Exercise
 import { db, type Tx } from "./client";
 import { notify } from "./events";
 import { writeOutbox } from "./outbox";
+import { clearPriorBests } from "./prs";
 import { customExercises, sets, templateExercises, workoutExercises, workouts, type CustomExerciseRow } from "./schema";
 import { bumpedAt } from "../lib/clock";
 import { customToExercise, isCustomInUse, type CustomUsage } from "../lib/custom";
@@ -259,6 +260,8 @@ export function mergeCustomExercise(sourceId: string, targetId: string, now = Da
       .returning()
       .get();
     if (src) writeOutbox(tx, "custom_exercise", src.id, "update", src);
+    // the target's history just grew; drop cached bests before write() notifies
+    clearPriorBests();
     return check;
   });
 }

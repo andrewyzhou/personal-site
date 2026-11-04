@@ -73,8 +73,10 @@ export function setPrKinds(bests: PriorBests, set: PrSet): SetPrKind[] {
   const m = measure(set);
   if (!m) return [];
   const out: SetPrKind[] = [];
-  if (m.est !== null && bests.e1rmKg !== null && m.est > bests.e1rmKg + EPS) out.push("e1rm");
-  if (bests.heaviestKg !== null && m.kg > bests.heaviestKg + EPS) out.push("weight");
+  // earlier sessions with no load (bodyweight, or reps too high for an e1rm)
+  // leave a null best; the first real one beats it, same as detectWorkoutPrs
+  if (m.est !== null && (bests.e1rmKg === null || m.est > bests.e1rmKg + EPS)) out.push("e1rm");
+  if (bests.heaviestKg === null || m.kg > bests.heaviestKg + EPS) out.push("weight");
   // a new weight is a weight pr, not a rep pr: needs an earlier set at the same load
   const prev = bests.repsAtWeight[weightKey(m.kg)];
   if (prev !== undefined && m.reps > prev) out.push("reps_at_weight");
@@ -198,8 +200,9 @@ export function fallbackWorkoutPrs(history: readonly HistorySet[], workoutId: st
     };
     const mineVol = volume(mine).get(workoutId) ?? 0;
     const prevVol = Math.max(0, ...volume(before).values());
-    if (prevVol > 0 && mineVol > prevVol + EPS) {
-      hits.push({ exerciseId, kind: "volume", value: mineVol, previous: prevVol, set: null });
+    // no earlier volume is a null best, beatable like the others
+    if (mineVol > 0 && mineVol > prevVol + EPS) {
+      hits.push({ exerciseId, kind: "volume", value: mineVol, previous: prevVol > 0 ? prevVol : null, set: null });
     }
   }
   return hits;

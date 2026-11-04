@@ -42,7 +42,8 @@ export default function Home() {
   const [offerRestore, setOfferRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
-  // re-checked on every db change: logging anything (or a restore) hides it
+  // re-checked on every db change: logging anything (or a restore) hides it,
+  // and saving a token in settings (setToken notifies) shows it
   useEffect(() => {
     let live = true;
     checkRestoreOffer().then(
@@ -79,7 +80,7 @@ export default function Home() {
       {offerRestore && !active ? (
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.title, { color: c.strong }]}>restore from server?</Text>
-          <Text style={{ color: c.muted }}>this phone is empty but still has your app token. bring back your workouts and templates.</Text>
+          <Text style={{ color: c.muted }}>this phone is empty and has your app token. bring back your workouts and templates.</Text>
           <Button label={restoring ? "restoring…" : "restore from server"} onPress={() => void restore()} style={styles.gap} />
           <Button
             label="start fresh"

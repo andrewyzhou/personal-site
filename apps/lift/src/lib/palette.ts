@@ -60,17 +60,19 @@ export const dark: Palette = palette({
   divider: 30.9,
   card: 0.1,
   steps: [21.8, 38.7, 51.0, 68.3, 94.9],
-  // muted red: the only hue in the app, kept quiet
-  danger: "#d27a72",
+  // muted red: the only hue in the app, kept quiet. light enough for 4.5:1 on done rows
+  danger: "#e08c84",
 });
 
 export const light: Palette = palette({
   bg: 94.9,
   text: 32.1,
   primary: 17.3,
-  muted: 45.0,
+  // a touch darker than the site's 45 so muted text still reads on done rows
+  muted: 43.0,
   divider: 85.5,
   card: 0.08,
   steps: [90.7, 75.7, 60.0, 43.1, 17.3],
-  danger: "#a8463e",
+  // dark enough for 4.5:1 on the input/done tints, not just the page
+  danger: "#8c362f",
 });
