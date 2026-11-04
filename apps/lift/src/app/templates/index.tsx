@@ -16,6 +16,7 @@ import {
   setTemplateArchived,
   templateExerciseCounts,
 } from "../../db/templates";
+import { useActionMenu } from "../../components/ActionMenu";
 import { Button } from "../../components/Button";
 import { Chip } from "../../components/library/Chip";
 import { NamePrompt } from "../../components/library/NamePrompt";
@@ -35,6 +36,7 @@ export default function Templates() {
   const version = useDbVersion();
   const [showArchived, setShowArchived] = useState(false);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
+  const { show: showMenu, menu } = useActionMenu();
 
   const { sections, folders, counts, archivedCount } = useMemo(() => {
     const folders = listFolders();
@@ -51,53 +53,51 @@ export default function Templates() {
   const folderActions = (folder: TemplateFolderRow) => {
     const i = folders.findIndex((f) => f.id === folder.id);
     const move = (to: number) => reorderFolders(moveItem(folders, i, to).map((f) => f.id));
-    Alert.alert(folder.name, undefined, [
-      { text: "new template here", onPress: () => setPrompt({ kind: "new-template", folderId: folder.id }) },
-      { text: "rename", onPress: () => setPrompt({ kind: "rename-folder", folder }) },
-      ...(i > 0 ? [{ text: "move up", onPress: () => move(i - 1) }] : []),
-      ...(i < folders.length - 1 ? [{ text: "move down", onPress: () => move(i + 1) }] : []),
+    showMenu(folder.name, [
+      { label: "new template here", onPress: () => setPrompt({ kind: "new-template", folderId: folder.id }) },
+      { label: "rename", onPress: () => setPrompt({ kind: "rename-folder", folder }) },
+      i > 0 && { label: "move up", onPress: () => move(i - 1) },
+      i < folders.length - 1 && { label: "move down", onPress: () => move(i + 1) },
       {
-        text: "delete folder",
-        style: "destructive" as const,
+        label: "delete folder",
+        destructive: true,
         onPress: () =>
           Alert.alert("delete folder?", "its templates are kept, without a folder.", [
             { text: "cancel", style: "cancel" },
             { text: "delete", style: "destructive", onPress: () => deleteFolder(folder.id) },
           ]),
       },
-      { text: "cancel", style: "cancel" },
     ]);
   };
 
+  // one button per folder, so this can be any length too
   const moveToFolder = (t: TemplateRow) => {
-    Alert.alert("move to", undefined, [
-      ...folders.filter((f) => f.id !== t.folderId).map((f) => ({ text: f.name, onPress: () => moveTemplateToFolder(t.id, f.id) })),
-      ...(t.folderId ? [{ text: "no folder", onPress: () => moveTemplateToFolder(t.id, null) }] : []),
-      { text: "cancel", style: "cancel" as const },
+    showMenu("move to", [
+      ...folders.filter((f) => f.id !== t.folderId).map((f) => ({ label: f.name, onPress: () => moveTemplateToFolder(t.id, f.id) })),
+      !!t.folderId && { label: "no folder", onPress: () => moveTemplateToFolder(t.id, null) },
     ]);
   };
 
   const templateActions = (t: TemplateRow, siblings: TemplateRow[]) => {
     const i = siblings.findIndex((s) => s.id === t.id);
     const move = (to: number) => reorderTemplates(moveItem(siblings, i, to).map((s) => s.id));
-    Alert.alert(t.name, undefined, [
-      { text: "start workout", onPress: () => startTemplate(t.id) },
-      { text: "edit", onPress: () => router.push({ pathname: "/templates/[id]", params: { id: t.id } }) },
-      { text: "duplicate", onPress: () => duplicateTemplate(t.id) },
-      ...(folders.length ? [{ text: "move to folder", onPress: () => moveToFolder(t) }] : []),
-      ...(i > 0 ? [{ text: "move up", onPress: () => move(i - 1) }] : []),
-      ...(i < siblings.length - 1 ? [{ text: "move down", onPress: () => move(i + 1) }] : []),
-      { text: t.archived ? "unarchive" : "archive", onPress: () => setTemplateArchived(t.id, !t.archived) },
+    showMenu(t.name, [
+      { label: "start workout", onPress: () => startTemplate(t.id) },
+      { label: "edit", onPress: () => router.push({ pathname: "/templates/[id]", params: { id: t.id } }) },
+      { label: "duplicate", onPress: () => duplicateTemplate(t.id) },
+      folders.length > 0 && { label: "move to folder", onPress: () => moveToFolder(t) },
+      i > 0 && { label: "move up", onPress: () => move(i - 1) },
+      i < siblings.length - 1 && { label: "move down", onPress: () => move(i + 1) },
+      { label: t.archived ? "unarchive" : "archive", onPress: () => setTemplateArchived(t.id, !t.archived) },
       {
-        text: "delete",
-        style: "destructive" as const,
+        label: "delete",
+        destructive: true,
         onPress: () =>
           Alert.alert("delete template?", t.name, [
             { text: "cancel", style: "cancel" },
             { text: "delete", style: "destructive", onPress: () => deleteTemplate(t.id) },
           ]),
       },
-      { text: "cancel", style: "cancel" },
     ]);
   };
 
@@ -170,6 +170,7 @@ export default function Templates() {
         onCancel={() => setPrompt(null)}
         onSubmit={submitPrompt}
       />
+      {menu}
     </ScrollView>
   );
 }

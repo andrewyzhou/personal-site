@@ -19,7 +19,9 @@ import {
   type WorkoutRow,
 } from "./schema";
 import { getPreferredUnit } from "./bodyweight";
+import { previousSessionSets } from "./workouts";
 import { copyName, validateName } from "../lib/names";
+import { clampSetNumbers, clampTitle, cleanNote } from "../lib/numbers";
 import { nextPosition } from "../lib/sets";
 import {
   byPositionThenName,
@@ -177,7 +179,7 @@ function insertTemplate(
       id: randomUUID(),
       folderId,
       name: input.name,
-      notes: input.notes?.trim() ? input.notes.trim() : null,
+      notes: cleanNote(input.notes),
       position: nextTemplatePosition(tx, folderId),
       archived: 0,
       createdAt: now,
@@ -232,7 +234,7 @@ export function saveTemplate(id: string, draft: TemplateDraft, now = Date.now())
   return write((tx) => {
     const current = tx.select().from(templates).where(eq(templates.id, id)).get();
     if (!current) return undefined;
-    const notes = draft.notes?.trim() ? draft.notes.trim() : null;
+    const notes = cleanNote(draft.notes);
     const folderId = draft.folderId ?? null;
     let row = current;
     if (current.name !== name || current.notes !== notes || current.folderId !== folderId) {
@@ -431,7 +433,7 @@ export function startWorkoutFromTemplate(templateId: string, now = Date.now()): 
       .insert(workouts)
       .values({
         id: randomUUID(),
-        title: template.name,
+        title: clampTitle(template.name),
         startedAt: now,
         utcOffsetMin: -new Date(now).getTimezoneOffset(),
         templateId,
@@ -465,14 +467,17 @@ export function startWorkoutFromTemplate(templateId: string, now = Date.now()): 
         .returning()
         .get();
       writeOutbox(tx, "workout_exercise", we.id, "insert", we);
-      setsFromPlanned(parsePlannedSets(te.plannedSets), unit).forEach((values, j) => {
+      // blank planned fields fill from last session, like adding the exercise by hand
+      const previous = previousSessionSets(tx, te.exerciseId, workout.id);
+      setsFromPlanned(parsePlannedSets(te.plannedSets), unit, previous).forEach((values, j) => {
         const s = tx
           .insert(sets)
           .values({
             id: randomUUID(),
             workoutExerciseId: we.id,
             position: j,
-            ...values,
+            // older plans were saved before clamping existed
+            ...clampSetNumbers(values),
             completed: 0,
             note: null,
             createdAt: now,

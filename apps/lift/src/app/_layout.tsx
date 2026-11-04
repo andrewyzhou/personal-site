@@ -26,8 +26,6 @@ export default function RootLayout() {
   const scheme = useColorScheme();
   const c = useColors();
   const [state, setState] = useState<"loading" | "ready" | Error>("loading");
-  // push-only sync on foreground + every few minutes; failures retry with backoff
-  useAutoSync();
 
   useEffect(() => {
     ready ??= migrate(sqlite);
@@ -61,6 +59,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={scheme === "dark" ? DarkTheme : DefaultTheme}>
       <StatusBar style="auto" />
+      <AutoSync />
       <Stack>
         <Stack.Screen name="index" options={{ title: "lift" }} />
         <Stack.Screen name="workout" options={{ title: "workout", headerBackTitle: "home" }} />
@@ -79,6 +78,13 @@ export default function RootLayout() {
       </Stack>
     </ThemeProvider>
   );
+}
+
+// push-only sync on foreground + every few minutes; failures retry with backoff.
+// mounted only once ready, so it never touches the db before migrations finish
+function AutoSync() {
+  useAutoSync();
+  return null;
 }
 
 const styles = StyleSheet.create({

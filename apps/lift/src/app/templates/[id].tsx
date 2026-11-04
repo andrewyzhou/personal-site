@@ -5,7 +5,10 @@ import type { WeightUnit } from "lift-core";
 import { getExerciseLookup } from "../../db/exercises";
 import { getPreferredUnit } from "../../db/bodyweight";
 import { deleteTemplate, duplicateTemplate, getTemplateDetail, listFolders, saveTemplate, setTemplateArchived } from "../../db/templates";
+import { useActionMenu } from "../../components/ActionMenu";
 import { Button } from "../../components/Button";
+import { MAX_NOTE_LENGTH } from "../../lib/numbers";
+import { MAX_REST_S } from "../../lib/rest";
 import { Chip } from "../../components/library/Chip";
 import { NumField } from "../../components/library/NumField";
 import { PickerModal } from "../../components/library/PickerModal";
@@ -51,7 +54,11 @@ export default function TemplateEditor() {
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const { show: showMenu, menu } = useActionMenu();
+
+  // seed (and re-seed after a save) from sqlite, so new rows carry their ids
+  // and a second save updates them instead of inserting copies
+  const load = (): void => {
     const detail = id ? getTemplateDetail(id) : undefined;
     if (!detail) return setMissing(true);
     setArchived(!!detail.template.archived);
@@ -69,7 +76,9 @@ export default function TemplateEditor() {
         plannedSets: planned,
       })),
     });
-  }, [id]);
+  };
+
+  useEffect(load, [id]);
 
   if (missing || !draft || !id) {
     return (
@@ -91,6 +100,7 @@ export default function TemplateEditor() {
   const save = (): boolean => {
     try {
       saveTemplate(id, { name: draft.name, notes: draft.notes, folderId: draft.folderId, exercises: draft.exercises });
+      load();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -101,15 +111,15 @@ export default function TemplateEditor() {
   const groups = normalizeSupersets(draft.exercises.map((e) => e.supersetGroup));
 
   const more = () =>
-    Alert.alert(draft.name, undefined, [
+    showMenu(draft.name, [
       {
-        text: "save and start workout",
+        label: "save and start workout",
         onPress: () => {
           if (save()) startTemplate(id);
         },
       },
       {
-        text: "duplicate",
+        label: "duplicate",
         onPress: () => {
           if (!save()) return;
           const copy = duplicateTemplate(id);
@@ -117,15 +127,15 @@ export default function TemplateEditor() {
         },
       },
       {
-        text: archived ? "unarchive" : "archive",
+        label: archived ? "unarchive" : "archive",
         onPress: () => {
           setTemplateArchived(id, !archived);
           setArchived(!archived);
         },
       },
       {
-        text: "delete",
-        style: "destructive",
+        label: "delete",
+        destructive: true,
         onPress: () =>
           Alert.alert("delete template?", draft.name, [
             { text: "cancel", style: "cancel" },
@@ -139,7 +149,6 @@ export default function TemplateEditor() {
             },
           ]),
       },
-      { text: "cancel", style: "cancel" },
     ]);
 
   return (
@@ -172,6 +181,7 @@ export default function TemplateEditor() {
           onChangeText={(notes) => update((d) => ({ ...d, notes }))}
           placeholder="notes"
           placeholderTextColor={c.muted}
+          maxLength={MAX_NOTE_LENGTH}
           multiline
           style={[styles.input, { color: c.text, backgroundColor: c.input }]}
         />
@@ -218,17 +228,18 @@ export default function TemplateEditor() {
                 <Pressable
                   hitSlop={8}
                   onPress={() =>
-                    Alert.alert(exercise?.name ?? "exercise", undefined, [
-                      ...(i > 0 ? [{ text: "move up", onPress: () => update((d) => ({ ...d, exercises: moveItem(d.exercises, i, i - 1) })) }] : []),
-                      ...(i < draft.exercises.length - 1
-                        ? [{ text: "move down", onPress: () => update((d) => ({ ...d, exercises: moveItem(d.exercises, i, i + 1) })) }]
-                        : []),
+                    // up + down + remove + cancel is four: past android's alert limit
+                    showMenu(exercise?.name ?? "exercise", [
+                      i > 0 && { label: "move up", onPress: () => update((d) => ({ ...d, exercises: moveItem(d.exercises, i, i - 1) })) },
+                      i < draft.exercises.length - 1 && {
+                        label: "move down",
+                        onPress: () => update((d) => ({ ...d, exercises: moveItem(d.exercises, i, i + 1) })),
+                      },
                       {
-                        text: "remove",
-                        style: "destructive" as const,
+                        label: "remove",
+                        destructive: true,
                         onPress: () => update((d) => ({ ...d, exercises: d.exercises.filter((e) => e.key !== ex.key) })),
                       },
-                      { text: "cancel", style: "cancel" as const },
                     ])
                   }
                 >
@@ -239,6 +250,8 @@ export default function TemplateEditor() {
                 <Text style={{ color: c.muted }}>rest</Text>
                 <NumField
                   integer
+                  field="durationS"
+                  max={MAX_REST_S}
                   value={ex.restS}
                   placeholder="default"
                   onChange={(restS) => updateExercise(ex.key, (e) => ({ ...e, restS }))}
@@ -260,6 +273,7 @@ export default function TemplateEditor() {
                     <View key={f} style={styles.field}>
                       <NumField
                         integer={f === "reps" || f === "durationS"}
+                        field={f}
                         value={s[f]}
                         placeholder={f === "weight" ? s.unit : FIELD_HINT[f]}
                         onChange={(v) => updateSet(ex.key, j, { [f]: v })}
@@ -301,6 +315,7 @@ export default function TemplateEditor() {
         />
         <Button label="more" variant="plain" onPress={more} />
       </ScrollView>
+      {menu}
       <PickerModal
         visible={picking}
         title="add exercise"

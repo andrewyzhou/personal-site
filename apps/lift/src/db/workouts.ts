@@ -15,16 +15,17 @@ import { getDefaultUnit } from "./settings";
 import { sets, workoutExercises, workouts, type SetRow, type WorkoutExerciseRow, type WorkoutRow } from "./schema";
 import { planFinish, type FinishDecision } from "../lib/finish";
 import { defaultWorkoutTitle } from "../lib/format";
+import { MAX_NOTE_LENGTH, clampSetNumbers } from "../lib/numbers";
 import { clampRestS } from "../lib/rest";
 import {
   byPosition,
+  choosePrefill,
   diffExercises,
   lastByPosition,
   linkWithNext,
   moveExercise,
   nextPosition,
   normalizeGroups,
-  pickPrevious,
   prefillSet,
   unlinkFromNext,
   type OrderedExercise,
@@ -111,7 +112,7 @@ export function getWorkoutDetail(workoutId: string): WorkoutDetail | undefined {
  * than `excludeWorkoutId`. if that session logged the exercise twice, the
  * first entry is the one compared against.
  */
-function previousSessionSets(q: Reader, exerciseId: string, excludeWorkoutId: string): SetRow[] {
+export function previousSessionSets(q: Reader, exerciseId: string, excludeWorkoutId: string): SetRow[] {
   const last = q
     .select({ id: workoutExercises.id })
     .from(workoutExercises)
@@ -143,22 +144,20 @@ export function getPreviousSessions(workoutId: string, exerciseIds: readonly str
 
 function insertSet(tx: Tx, workoutExerciseId: string, now: number): SetRow {
   const own = tx.select().from(sets).where(eq(sets.workoutExerciseId, workoutExerciseId)).all();
-  let previous: Parameters<typeof prefillSet>[0] = lastByPosition(own);
-  if (!previous) {
-    const we = tx.select().from(workoutExercises).where(eq(workoutExercises.id, workoutExerciseId)).get();
-    if (we) {
-      // first set of a repeated exercise: borrow from its earlier entry in this workout
-      const sibling = tx
-        .select({ s: sets, pos: workoutExercises.position })
-        .from(sets)
-        .innerJoin(workoutExercises, eq(sets.workoutExerciseId, workoutExercises.id))
-        .where(and(eq(workoutExercises.workoutId, we.workoutId), eq(workoutExercises.exerciseId, we.exerciseId)))
-        .orderBy(desc(workoutExercises.position), desc(sets.position))
-        .get();
-      // nothing yet this workout: start from what was lifted last session
-      previous = sibling?.s ?? pickPrevious(previousSessionSets(tx, we.exerciseId, we.workoutId), own.length);
-    }
-  }
+  const we = tx.select().from(workoutExercises).where(eq(workoutExercises.id, workoutExerciseId)).get();
+  const session = we ? previousSessionSets(tx, we.exerciseId, we.workoutId) : [];
+  const previous = choosePrefill<Parameters<typeof prefillSet>[0]>(session, own.length, lastByPosition(own), () =>
+    // first set of a repeated exercise: borrow from its earlier entry in this workout
+    we
+      ? tx
+          .select({ s: sets })
+          .from(sets)
+          .innerJoin(workoutExercises, eq(sets.workoutExerciseId, workoutExercises.id))
+          .where(and(eq(workoutExercises.workoutId, we.workoutId), eq(workoutExercises.exerciseId, we.exerciseId)))
+          .orderBy(desc(workoutExercises.position), desc(sets.position))
+          .get()?.s
+      : undefined
+  );
   const values = prefillSet(previous, getDefaultUnit());
   const row = tx
     .insert(sets)
@@ -220,7 +219,10 @@ export interface SetPatch {
 }
 
 export function updateSet(setId: string, patch: SetPatch, now = Date.now()): SetRow | undefined {
-  const { completed, ...rest } = patch;
+  const { completed, ...raw } = patch;
+  // server bounds: an out-of-range value would be rejected on every push
+  const rest = clampSetNumbers(raw);
+  if (typeof rest.note === "string") rest.note = rest.note.slice(0, MAX_NOTE_LENGTH);
   return write((tx) => {
     const row = tx
       .update(sets)

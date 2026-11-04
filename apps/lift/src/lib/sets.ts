@@ -101,6 +101,15 @@ export function pickPrevious<T>(previous: readonly T[], index: number): T | unde
   return previous[index] ?? previous[previous.length - 1];
 }
 
+/**
+ * what a new set at `index` copies: last session's set at the same position
+ * (so pyramids and back-off sets repeat), else this entry's last set, else an
+ * earlier entry of the same exercise in this workout. undefined -> defaults.
+ */
+export function choosePrefill<T>(session: readonly T[], index: number, lastOwn: T | undefined, sibling: () => T | undefined): T | undefined {
+  return session[index] ?? lastOwn ?? sibling();
+}
+
 /** ghost text for a previous-session set: "185×5", "10 reps", "1:30", "400 m" */
 export function formatPrevious(s: {
   weight: number | null;

@@ -8,6 +8,7 @@ import { Chip } from "../components/library/Chip";
 import { TrendLine } from "../components/library/TrendLine";
 import { useColors } from "../components/theme";
 import { useDbVersion } from "../components/useDbVersion";
+import { MAX_NOTE_LENGTH } from "../lib/numbers";
 import { convertWeight, formatWeight, parseBodyweight, parseDateInput, toDateInput } from "../lib/bodyweight";
 
 const TREND_POINTS = 60;
@@ -76,6 +77,7 @@ export default function Bodyweight() {
       <TextInput
         value={note}
         onChangeText={setNote}
+        maxLength={MAX_NOTE_LENGTH}
         placeholder="note"
         placeholderTextColor={c.muted}
         style={[styles.input, { backgroundColor: c.input, color: c.text }]}

@@ -15,7 +15,7 @@ import { CustomExerciseForm, type CustomExerciseValues } from "../../components/
 import { PickerModal } from "../../components/library/PickerModal";
 import { useColors } from "../../components/theme";
 import { useDbVersion } from "../../components/useDbVersion";
-import { customToExercise } from "../../lib/custom";
+import { customToExercise, describeCustomUsage, isCustomInUse } from "../../lib/custom";
 
 export default function EditCustomExercise() {
   const c = useColors();
@@ -54,12 +54,8 @@ export default function EditCustomExercise() {
 
   const remove = () => {
     const usage = getCustomUsage(row.id);
-    if (usage.workoutExercises || usage.templateExercises) {
-      const parts = [
-        usage.workoutExercises ? `${usage.workoutExercises} workout entries` : "",
-        usage.templateExercises ? `${usage.templateExercises} template entries` : "",
-      ].filter(Boolean);
-      return Alert.alert("in use", `used by ${parts.join(" and ")}. archive it instead?`, [
+    if (isCustomInUse(usage)) {
+      return Alert.alert("in use", `used by ${describeCustomUsage(usage)}. archive it instead?`, [
         { text: "cancel", style: "cancel" },
         ...(row.archived ? [] : [{ text: "archive", onPress: () => setCustomArchived(row.id, true) }]),
       ]);
@@ -70,8 +66,8 @@ export default function EditCustomExercise() {
         text: "delete",
         style: "destructive",
         onPress: () => {
-          deleteCustomExercise(row.id);
-          router.back();
+          // re-checked inside: a merge may have landed since the prompt opened
+          if (deleteCustomExercise(row.id) !== "in_use") router.back();
         },
       },
     ]);

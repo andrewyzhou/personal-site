@@ -6,6 +6,7 @@ import { notify } from "./events";
 import { writeOutbox } from "./outbox";
 import { bodyweights, kv, type BodyweightRow } from "./schema";
 import { parseUnit } from "../lib/bodyweight";
+import { NUMERIC_LIMITS, clampNumber, cleanNote } from "../lib/numbers";
 
 // "unit" is the agreed key; "default_unit" is what the logger's settings write
 const UNIT_KEYS = ["unit", "default_unit"];
@@ -36,9 +37,10 @@ export function addBodyweight(input: NewBodyweight, now = Date.now()): Bodyweigh
       .values({
         id: randomUUID(),
         measuredAt: input.measuredAt ?? now,
-        weight: input.weight,
+        // server bounds; parseBodyweight is stricter, this guards other callers
+        weight: clampNumber(input.weight, "bodyweight") ?? NUMERIC_LIMITS.bodyweight.min,
         unit: input.unit,
-        note: input.note?.trim() ? input.note.trim() : null,
+        note: cleanNote(input.note),
         createdAt: now,
         updatedAt: now,
       })
