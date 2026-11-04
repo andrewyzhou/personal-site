@@ -118,6 +118,8 @@ export function publicActivityDetail(row: ActivityRow, photos: PublicPhotoInput[
     ...publicCalendarActivity(row),
     ...publicRoute(row),
     fogDurationsS: publicFogDurations(row),
+    // seconds per hr zone; hidden with heart rate
+    hrZonesS: row.hrHidden ? null : row.hrZonesS,
     gear: row.gear,
     photos: publicPhotos(row, photos),
   };
