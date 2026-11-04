@@ -504,6 +504,16 @@ describe("split", () => {
     expect(revalidate).toHaveBeenCalledWith(`/activities/${j.childId}`);
   });
 
+  it("carries cleaning in the second half over to the child", async () => {
+    addEdit(5, "cut", { fromS: 100, toS: 150 }); // first half only: stays on the parent
+    addEdit(5, "cut", { fromS: 400, toS: 450 });
+    addEdit(5, "drop-points", { ts: [12, 480] });
+    const res = await doSplit(300);
+    const j = await res.json();
+    expect(active(j.childId).map((e) => e.kind).sort()).toEqual(["crop", "cut", "drop-points"]);
+    expect(active(j.childId).find((e) => e.kind === "cut")!.params).toEqual({ fromS: 400, toS: 450 });
+  });
+
   it("is safe to retry: a finished split is reused without new rows", async () => {
     const first = await (await doSplit(300)).json();
     const edits = db.edits.length;

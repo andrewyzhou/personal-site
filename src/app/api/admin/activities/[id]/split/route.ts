@@ -109,6 +109,14 @@ export async function POST(request: Request, { params }: Ctx) {
     }
     const trim = latestOf(edits, "trim");
     if (trim && !latestOf(childEdits, "trim")) await insertEdit(childId, "trim", trim.params, `trim copied from #${id} at split`);
+    // cleaning that falls in the second half keeps applying there (same clock)
+    const childKeys = new Set(childEdits.map((e) => `${e.kind}:${JSON.stringify(e.params)}`));
+    for (const e of edits) {
+      if (!["cut", "drop-points", "no-gps"].includes(e.kind)) continue;
+      if (e.kind === "cut" && Number(e.params.toS) <= atS) continue;
+      if (childKeys.has(`${e.kind}:${JSON.stringify(e.params)}`)) continue;
+      await insertEdit(childId, e.kind, e.params, `copied from #${id} at split`);
+    }
 
     const parentCropEditId = ourCrop?.id ?? (await insertEdit(id, "crop", crops.parent, `split at ${atS} s into #${childId}`));
     const markerEditId = await insertEdit(id, "split", { childId, atS, parentCropEditId }, `split into #${childId}`);
