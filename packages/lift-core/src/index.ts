@@ -6,3 +6,7 @@ export * from "./catalog";
 export * from "./search";
 export * from "./muscles";
 export * from "./sync";
+export * from "./ids";
+export * from "./calc";
+export * from "./history";
+export * from "./parse-workout-csv";
