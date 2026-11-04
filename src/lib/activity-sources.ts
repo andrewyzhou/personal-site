@@ -2,7 +2,7 @@
 // scripts): store raw inputs, link them to activities as sources, record edits.
 // all writes are insert-only and idempotent. server-only.
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, activitySources, activityEdits } from "./db";
 import { fitBlobPathname } from "./activities";
 import { unwrapTrackFile, type TrackFileType } from "./fit";
@@ -47,6 +47,16 @@ export async function findActivityIdBySource(provider: SourceProvider, externalI
     .orderBy(desc(activitySources.id))
     .limit(1);
   return rows[0]?.activityId ?? null;
+}
+
+// which of these provider ids are already attached to some activity
+export async function knownExternalIds(provider: SourceProvider, externalIds: string[]): Promise<Set<string>> {
+  if (externalIds.length === 0) return new Set();
+  const rows = await getDb()
+    .selectDistinct({ externalId: activitySources.externalId })
+    .from(activitySources)
+    .where(and(eq(activitySources.provider, provider), inArray(activitySources.externalId, externalIds)));
+  return new Set(rows.map((r) => r.externalId).filter((x): x is string => x !== null));
 }
 
 export async function addActivityEdit(

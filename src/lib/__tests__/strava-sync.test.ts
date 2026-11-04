@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { known, byIdRows, updates, findSame, insert, sources, bySource, storeRaw, republish, invalidate } = vi.hoisted(() => ({
+const { linked, known, byIdRows, updates, findSame, insert, sources, bySource, storeRaw, republish, invalidate } = vi.hoisted(() => ({
+  linked: { value: [] as string[] },
   known: { value: [] as { externalId: string }[] },
   byIdRows: { value: [] as { id: number }[] },
   updates: [] as Record<string, unknown>[],
@@ -36,6 +37,7 @@ vi.mock("@/lib/activities", async (orig) => ({
 vi.mock("@/lib/activity-sources", () => ({
   addActivitySource: async (s: Record<string, unknown>) => void sources.push(s),
   findActivityIdBySource: (p: string, id: string) => bySource(p, id),
+  knownExternalIds: async () => new Set(linked.value),
   storeRawPayload: (...a: unknown[]) => storeRaw(...a),
 }));
 
@@ -79,6 +81,7 @@ const decode = (b: unknown) => new TextDecoder().decode(b as Uint8Array);
 beforeEach(() => {
   vi.clearAllMocks();
   known.value = [];
+  linked.value = [];
   byIdRows.value = [];
   updates.length = 0;
   sources.length = 0;
@@ -160,6 +163,14 @@ describe("syncStravaActivities", () => {
     mockApi();
     expect(await syncStravaActivities()).toMatchObject({ inserted: 0, merged: 0 });
     expect(fetched.some((u) => u.endsWith("/activities/77"))).toBe(false);
+  });
+
+  it("skips activities already merged into another row (known via source link)", async () => {
+    linked.value = ["77"];
+    mockApi();
+    expect(await syncStravaActivities()).toMatchObject({ inserted: 0, merged: 0 });
+    expect(fetched.some((u) => u.endsWith("/activities/77"))).toBe(false);
+    expect(storeRaw).not.toHaveBeenCalled();
   });
 
   it("does not link or republish when the insert hits an existing row", async () => {

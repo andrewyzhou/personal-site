@@ -15,6 +15,7 @@
 // pairs that already have a source row are skipped, and a local checkpoint
 // remembers finished and 404 pairs.
 
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -56,7 +57,9 @@ const csvPath = arg("ids-from-csv")?.replace(/^~/, home);
 const limit = Number(arg("limit") ?? Infinity);
 const retryGone = has("retry-gone");
 const waitDaily = has("wait-daily");
-const checkpointPath = arg("checkpoint") ?? path.join(os.tmpdir(), "strava-api-snapshot.checkpoint.json");
+// one checkpoint per database, so a run against another db never skips pairs here
+const dbTag = createHash("sha256").update(new URL(process.env.DATABASE_URL ?? "postgres://none").host).digest("hex").slice(0, 12);
+const checkpointPath = arg("checkpoint") ?? path.join(os.tmpdir(), `strava-api-snapshot.${dbTag}.checkpoint.json`);
 const kinds = (arg("kinds")?.split(",").map((s) => s.trim()) ?? [...SNAPSHOT_KINDS]) as SnapshotKind[];
 for (const k of kinds) {
   if (!(SNAPSHOT_KINDS as readonly string[]).includes(k)) {

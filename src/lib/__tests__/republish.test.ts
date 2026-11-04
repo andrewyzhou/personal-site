@@ -16,6 +16,7 @@ import {
   resolveTrim,
   stableStringify,
   trackCandidates,
+  withLegacyTrim,
   type EditInput,
   type RepublishDeps,
   type SourceInput,
@@ -33,7 +34,7 @@ const src = (over: Partial<SourceInput>): SourceInput => ({
 });
 
 describe("trackCandidates", () => {
-  it("orders device file > streams > polyline, newest first within a kind", () => {
+  it("orders device file > streams > polyline; first-attached device file wins", () => {
     const c = trackCandidates([
       src({ id: 1, kind: "strava-detail", rawSha256: "d".repeat(64) }),
       src({ id: 2, kind: "strava-streams", rawSha256: "s".repeat(64) }),
@@ -42,8 +43,8 @@ describe("trackCandidates", () => {
       src({ id: 5, kind: "summary", rawSha256: null }),
     ]);
     expect(c.map((r) => [r.kind, r.sha256[0]])).toEqual([
-      ["device-file", "b"],
       ["device-file", "a"],
+      ["device-file", "b"],
       ["strava-streams", "s"],
       ["strava-polyline", "d"],
     ]);
@@ -74,6 +75,15 @@ describe("edits", () => {
     expect(resolveTrim([], true)).toEqual({ startM: DEFAULT_PRIVACY_TRIM_M, endM: DEFAULT_PRIVACY_TRIM_M });
     expect(resolveTrim([], false)).toEqual({ startM: 0, endM: 0 });
     expect(resolveTrim([{ id: 1, kind: "trim", params: { startM: -5, endM: "x" } }], true)).toEqual({ startM: 0, endM: 0 });
+  });
+
+  it("withLegacyTrim only applies to never-republished rows with a route or original", () => {
+    const base = { processingVersion: 0, polyline: "p", fitSha256: null, trimStartM: 10, trimEndM: 20 };
+    expect(withLegacyTrim(base, [])).toEqual([{ id: 0, kind: "trim", params: { startM: 10, endM: 20 } }]);
+    expect(withLegacyTrim({ ...base, processingVersion: 1 }, [])).toEqual([]);
+    expect(withLegacyTrim({ ...base, polyline: null }, [])).toEqual([]);
+    const trim = { id: 3, kind: "trim", params: { startM: 0, endM: 0 } };
+    expect(withLegacyTrim(base, [trim])).toEqual([trim]);
   });
 
   it("resolveOverrides whitelists fields and validates values", () => {
@@ -241,12 +251,37 @@ describe("republish", () => {
     expect(derived.size).toBe(0);
   });
 
-  it("falls back to the next source when the best one's bytes are missing", async () => {
-    const otherSha = "e".repeat(64);
-    sources = [src({ id: 1 }), src({ id: 2, rawSha256: otherSha })]; // newest (missing) first
+  it("never downgrades past a source whose bytes are missing", async () => {
+    const missing = "e".repeat(64);
+    sources = [src({ id: 1, rawSha256: missing }), src({ id: 2 }), src({ id: 3, kind: "strava-detail", rawSha256: "d".repeat(64) })];
     const res = await republish(7, { deps });
-    expect(res.status).toBe("published");
+    expect(res.status).toBe("source-unavailable");
+    if (res.status === "source-unavailable") expect(res.track.sha256).toBe(missing);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("a later device-file copy does not displace the first original", async () => {
+    sources = [src({ id: 1 }), src({ id: 9, rawSha256: sha256Hex(gz) })];
+    raw.set(sha256Hex(gz), gz);
+    const res = await republish(7, { deps });
     if (res.status === "published") expect(res.track.sha256).toBe(innerSha);
+    else throw new Error(res.status);
+  });
+
+  it("keeps the legacy trim of a never-republished row without a trim edit, and persists it", async () => {
+    edits = [];
+    row = fakeRow({ polyline: "abc", trimStartM: 50, trimEndM: 0 });
+    const recorded: unknown[] = [];
+    deps.recordEdit = async (_id, kind, params) => {
+      recorded.push({ kind, params });
+      edits = [{ id: 11, kind, params }];
+      return 11;
+    };
+    await republish(7, { deps });
+    expect(recorded).toEqual([{ kind: "trim", params: { startM: 50, endM: 0 } }]);
+    expect(row.trimStartM).toBe(50);
+    // second run sees the persisted edit and is fresh
+    expect((await republish(7, { deps })).status).toBe("fresh");
   });
 
   it("leaves trackless activities untouched", async () => {

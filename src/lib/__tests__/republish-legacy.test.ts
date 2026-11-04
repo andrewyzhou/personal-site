@@ -124,10 +124,10 @@ describe("republish with legacy deps", () => {
     expect(res.status).toBe("no-source");
   });
 
-  it("a missing original falls through to no-source", async () => {
+  it("a missing original is reported as unavailable, never downgraded", async () => {
     const row = legacyRow({ fitSha256: "f".repeat(64), polyline: "abc" });
     const res = await republish(row.id, { dryRun: true, deps: depsFor(row) });
-    expect(res.status).toBe("no-source");
+    expect(res.status).toBe("source-unavailable");
   });
 
   it("not-found for unknown ids", async () => {

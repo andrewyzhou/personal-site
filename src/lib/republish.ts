@@ -69,7 +69,9 @@ export interface TrackRef {
   detailSha256: string | null;
 }
 
-// every candidate track, best first. within a kind the newest source row wins.
+// every candidate track, best first. device files: the first one attached wins
+// (a later copy of the same workout, e.g. from a bulk export, never displaces
+// the original already publishing). api snapshots: the newest wins.
 export function trackCandidates(sources: SourceInput[]): TrackRef[] {
   const newest = (kind: string, provider?: string) =>
     sources
@@ -79,7 +81,7 @@ export function trackCandidates(sources: SourceInput[]): TrackRef[] {
   const out: TrackRef[] = [];
   for (const kind of TRACK_SOURCE_PRECEDENCE) {
     if (kind === "device-file") {
-      for (const s of newest("device-file")) out.push({ kind, sha256: s.rawSha256!, detailSha256: null });
+      for (const s of newest("device-file").reverse()) out.push({ kind, sha256: s.rawSha256!, detailSha256: null });
     } else if (kind === "strava-streams") {
       if (detail) for (const s of newest("strava-streams")) out.push({ kind, sha256: s.rawSha256!, detailSha256: detail });
     } else if (kind === "strava-polyline") {
@@ -137,6 +139,18 @@ export function resolveTrim(edits: EditInput[], gps: boolean): { startM: number;
     };
   }
   return gps ? { startM: DEFAULT_PRIVACY_TRIM_M, endM: DEFAULT_PRIVACY_TRIM_M } : { startM: 0, endM: 0 };
+}
+
+// rows written by the legacy pipeline (never republished) with no trim edit —
+// e.g. inserted by old code between the migration and the deploy — keep the
+// trim they were published with instead of falling back to the default
+export function withLegacyTrim(
+  row: Pick<ActivityRow, "processingVersion" | "polyline" | "fitSha256" | "trimStartM" | "trimEndM">,
+  edits: EditInput[]
+): EditInput[] {
+  if (row.processingVersion !== 0 || edits.some((e) => e.kind === "trim")) return edits;
+  if (!row.polyline && !row.fitSha256) return edits;
+  return [{ id: 0, kind: "trim", params: { startM: row.trimStartM, endM: row.trimEndM } }, ...edits];
 }
 
 export const OVERRIDABLE_FIELDS = [
@@ -243,12 +257,14 @@ export interface RepublishDeps {
   loadRaw(sha256: string, row: ActivityRow): Promise<Uint8Array | null>;
   storeDerived(key: string, bytes: Uint8Array): Promise<boolean>; // false when no private store
   writeColumns(id: number, values: Record<string, unknown>): Promise<void>;
+  recordEdit?(id: number, kind: string, params: Record<string, unknown>, note: string): Promise<number>;
 }
 
 export type RepublishResult =
   | { status: "not-found"; id: number }
   | { status: "fresh"; id: number; hash: string }
   | { status: "no-source"; id: number; hash: string } // nothing to build a track from
+  | { status: "source-unavailable"; id: number; hash: string; track: TrackRef } // best source's bytes unreadable
   | {
       status: "published" | "would-publish";
       id: number;
@@ -265,9 +281,15 @@ export interface RepublishOptions {
   deps?: RepublishDeps;
 }
 
-async function buildTrack(ref: TrackRef, row: ActivityRow, deps: RepublishDeps): Promise<CanonicalTrack | null> {
+// "unavailable": raw bytes not reachable (never silently downgrade past it);
+// null: the bytes are there but hold no track (try the next source)
+async function buildTrack(
+  ref: TrackRef,
+  row: ActivityRow,
+  deps: RepublishDeps
+): Promise<CanonicalTrack | null | "unavailable"> {
   const bytes = await deps.loadRaw(ref.sha256, row);
-  if (!bytes) return null;
+  if (!bytes) return "unavailable";
   if (ref.kind === "device-file") {
     try {
       return canonicalFromDeviceFile(bytes, `${ref.sha256}.${row.fileType ?? "fit"}`, ref.sha256);
@@ -279,7 +301,7 @@ async function buildTrack(ref: TrackRef, row: ActivityRow, deps: RepublishDeps):
     }
   }
   const detailBytes = ref.kind === "strava-polyline" ? bytes : await deps.loadRaw(ref.detailSha256!, row);
-  if (!detailBytes) return null;
+  if (!detailBytes) return "unavailable";
   const detail = JSON.parse(new TextDecoder().decode(detailBytes)) as StravaDetailLike;
   if (ref.kind === "strava-streams") {
     return canonicalFromStravaStreams(detail, JSON.parse(new TextDecoder().decode(bytes)), {
@@ -295,12 +317,20 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
   const row = await deps.loadActivity(activityId);
   if (!row) return { status: "not-found", id: activityId };
 
-  const [sources, edits, zones] = await Promise.all([
+  const [sources, storedEdits, zones] = await Promise.all([
     deps.loadSources(activityId),
     deps.loadEdits(activityId),
     deps.loadZones(),
   ]);
+  let edits = withLegacyTrim(row, storedEdits);
   const candidates = trackCandidates(sources);
+  // persist a synthesized legacy trim as a real edit before publishing with it,
+  // so the next run (processing_version no longer 0) still sees it
+  const synthesized = edits.find((e) => e.id === 0);
+  if (synthesized && !opts.dryRun && deps.recordEdit && candidates.length > 0) {
+    const id = await deps.recordEdit(activityId, synthesized.kind, synthesized.params, "legacy trim kept at first republish");
+    edits = edits.map((e) => (e === synthesized ? { ...e, id } : e));
+  }
 
   const best = candidates[0] ?? null;
   const bestHash = inputsHash({ track: best, edits, zones });
@@ -308,9 +338,14 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     return { status: "fresh", id: activityId, hash: bestHash };
   }
 
-  // best source first; fall through when its raw bytes aren't reachable yet
+  // best source first; skip sources that hold no track, but stop (write
+  // nothing) when a better source's bytes can't be read — publishing a worse
+  // track over it would silently replace device data
   for (const ref of candidates) {
     const track = await buildTrack(ref, row, deps);
+    if (track === "unavailable") {
+      return { status: "source-unavailable", id: activityId, hash: bestHash, track: ref };
+    }
     if (!track) continue;
     const hash = inputsHash({ track: ref, edits, zones });
     const columns = computePublicColumns(track, edits);
@@ -393,6 +428,13 @@ export function defaultDeps(): RepublishDeps {
     },
     async writeColumns(id, values) {
       await db.update(activities).set(values).where(eq(activities.id, id));
+    },
+    async recordEdit(id, kind, params, note) {
+      const rows = await db
+        .insert(activityEdits)
+        .values({ activityId: id, kind, params, note })
+        .returning({ id: activityEdits.id });
+      return rows[0].id;
     },
   };
 }
