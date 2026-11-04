@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getLatestActivity, getAllActivities, formatDistance, formatDuration, formatTimeAgo, CalendarActivity } from "@/lib/strava";
 import { getCachedData } from "@/lib/cache";
 import { log } from "@/lib/log";
+import { isAdminRequest, unauthorizedResponse } from "@/lib/admin-auth";
 import { Redis } from "@upstash/redis";
 
 export const dynamic = "force-dynamic"; // disable next.js caching, we use redis
@@ -80,7 +81,10 @@ async function fetchStravaData() {
   };
 }
 
-export async function GET() {
+// legacy pre-database path (the site uses /api/activities/latest): it bypasses
+// the public serializer (visibility switches, published times), so admin only
+export async function GET(request: Request) {
+  if (!(await isAdminRequest(request))) return unauthorizedResponse();
   try {
     const { data, fetchedAt, previousFetchedAt, stale } = await getCachedData("strava", fetchStravaData);
 

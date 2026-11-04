@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { getDb, activities } from "@/lib/db";
-import { rowToCalendarActivity } from "@/lib/activities";
+import { isPublic, publicCalendarActivity } from "@/lib/public-activity";
 import { getCachedData } from "@/lib/cache";
 import { log } from "@/lib/log";
 import type { CalendarActivity } from "@/lib/strava";
@@ -9,14 +9,17 @@ import type { CalendarActivity } from "@/lib/strava";
 export const dynamic = "force-dynamic";
 
 // shape-identical replacement for /api/strava/activities: full history, date
-// desc, no polylines (payload parity with the old response)
+// desc, no polylines (payload parity with the old response). rows go through
+// the public serializer before they're cached, so the kv copy is public too.
 async function fetchActivities(): Promise<CalendarActivity[]> {
   const rows = await getDb()
     .select()
     .from(activities)
     .where(eq(activities.hidden, false))
     .orderBy(desc(activities.localDate), desc(activities.localTime));
-  return rows.map(rowToCalendarActivity);
+  // the where clause already drops private rows; filtered again so a query
+  // change can never publish one
+  return rows.filter(isPublic).map(publicCalendarActivity);
 }
 
 export async function GET() {

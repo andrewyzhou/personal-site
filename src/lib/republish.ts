@@ -395,9 +395,12 @@ export function computePhotoPins(
   });
 }
 
-// published start: floored to the coarsening step; local time from the row's offset
+// published start: floored to the coarsening step in LOCAL wall time (steps
+// divide a day, so the local date never changes), then mapped back to utc
 export function publishedStart(row: Pick<ActivityRow, "startDateUtc" | "utcOffsetMin">, settings: PrivacySettings) {
-  const publishedStartUtc = coarsenStart(row.startDateUtc, settings.coarsenStartMin);
+  const offsetMs = row.utcOffsetMin * 60000;
+  const localFloored = coarsenStart(new Date(row.startDateUtc.getTime() + offsetMs), settings.coarsenStartMin);
+  const publishedStartUtc = new Date(localFloored.getTime() - offsetMs);
   return { publishedStartUtc, publishedLocalTime: localDateTime(publishedStartUtc, row.utcOffsetMin).localTime };
 }
 

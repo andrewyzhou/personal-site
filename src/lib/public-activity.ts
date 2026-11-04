@@ -80,7 +80,9 @@ export function publicRoute(row: ActivityRow): PublicRoute {
 
 // fog events without their edge points (for when the map is hidden but the
 // "in the fog · 14 min" line can still be shown)
+// (map hidden: nothing about fog at all — not even that a zone was entered)
 export function publicFogDurations(row: ActivityRow): number[] {
+  if (row.mapHidden) return [];
   return (row.fogEvents ?? []).map((e) => e.durationS);
 }
 

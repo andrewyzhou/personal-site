@@ -10,7 +10,11 @@ import { activities } from "../db/schema";
 import {
   LEGACY_ACTIVITY_COLUMN_NAMES,
   emptySummary,
+  fillActivityRow,
   formatValue,
+  missingActivityColumns,
+  presentActivityColumns,
+  readOnlyDeps,
   legacyActivityColumns,
   legacyDeps,
   legacyEdits,
@@ -62,7 +66,7 @@ describe("legacy column list", () => {
   it("is the schema minus the v2 + privacy columns", () => {
     const all = getTableColumns(activities);
     const legacy = legacyActivityColumns();
-    expect(Object.keys(legacy)).toHaveLength(Object.keys(all).length - 11);
+    expect(Object.keys(legacy)).toHaveLength(Object.keys(all).length - 12);
     expect(legacy).not.toHaveProperty("processingVersion");
     expect(legacy).not.toHaveProperty("publishedInputsHash");
     expect(legacy).not.toHaveProperty("canonicalTrackKey");
@@ -138,6 +142,53 @@ describe("republish with legacy deps", () => {
   it("refuses to write even without dryRun", async () => {
     const row = legacyPublishedRow(200, 200);
     await expect(republish(row.id, { deps: depsFor(row) })).rejects.toThrow(/read-only/);
+  });
+});
+
+describe("partially migrated databases", () => {
+  // prod at 0004: everything but the 0005 privacy columns
+  const at0004 = Object.values(getTableColumns(activities))
+    .map((c) => c.name)
+    .filter((n) => ![
+      "map_hidden", "hr_hidden", "published_local_time", "published_start_utc", "fog_events",
+      "fog_shapes", "track_bbox", "needs_republish", "republish_attempted_at",
+    ].includes(n));
+
+  it("selects only the columns that exist", () => {
+    const cols = presentActivityColumns(at0004);
+    expect(Object.keys(cols)).toContain("processingVersion");
+    expect(Object.keys(cols)).not.toContain("mapHidden");
+    expect(Object.values(cols).map((c) => c!.name).sort()).toEqual([...at0004].sort());
+    expect(missingActivityColumns(at0004)).toHaveLength(9);
+    expect(missingActivityColumns(Object.values(getTableColumns(activities)).map((c) => c.name))).toEqual([]);
+  });
+
+  it("refuses when a legacy column is missing", () => {
+    expect(() => presentActivityColumns(at0004.filter((n) => n !== "polyline"))).toThrow(/polyline/);
+  });
+
+  it("fills missing columns with defaults and keeps present ones", () => {
+    const r = fillActivityRow({ ...legacyRow(), processingVersion: 1, publishedInputsHash: "h" });
+    expect(r.processingVersion).toBe(1);
+    expect(r.publishedInputsHash).toBe("h");
+    expect(r.mapHidden).toBe(false);
+    expect(r.fogEvents).toBeNull();
+    expect(r.republishAttemptedAt).toBeNull();
+  });
+
+  it("readOnlyDeps: real sources/edits, default settings, every write throws", async () => {
+    const row = legacyPublishedRow(200, 200);
+    const deps = readOnlyDeps({
+      loadRow: async (id) => (id === row.id ? fillActivityRow({ ...row, processingVersion: 1 }) : null),
+      loadSources: async () => [{ id: 10, provider: "strava", externalId: "123", kind: "device-file", rawSha256: innerSha }],
+      loadEdits: async () => [{ id: 3, kind: "trim", params: { startM: 200, endM: 200 } }],
+      loadRaw: async (sha) => (sha === innerSha ? inner : null),
+    });
+    const res = await republish(row.id, { dryRun: true, deps });
+    expect(res.status).toBe("would-publish");
+    if (res.status === "would-publish") expect(res.changed).toEqual([]);
+    await expect(republish(row.id, { deps })).rejects.toThrow(/read-only/);
+    await expect(deps.writePhotoPins!(row.id, [])).rejects.toThrow(/read-only/);
   });
 });
 
