@@ -1,0 +1,113 @@
+name: backup db
+
+# nightly pg_dump of neon into the private raw bucket, write-once:
+#   backups/pg/YYYY/MM/DD/<timestamp>.dump  (+ .dump.sha256)
+# secrets: BACKUP_DATABASE_URL (direct, non-pooled neon url; a read-only role is
+# enough), R2_ACCOUNT_ID, R2_BACKUP_ACCESS_KEY_ID, R2_BACKUP_SECRET_ACCESS_KEY
+# (token scoped to the raw bucket, object read + write), R2_RAW_BUCKET
+on:
+  schedule:
+    - cron: "23 9 * * *" # 09:23 utc, ~1-2 am pacific
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PG_MAJOR: "17" # neon server major; pg_dump must be >= the server
+    steps:
+      - name: install postgresql client (pgdg)
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}"
+          echo "/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_PATH"
+
+      - name: check secrets
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          R2_RAW_BUCKET: ${{ secrets.R2_RAW_BUCKET }}
+        run: |
+          set -euo pipefail
+          for v in BACKUP_DATABASE_URL R2_ACCOUNT_ID R2_BACKUP_ACCESS_KEY_ID R2_BACKUP_SECRET_ACCESS_KEY R2_RAW_BUCKET; do
+            if [ -z "${!v}" ]; then echo "::error::secret $v is not set"; exit 1; fi
+          done
+
+      - name: pg_dump
+        id: dump
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          pg_dump --version
+          ts="$(date -u +%Y%m%dT%H%M%SZ)"
+          prefix="backups/pg/$(date -u +%Y/%m/%d)"
+          file="$RUNNER_TEMP/${ts}.dump"
+          pg_dump --format=custom --no-owner --no-privileges --file="$file" "$BACKUP_DATABASE_URL"
+          # the archive must be readable and contain the tables that matter
+          pg_restore --list "$file" > "$RUNNER_TEMP/toc.txt"
+          for t in activities activity_photos comments; do
+            grep -Eq "TABLE DATA public ${t}( |$)" "$RUNNER_TEMP/toc.txt" || { echo "::error::dump has no data for table ${t}"; exit 1; }
+          done
+          (cd "$RUNNER_TEMP" && sha256sum "${ts}.dump" > "${ts}.dump.sha256")
+          size="$(stat -c %s "$file")"
+          echo "dump: $file ($size bytes), $(cut -d' ' -f1 "$file.sha256")"
+          {
+            echo "file=$file"
+            echo "key=${prefix}/${ts}.dump"
+            echo "sha256=$(cut -d' ' -f1 "$file.sha256")"
+            echo "size=$size"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: upload to r2 (write-once)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # r2 doesn't support the cli's default crc checksums / chunked uploads
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_RAW_BUCKET: ${{ secrets.R2_RAW_BUCKET }}
+          FILE: ${{ steps.dump.outputs.file }}
+          KEY: ${{ steps.dump.outputs.key }}
+          SHA256: ${{ steps.dump.outputs.sha256 }}
+          SIZE: ${{ steps.dump.outputs.size }}
+        run: |
+          set -euo pipefail
+          aws --version
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          b64="$(openssl dgst -sha256 -binary "$FILE" | base64)"
+          [ "$(openssl dgst -sha256 -r "$FILE" | cut -d' ' -f1)" = "$SHA256" ] || { echo "::error::dump changed since hashing"; exit 1; }
+          # if-none-match: r2 refuses (412) instead of overwriting an existing key;
+          # checksum-sha256: r2 rejects the upload if the received bytes differ
+          aws s3api put-object --endpoint-url "$endpoint" --bucket "$R2_RAW_BUCKET" --key "$KEY" \
+            --body "$FILE" --content-type application/octet-stream \
+            --checksum-sha256 "$b64" --if-none-match '*' \
+            --metadata "sha256=${SHA256}" > /dev/null
+          aws s3api put-object --endpoint-url "$endpoint" --bucket "$R2_RAW_BUCKET" --key "${KEY}.sha256" \
+            --body "${FILE}.sha256" --content-type text/plain --if-none-match '*' > /dev/null
+          # read back the size and fail loudly on any mismatch
+          remote="$(aws s3api head-object --endpoint-url "$endpoint" --bucket "$R2_RAW_BUCKET" --key "$KEY" \
+            --query ContentLength --output text)"
+          if [ "$remote" != "$SIZE" ]; then
+            echo "::error::uploaded size $remote != local $SIZE for $KEY"; exit 1
+          fi
+          echo "uploaded s3://${R2_RAW_BUCKET}/${KEY} ($SIZE bytes, sha256 $SHA256)"
+          echo "backup: \`${KEY}\` — ${SIZE} bytes, sha256 \`${SHA256}\`" >> "$GITHUB_STEP_SUMMARY"
