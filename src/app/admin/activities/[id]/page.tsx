@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { getDb, activities } from "@/lib/db";
+import { asc, eq } from "drizzle-orm";
+import { getDb, activities, activityPhotos } from "@/lib/db";
+import { visibilityOf } from "@/lib/public-activity";
 import EditActivity from "@/components/admin/EditActivity";
 import RouteThumb from "@/components/RouteThumb";
 
@@ -12,9 +13,23 @@ export default async function AdminEditActivityPage({ params }: { params: Promis
   const id = Number(idStr);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const rows = await getDb().select().from(activities).where(eq(activities.id, id)).limit(1);
+  const db = getDb();
+  const rows = await db.select().from(activities).where(eq(activities.id, id)).limit(1);
   const row = rows[0];
   if (!row) notFound();
+
+  // public columns only: the private exif never reaches the browser
+  const photos = await db
+    .select({
+      pathname: activityPhotos.blobPathname,
+      url: activityPhotos.blobUrl,
+      width: activityPhotos.width,
+      height: activityPhotos.height,
+      caption: activityPhotos.caption,
+    })
+    .from(activityPhotos)
+    .where(eq(activityPhotos.activityId, id))
+    .orderBy(asc(activityPhotos.position));
 
   return (
     <div>
@@ -35,10 +50,13 @@ export default async function AdminEditActivityPage({ params }: { params: Promis
           sportType: row.sportType,
           gear: row.gear,
           description: row.description,
-          hidden: row.hidden,
+          visibility: visibilityOf(row),
+          hrHidden: row.hrHidden,
           trimStartM: row.trimStartM,
           trimEndM: row.trimEndM,
           hasOriginal: !!row.fitBlobPathname,
+          utcOffsetMin: row.utcOffsetMin,
+          photos,
         }}
       />
     </div>

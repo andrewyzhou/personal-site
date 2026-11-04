@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { requireAdmin } from "@/lib/admin-auth";
 import { r2Put } from "@/lib/r2";
+import { FORMAT_CONTENT_TYPES, ImageStripError, sniffImageFormat, stripImageMetadata } from "@/lib/image-strip";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -41,11 +42,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: { code: "validation", message: "image too large — downscaling failed?" } }, { status: 413 });
     }
 
+    // public bytes never carry exif/xmp/text metadata, whatever the client did
+    const raw = new Uint8Array(await file.arrayBuffer());
+    const format = sniffImageFormat(raw);
+    if (!format || FORMAT_CONTENT_TYPES[format] !== file.type) {
+      return NextResponse.json({ error: { code: "validation", message: "file contents don't match its type" } }, { status: 415 });
+    }
+    let bytes: Uint8Array;
+    try {
+      bytes = stripImageMetadata(raw);
+    } catch (error) {
+      if (!(error instanceof ImageStripError)) throw error;
+      return NextResponse.json({ error: { code: "validation", message: `unreadable image: ${error.message}` } }, { status: 415 });
+    }
+
     const width = Number(form.get("width")) || null;
     const height = Number(form.get("height")) || null;
     const pathname = `${prefix}/${randomUUID()}.${ALLOWED_TYPES[file.type]}`;
-    const { url } = await r2Put(pathname, new Uint8Array(await file.arrayBuffer()), file.type);
-    log.info("admin:upload", `uploaded ${pathname} (${file.size}b)`);
+    const { url } = await r2Put(pathname, bytes, file.type);
+    log.info("admin:upload", `uploaded ${pathname} (${bytes.length}b, ${raw.length - bytes.length}b metadata stripped)`);
     return NextResponse.json({ data: { url, pathname, width, height } });
   } catch (error) {
     log.error("admin:upload", "upload failed", error);

@@ -132,6 +132,23 @@ export function r2BucketFetch(bucket: string, key: string, init?: RequestInit): 
   return client().fetch(`${endpointFor(bucket)}/${encodeKey(key)}`, init);
 }
 
+// presigned browser PUT into any bucket. `headers` are signed into the url, so
+// the browser must send exactly these (and r2 enforces them, e.g. a checksum
+// or If-None-Match: * for write-once keys). content-type is never signed.
+export async function r2PresignPutIn(
+  bucket: string,
+  key: string,
+  opts: { expiresSeconds?: number; headers?: Record<string, string> } = {}
+): Promise<{ url: string; headers: Record<string, string> }> {
+  const url = new URL(`${endpointFor(bucket)}/${encodeKey(key)}`);
+  url.searchParams.set("X-Amz-Expires", String(opts.expiresSeconds ?? 600));
+  const headers = opts.headers ?? {};
+  const signed = await client().sign(new Request(url.toString(), { method: "PUT", headers }), {
+    aws: { signQuery: true },
+  });
+  return { url: signed.url, headers };
+}
+
 // list keys (and sizes) under a prefix in any bucket
 export async function r2BucketList(
   bucket: string,
