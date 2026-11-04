@@ -5,10 +5,12 @@ import { getDb, activities } from "@/lib/db";
 import { r2Usage } from "@/lib/r2";
 import { formatMiles, formatClockDuration, sportIcon, DURATION_ONLY_TYPES } from "@/lib/activity-format";
 import { log } from "@/lib/log";
+import { isAdminViewer } from "./require-admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
+  if (!(await isAdminViewer())) return null;
   let recent: (typeof activities.$inferSelect)[] = [];
   try {
     recent = await getDb().select().from(activities).orderBy(desc(activities.startDateUtc)).limit(10);

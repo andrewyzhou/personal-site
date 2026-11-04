@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { asc, eq, and } from "drizzle-orm";
 import { getDb, activities, activityPhotos } from "@/lib/db";
-import { rowToCalendarActivity } from "@/lib/activities";
+import { isPublic, publicActivityDetail } from "@/lib/public-activity";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
-// per-id detail: calendar fields + route polylines + photos. feeds the calendar
-// detail card's lazy enhancement and anything needing the route.
+// per-id detail: calendar fields + route polylines + fog + photos, all via the
+// public serializer. feeds the calendar detail card's lazy enhancement and
+// anything needing the route.
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = await params;
   const id = Number(idStr);
@@ -22,32 +23,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       .from(activities)
       .where(and(eq(activities.id, id), eq(activities.hidden, false)))
       .limit(1);
-    if (rows.length === 0) {
+    const row = rows[0];
+    if (!row || !isPublic(row)) {
       return NextResponse.json({ activity: null }, { status: 404 });
     }
-    const row = rows[0];
 
+    // public columns only: the exif time/gps (taken_at, gps_*) never leave the db
     const photos = await db
       .select({
-        url: activityPhotos.blobUrl,
+        blobUrl: activityPhotos.blobUrl,
         width: activityPhotos.width,
         height: activityPhotos.height,
         caption: activityPhotos.caption,
+        pinLat: activityPhotos.pinLat,
+        pinLng: activityPhotos.pinLng,
       })
       .from(activityPhotos)
       .where(eq(activityPhotos.activityId, id))
       .orderBy(asc(activityPhotos.position));
 
-    return NextResponse.json({
-      activity: {
-        ...rowToCalendarActivity(row),
-        polyline: row.polyline,
-        cardPolyline: row.cardPolyline,
-        bounds: row.bounds,
-        gear: row.gear,
-        photos,
-      },
-    });
+    return NextResponse.json({ activity: publicActivityDetail(row, photos) });
   } catch (error) {
     log.error("api:activities/[id]", `fetch failed for ${id}`, error);
     return NextResponse.json({ activity: null }, { status: 500 });

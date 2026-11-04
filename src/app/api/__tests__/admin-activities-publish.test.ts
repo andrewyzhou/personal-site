@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { insert, sources, edits, republish, rawGet, rawConfigured, r2Get, revalidate, invalidate } = vi.hoisted(() => ({
+const { insert, photoInserts, order, sources, edits, republish, rawGet, rawConfigured, r2Get, revalidate, invalidate } = vi.hoisted(() => ({
   insert: vi.fn(),
+  photoInserts: [] as Record<string, unknown>[],
+  order: [] as string[],
   sources: [] as Record<string, unknown>[],
   edits: [] as unknown[][],
   republish: vi.fn(),
@@ -15,7 +17,17 @@ const { insert, sources, edits, republish, rawGet, rawConfigured, r2Get, revalid
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin: async () => null }));
 vi.mock("next/cache", () => ({ revalidatePath: (p: string) => revalidate(p) }));
 vi.mock("@/lib/cache", () => ({ invalidateCache: (...a: unknown[]) => invalidate(...a) }));
-vi.mock("@/lib/db", () => ({ getDb: () => ({ insert: () => ({ values: async () => undefined }) }), activityPhotos: {} }));
+vi.mock("@/lib/db", () => ({
+  getDb: () => ({
+    insert: () => ({
+      values: async (v: Record<string, unknown>[]) => {
+        order.push("photos");
+        photoInserts.push(...v);
+      },
+    }),
+  }),
+  activityPhotos: {},
+}));
 
 vi.mock("@/lib/activities", async (orig) => ({
   ...(await orig<typeof import("@/lib/activities")>()),
@@ -39,7 +51,12 @@ vi.mock("@/lib/raw-store", () => ({
   }),
 }));
 
-vi.mock("@/lib/republish", () => ({ republish: (id: number) => republish(id) }));
+vi.mock("@/lib/republish", () => ({
+  republish: (id: number) => {
+    order.push("republish");
+    return republish(id);
+  },
+}));
 
 vi.mock("@/lib/r2", () => ({
   r2Get: (p: string) => r2Get(p),
@@ -78,6 +95,8 @@ function publish(body: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   sources.length = 0;
+  photoInserts.length = 0;
+  order.length = 0;
   edits.length = 0;
   rawConfigured.value = true;
   rawGet.mockResolvedValue(BYTES);
@@ -150,5 +169,64 @@ describe("POST /api/admin/activities", () => {
     rawGet.mockRejectedValue(new Error("missing"));
     expect((await publish({ rawSha256: SHA, name: "run" })).status).toBe(502);
     expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("stores each photo's private fields, before republish computes the pins", async () => {
+    const res = await publish({
+      rawSha256: SHA,
+      name: "run",
+      photos: [
+        {
+          pathname: "activities/photos/2026/a.jpg",
+          url: "https://cdn.test/a.jpg",
+          width: 2000,
+          height: 1500,
+          originalSha256: "e".repeat(64),
+          takenAt: "2026-10-03T15:10:00.000Z",
+          gpsLat: 37.8712345,
+          gpsLng: -122.2598765,
+        },
+        { pathname: "activities/photos/2026/b.jpg", url: "https://cdn.test/b.jpg", originalSha256: null, takenAt: null, gpsLat: null, gpsLng: null },
+      ],
+    });
+    expect(res.status).toBe(201);
+    expect(order).toEqual(["photos", "republish"]);
+    expect(photoInserts).toEqual([
+      {
+        activityId: 42,
+        blobUrl: "https://cdn.test/a.jpg",
+        blobPathname: "activities/photos/2026/a.jpg",
+        width: 2000,
+        height: 1500,
+        position: 0,
+        caption: null,
+        originalSha256: "e".repeat(64),
+        takenAt: new Date("2026-10-03T15:10:00.000Z"),
+        gpsLat: 37.8712345,
+        gpsLng: -122.2598765,
+      },
+      expect.objectContaining({ position: 1, originalSha256: null, takenAt: null, gpsLat: null, gpsLng: null }),
+    ]);
+    // the public pin columns are republish's alone
+    for (const p of photoInserts) expect(p).not.toHaveProperty("pinLat");
+  });
+
+  it("rejects invalid private photo fields before publishing anything", async () => {
+    const base = { pathname: "activities/photos/a.jpg", url: "u" };
+    for (const bad of [
+      { ...base, originalSha256: "xyz" },
+      { ...base, takenAt: "yesterday" },
+      { ...base, takenAt: "2026-13-45T99:00:00Z" },
+      { ...base, gpsLat: 91, gpsLng: 0 },
+      { ...base, gpsLat: 10 },
+      { ...base, gpsLat: Number.NaN, gpsLng: 1 },
+      { url: "u" },
+    ]) {
+      const res = await publish({ rawSha256: SHA, name: "run", photos: [bad] });
+      expect(res.status).toBe(400);
+    }
+    expect((await publish({ rawSha256: SHA, name: "run", photos: "nope" })).status).toBe(400);
+    expect(insert).not.toHaveBeenCalled();
+    expect(photoInserts).toHaveLength(0);
   });
 });

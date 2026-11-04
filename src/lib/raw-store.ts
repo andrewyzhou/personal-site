@@ -53,6 +53,36 @@ export class RawIntegrityError extends Error {
   }
 }
 
+export class RawNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RawNotFoundError";
+  }
+}
+
+export class RawTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RawTooLargeError";
+  }
+}
+
+// adopting an object that something else (a presigned browser put) already
+// wrote under rawKey(sha): the bytes are read back and must hash to the key
+export interface RawAdoptOptions {
+  kind: RawKind;
+  // a function sees the verified bytes (e.g. to sniff the type) and may throw
+  // to refuse the object before any manifest row exists
+  contentType: string | ((bytes: Uint8Array) => string);
+  filename?: string | null;
+  metadata?: Record<string, unknown> | null;
+  maxBytes?: number;
+}
+
+export interface RawAdoptResult extends RawPutResult {
+  bytes: Uint8Array;
+}
+
 // storage + manifest are injected so the logic is testable without r2/neon
 export interface RawBackend {
   head(key: string): Promise<{ size: number } | null>;
@@ -93,6 +123,7 @@ export function rawKey(sha256: string): string {
 
 export interface RawStore {
   put(bytes: Uint8Array, opts: RawPutOptions): Promise<RawPutResult>;
+  adopt(sha256: string, opts: RawAdoptOptions): Promise<RawAdoptResult>;
   head(sha256: string): Promise<{ exists: boolean; sizeBytes: number | null }>;
   get(sha256: string): Promise<Uint8Array>; // throws when missing or corrupt
   tryGet(sha256: string): Promise<Uint8Array | null>; // null when missing, throws when corrupt
@@ -142,6 +173,36 @@ export function createRawStore(backend: RawBackend, manifest: RawManifest): RawS
       return { sha256, key, sizeBytes: bytes.length, created };
     },
 
+    async adopt(sha256, opts) {
+      const key = rawKey(sha256);
+      const h = await backend.head(key);
+      if (!h) throw new RawNotFoundError(`raw object ${sha256} not found`);
+      if (opts.maxBytes !== undefined && h.size > opts.maxBytes) {
+        throw new RawTooLargeError(`raw object ${sha256} is ${h.size} bytes (max ${opts.maxBytes})`);
+      }
+      const bytes = await backend.get(key);
+      if (!bytes) throw new RawNotFoundError(`raw object ${sha256} not found`);
+      if (opts.maxBytes !== undefined && bytes.length > opts.maxBytes) {
+        throw new RawTooLargeError(`raw object ${sha256} is ${bytes.length} bytes (max ${opts.maxBytes})`);
+      }
+      const actual = sha256Hex(bytes);
+      if (actual !== sha256) {
+        // never recorded; the key stays write-once, so this needs a manual look
+        throw new RawIntegrityError(`raw object ${sha256} hashes to ${actual}`);
+      }
+      const contentType = typeof opts.contentType === "function" ? opts.contentType(bytes) : opts.contentType;
+      await manifest.record({
+        sha256,
+        key,
+        sizeBytes: bytes.length,
+        contentType,
+        kind: opts.kind,
+        originalFilename: opts.filename ?? null,
+        metadata: opts.metadata ?? null,
+      });
+      return { sha256, key, sizeBytes: bytes.length, created: false, bytes };
+    },
+
     async head(sha256) {
       const h = await backend.head(rawKey(sha256));
       return { exists: h !== null, sizeBytes: h?.size ?? null };
@@ -189,7 +250,8 @@ export function isRawStoreConfigured(): boolean {
   return Boolean(process.env.R2_RAW_BUCKET);
 }
 
-function rawBucket(): string {
+// the private bucket name (exported for presigned photo-original puts)
+export function rawBucket(): string {
   const bucket = process.env.R2_RAW_BUCKET;
   if (!bucket) throw new Error("R2_RAW_BUCKET is not set");
   if (bucket === process.env.R2_BUCKET) {

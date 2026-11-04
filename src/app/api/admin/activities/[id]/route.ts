@@ -7,6 +7,8 @@ import { republish } from "@/lib/republish";
 import { getDb, activities, activityPhotos } from "@/lib/db";
 import { invalidateCache } from "@/lib/cache";
 import { r2Delete } from "@/lib/r2";
+import { visibilityColumns, type Visibility } from "@/lib/public-activity";
+import { parsePhotoList, type PhotoInput } from "@/app/api/admin/photos/photo-input";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +19,17 @@ interface PatchBody {
   description?: string | null;
   sportType?: string;
   gear?: string | null;
-  hidden?: boolean;
+  hidden?: boolean; // legacy switch; visibility wins when both are sent
+  visibility?: unknown; // public | hide-map | private
+  hrHidden?: unknown;
   trimStartM?: number;
   trimEndM?: number;
-  photos?: { pathname: string; url: string; width?: number; height?: number; caption?: string | null }[];
+  // private fields (originalSha256, takenAt, gpsLat/gpsLng) ride along per photo;
+  // omitted ones are kept from the photo with the same pathname
+  photos?: unknown;
 }
+
+const VISIBILITIES: readonly Visibility[] = ["public", "hide-map", "private"];
 
 async function loadRow(id: number) {
   const rows = await getDb().select().from(activities).where(eq(activities.id, id)).limit(1);
@@ -45,6 +53,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: false, error: "invalid json body" }, { status: 400 });
   }
 
+  if (body.visibility !== undefined && !VISIBILITIES.includes(body.visibility as Visibility)) {
+    return NextResponse.json({ ok: false, error: "visibility must be public, hide-map or private" }, { status: 400 });
+  }
+  if (body.hrHidden !== undefined && typeof body.hrHidden !== "boolean") {
+    return NextResponse.json({ ok: false, error: "hrHidden must be a boolean" }, { status: 400 });
+  }
+  let photos: PhotoInput[] | null = null;
+  if (body.photos !== undefined && body.photos !== null) {
+    const parsedPhotos = parsePhotoList(body.photos);
+    if ("error" in parsedPhotos) return NextResponse.json({ ok: false, error: parsedPhotos.error }, { status: 400 });
+    photos = parsedPhotos.photos;
+  }
+
   try {
     const row = await loadRow(id);
     if (!row) {
@@ -57,6 +78,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (typeof body.sportType === "string" && body.sportType) updates.sportType = body.sportType;
     if (body.gear !== undefined) updates.gear = body.gear?.trim() || null;
     if (typeof body.hidden === "boolean") updates.hidden = body.hidden;
+    // visibility is plain columns the public serializer applies; nothing to rebuild
+    if (body.visibility !== undefined) Object.assign(updates, visibilityColumns(body.visibility as Visibility));
+    if (typeof body.hrHidden === "boolean") updates.hrHidden = body.hrHidden;
 
     // a trim change is a recorded edit; republish rebuilds the published columns
     // from the stored track. nothing to rebuild from → the edit is reverted.
@@ -93,33 +117,69 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await db.update(activities).set(updates).where(eq(activities.id, id));
 
     // photo list replacement (rows only; blobs are removed by hard delete)
-    if (body.photos) {
-      // keep each photo's private original link across the row replacement
+    let pinStatus: string | null = null;
+    if (photos) {
+      // the private fields (original link, capture time, precise gps) of a photo
+      // already on the activity survive the row replacement unless new ones are sent
       const previous = await db
-        .select({ pathname: activityPhotos.blobPathname, originalSha256: activityPhotos.originalSha256 })
+        .select({
+          pathname: activityPhotos.blobPathname,
+          width: activityPhotos.width,
+          height: activityPhotos.height,
+          originalSha256: activityPhotos.originalSha256,
+          takenAt: activityPhotos.takenAt,
+          gpsLat: activityPhotos.gpsLat,
+          gpsLng: activityPhotos.gpsLng,
+          pinLat: activityPhotos.pinLat,
+          pinLng: activityPhotos.pinLng,
+        })
         .from(activityPhotos)
         .where(eq(activityPhotos.activityId, id));
-      const originals = new Map(previous.map((p) => [p.pathname, p.originalSha256]));
+      const byPath = new Map(previous.map((p) => [p.pathname, p]));
+      const rows = photos.map((p, i) => {
+        const prev = byPath.get(p.pathname);
+        const takenAt = p.takenAt ?? prev?.takenAt ?? null;
+        const gpsLat = p.gps ? p.gps.lat : (prev?.gpsLat ?? null);
+        const gpsLng = p.gps ? p.gps.lng : (prev?.gpsLng ?? null);
+        // the old pin stays only while its inputs are unchanged (republish below refreshes it)
+        const samePlace =
+          !!prev && prev.gpsLat === gpsLat && prev.gpsLng === gpsLng &&
+          (prev.takenAt?.getTime() ?? null) === (takenAt?.getTime() ?? null);
+        return {
+          activityId: id,
+          blobUrl: p.url,
+          blobPathname: p.pathname,
+          width: p.width ?? prev?.width ?? null,
+          height: p.height ?? prev?.height ?? null,
+          position: i,
+          caption: p.caption,
+          originalSha256: p.originalSha256 ?? prev?.originalSha256 ?? null,
+          takenAt,
+          gpsLat,
+          gpsLng,
+          pinLat: samePlace ? prev.pinLat : null,
+          pinLng: samePlace ? prev.pinLng : null,
+        };
+      });
       await db.delete(activityPhotos).where(eq(activityPhotos.activityId, id));
-      if (body.photos.length > 0) {
-        await db.insert(activityPhotos).values(
-          body.photos.map((p, i) => ({
-            activityId: id,
-            blobUrl: p.url,
-            blobPathname: p.pathname,
-            width: p.width ?? null,
-            height: p.height ?? null,
-            position: i,
-            caption: p.caption ?? null,
-            originalSha256: originals.get(p.pathname) ?? null,
-          }))
-        );
+      if (rows.length > 0) await db.insert(activityPhotos).values(rows);
+
+      // pins come from republish; the edit itself is already saved, so a failure
+      // here only leaves pins stale until the next rebuild
+      try {
+        pinStatus = (await republish(id)).status;
+      } catch (error) {
+        pinStatus = "failed";
+        log.error("admin:edit", `republish after photo change failed for ${id}`, error);
       }
     }
 
     await invalidateCache("activities_list", "activities_latest");
     revalidatePath(`/activities/${id}`);
-    log.info("admin:edit", `patched activity ${id}${trimChanged ? " (trim recomputed)" : ""}`);
+    log.info(
+      "admin:edit",
+      `patched activity ${id}${trimChanged ? " (trim recomputed)" : ""}${pinStatus ? ` (photos, republish ${pinStatus})` : ""}`
+    );
     return NextResponse.json({ ok: true });
   } catch (error) {
     log.error("admin:edit", `patch failed for ${id}`, error);

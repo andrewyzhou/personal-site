@@ -211,7 +211,7 @@ describe("pullIntervalsActivities", () => {
     });
     expect(storeOriginal).not.toHaveBeenCalled();
     expect(sources.map((s) => s.kind)).toEqual(["summary", "intervals-activity"]);
-    expect(republish).not.toHaveBeenCalled();
+    expect(republish).toHaveBeenCalledTimes(1); // published start for summary rows
   });
 
   it("does not attach sources when the insert hits an existing row", async () => {

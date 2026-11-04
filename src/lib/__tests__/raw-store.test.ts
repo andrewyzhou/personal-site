@@ -5,6 +5,8 @@ import {
   rawKey,
   sha256Hex,
   RawIntegrityError,
+  RawNotFoundError,
+  RawTooLargeError,
   type RawBackend,
   type RawManifest,
 } from "../raw-store";
@@ -200,5 +202,79 @@ describe("r2 raw backend", () => {
     process.env.R2_BUCKET = "public";
     process.env.R2_RAW_BUCKET = "public";
     expect(() => r2RawBackend()).toThrow(/public bucket/);
+  });
+});
+
+describe("raw store adopt", () => {
+  // what a presigned browser put leaves behind: bytes under their key, no manifest row
+  const browserPut = (b: Uint8Array) => mem.objects.set(rawKey(sha256Hex(b)), b.slice());
+
+  it("verifies an object already in the bucket and records its manifest row", async () => {
+    const b = bytes("photo original");
+    const sha = sha256Hex(b);
+    browserPut(b);
+    const res = await store.adopt(sha, { kind: "photo-original", contentType: "image/jpeg", filename: "IMG_1.HEIC", metadata: { via: "t" } });
+    expect(res).toMatchObject({ sha256: sha, key: rawKey(sha), sizeBytes: b.length, created: false });
+    expect(Array.from(res.bytes)).toEqual(Array.from(b));
+    expect(man.rows.get(sha)).toMatchObject({ kind: "photo-original", contentType: "image/jpeg", originalFilename: "IMG_1.HEIC", sizeBytes: b.length });
+    expect(mem.calls.putIfAbsent + mem.calls.put).toBe(0); // never writes
+    expect(await store.verify(sha)).toEqual({ ok: true });
+  });
+
+  it("is idempotent and keeps the first manifest row (insert-only)", async () => {
+    const b = bytes("again");
+    const sha = sha256Hex(b);
+    browserPut(b);
+    await store.adopt(sha, { kind: "photo-original", contentType: "image/jpeg", filename: "first.jpg" });
+    await store.adopt(sha, { kind: "photo-original", contentType: "image/jpeg", filename: "second.jpg" });
+    expect(man.rows.get(sha)!.originalFilename).toBe("first.jpg");
+  });
+
+  it("throws RawNotFoundError when nothing was uploaded", async () => {
+    await expect(store.adopt(sha256Hex(bytes("nope")), { kind: "photo-original", contentType: "x" })).rejects.toBeInstanceOf(RawNotFoundError);
+    expect(man.rows.size).toBe(0);
+  });
+
+  it("refuses bytes that don't hash to the key, without recording or touching them", async () => {
+    const sha = sha256Hex(bytes("claimed"));
+    mem.objects.set(rawKey(sha), bytes("something else"));
+    await expect(store.adopt(sha, { kind: "photo-original", contentType: "x" })).rejects.toBeInstanceOf(RawIntegrityError);
+    expect(man.rows.size).toBe(0);
+    expect(new TextDecoder().decode(mem.objects.get(rawKey(sha)))).toBe("something else");
+  });
+
+  it("enforces maxBytes", async () => {
+    const b = bytes("0123456789");
+    browserPut(b);
+    await expect(store.adopt(sha256Hex(b), { kind: "photo-original", contentType: "x", maxBytes: 5 })).rejects.toBeInstanceOf(RawTooLargeError);
+    expect(man.rows.size).toBe(0);
+  });
+
+  it("lets a content-type function see the verified bytes or refuse them", async () => {
+    const b = bytes("fake jpeg");
+    const sha = sha256Hex(b);
+    browserPut(b);
+    const seen: number[] = [];
+    await store.adopt(sha, {
+      kind: "photo-original",
+      contentType: (x) => {
+        seen.push(x.length);
+        return "image/jpeg";
+      },
+    });
+    expect(seen).toEqual([b.length]);
+    expect(man.rows.get(sha)!.contentType).toBe("image/jpeg");
+
+    const c = bytes("not an image");
+    browserPut(c);
+    await expect(
+      store.adopt(sha256Hex(c), {
+        kind: "photo-original",
+        contentType: () => {
+          throw new Error("not an image");
+        },
+      })
+    ).rejects.toThrow("not an image");
+    expect(man.rows.has(sha256Hex(c))).toBe(false);
   });
 });
