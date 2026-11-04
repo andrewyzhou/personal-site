@@ -10,6 +10,7 @@ import { db, type Db, type Tx } from "./client";
 // reads that run both inside a write transaction and outside one
 type Reader = Pick<Db, "select">;
 import { notify } from "./events";
+import { bumpedAt } from "../lib/clock";
 import { writeOutbox } from "./outbox";
 import { getDefaultUnit } from "./settings";
 import { sets, workoutExercises, workouts, type SetRow, type WorkoutExerciseRow, type WorkoutRow } from "./schema";
@@ -226,7 +227,7 @@ export function updateSet(setId: string, patch: SetPatch, now = Date.now()): Set
   return write((tx) => {
     const row = tx
       .update(sets)
-      .set({ ...rest, ...(completed === undefined ? {} : { completed: completed ? 1 : 0 }), updatedAt: now })
+      .set({ ...rest, ...(completed === undefined ? {} : { completed: completed ? 1 : 0 }), updatedAt: bumpedAt(sets.updatedAt, now) })
       .where(eq(sets.id, setId))
       .returning()
       .get();
@@ -259,7 +260,7 @@ function patchExercise(
 ): WorkoutExerciseRow | undefined {
   const row = tx
     .update(workoutExercises)
-    .set({ ...patch, updatedAt: now })
+    .set({ ...patch, updatedAt: bumpedAt(workoutExercises.updatedAt, now) })
     .where(eq(workoutExercises.id, id))
     .returning()
     .get();
@@ -338,7 +339,7 @@ export function removeExercise(workoutId: string, workoutExerciseId: string, now
 function closeWorkout(tx: Tx, workoutId: string, status: "finished" | "discarded", now: number): void {
   const row = tx
     .update(workouts)
-    .set({ status, endedAt: now, updatedAt: now })
+    .set({ status, endedAt: now, updatedAt: bumpedAt(workouts.updatedAt, now) })
     .where(and(eq(workouts.id, workoutId), eq(workouts.status, "active")))
     .returning()
     .get();

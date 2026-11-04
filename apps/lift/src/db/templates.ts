@@ -20,6 +20,7 @@ import {
 } from "./schema";
 import { getPreferredUnit } from "./bodyweight";
 import { previousSessionSets } from "./workouts";
+import { bumpedAt } from "../lib/clock";
 import { copyName, validateName } from "../lib/names";
 import { clampSetNumbers, clampTitle, cleanNote } from "../lib/numbers";
 import { nextPosition } from "../lib/sets";
@@ -73,7 +74,7 @@ export function renameFolder(id: string, name: string, now = Date.now()): Templa
   return write((tx) => {
     const row = tx
       .update(templateFolders)
-      .set({ name: clean, updatedAt: now })
+      .set({ name: clean, updatedAt: bumpedAt(templateFolders.updatedAt, now) })
       .where(eq(templateFolders.id, id))
       .returning()
       .get();
@@ -91,7 +92,7 @@ export function reorderFolders(orderedIds: readonly string[], now = Date.now()):
     for (const u of positionUpdates(ordered)) {
       const row = tx
         .update(templateFolders)
-        .set({ position: u.position, updatedAt: now })
+        .set({ position: u.position, updatedAt: bumpedAt(templateFolders.updatedAt, now) })
         .where(eq(templateFolders.id, u.id))
         .returning()
         .get();
@@ -109,7 +110,7 @@ export function deleteFolder(id: string, now = Date.now()): void {
     for (const t of inside) {
       const row = tx
         .update(templates)
-        .set({ folderId: null, position: pos++, updatedAt: now })
+        .set({ folderId: null, position: pos++, updatedAt: bumpedAt(templates.updatedAt, now) })
         .where(eq(templates.id, t.id))
         .returning()
         .get();
@@ -241,7 +242,7 @@ export function saveTemplate(id: string, draft: TemplateDraft, now = Date.now())
       const position = current.folderId === folderId ? current.position : nextTemplatePosition(tx, folderId);
       row = tx
         .update(templates)
-        .set({ name, notes, folderId, position, updatedAt: now })
+        .set({ name, notes, folderId, position, updatedAt: bumpedAt(templates.updatedAt, now) })
         .where(eq(templates.id, id))
         .returning()
         .get()!;
@@ -256,7 +257,7 @@ export function saveTemplate(id: string, draft: TemplateDraft, now = Date.now())
     for (const { id: upId, ...values } of plan.updates) {
       const up = tx
         .update(templateExercises)
-        .set({ ...values, updatedAt: now })
+        .set({ ...values, updatedAt: bumpedAt(templateExercises.updatedAt, now) })
         .where(eq(templateExercises.id, upId))
         .returning()
         .get();
@@ -297,7 +298,7 @@ export function setTemplateArchived(id: string, archived: boolean, now = Date.no
   return write((tx) => {
     const row = tx
       .update(templates)
-      .set({ archived: archived ? 1 : 0, updatedAt: now })
+      .set({ archived: archived ? 1 : 0, updatedAt: bumpedAt(templates.updatedAt, now) })
       .where(eq(templates.id, id))
       .returning()
       .get();
@@ -329,7 +330,7 @@ export function reorderTemplates(orderedIds: readonly string[], now = Date.now()
     for (const u of positionUpdates(ordered)) {
       const row = tx
         .update(templates)
-        .set({ position: u.position, updatedAt: now })
+        .set({ position: u.position, updatedAt: bumpedAt(templates.updatedAt, now) })
         .where(eq(templates.id, u.id))
         .returning()
         .get();
@@ -344,7 +345,7 @@ export function moveTemplateToFolder(id: string, folderId: string | null, now = 
     if (!current || current.folderId === folderId) return current;
     const row = tx
       .update(templates)
-      .set({ folderId, position: nextTemplatePosition(tx, folderId), updatedAt: now })
+      .set({ folderId, position: nextTemplatePosition(tx, folderId), updatedAt: bumpedAt(templates.updatedAt, now) })
       .where(eq(templates.id, id))
       .returning()
       .get();

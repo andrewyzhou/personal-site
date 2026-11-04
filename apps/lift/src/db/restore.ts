@@ -17,8 +17,9 @@ import {
   workoutExercises,
   workouts,
 } from "./schema";
-import { countRejected, countUnsynced, getServerUrl, getToken } from "./sync";
+import { countRejected, countUnsynced, getServerUrl, getToken, isSyncing, recoverServerUrl } from "./sync";
 import { chunk, fetchSnapshot, restoreBlocker, restorePlan, wipeOrder } from "../lib/sync/snapshot";
+import { shouldOfferRestore } from "../lib/sync/restoreOffer";
 import type { FetchLike } from "../lib/sync/push";
 
 const TABLES = {
@@ -42,6 +43,36 @@ export function getRestoredAt(): number | null {
   return v ? Number(v) : null;
 }
 
+const OFFER_DISMISSED = "restoreOfferDismissed";
+
+/** rows across every synced table; templates or a bodyweight alone still count as data */
+export function countLocalRows(): number {
+  let n = 0;
+  for (const t of Object.values(TABLES)) n += db.select({ n: count() }).from(t as typeof workouts).get()?.n ?? 0;
+  return n;
+}
+
+export function dismissRestoreOffer(): void {
+  const at = String(Date.now());
+  db.insert(kv).values({ key: OFFER_DISMISSED, value: at }).onConflictDoUpdate({ target: kv.key, set: { value: at } }).run();
+}
+
+/** home's one-tap restore: only for an empty db with a token that survived a reinstall */
+export async function checkRestoreOffer(): Promise<boolean> {
+  const dismissed = db.select({ value: kv.value }).from(kv).where(eq(kv.key, OFFER_DISMISSED)).get();
+  const base = {
+    localRows: countLocalRows(),
+    pending: countUnsynced() + countRejected(),
+    restoredAt: getRestoredAt(),
+    dismissed: Boolean(dismissed),
+  };
+  // the cheap checks first, so a normal launch never touches the keychain
+  if (!shouldOfferRestore({ ...base, hasToken: true })) return false;
+  const hasToken = Boolean(await getToken());
+  if (hasToken) await recoverServerUrl();
+  return shouldOfferRestore({ ...base, hasToken });
+}
+
 export interface RestoreResult {
   workouts: number;
   sets: number;
@@ -57,6 +88,8 @@ export async function restoreFromServer(
   } = {}
 ): Promise<RestoreResult> {
   // pending (or refused) changes would be wiped before reaching the server
+  // a push in flight would ack outbox rows while the tables are being replaced
+  if (isSyncing()) throw new Error("sync in progress, try again in a moment");
   const blocked = restoreBlocker({ unsynced: countUnsynced(), rejected: countRejected() }, options.allowRejected);
   if (blocked) throw new Error(blocked);
   if (countLocalWorkouts() > 0 && !options.replace) throw new Error("local data exists");
