@@ -278,6 +278,7 @@ export default function EditActivity({ id, initial }: EditProps) {
         <Link href={`/activities/${id}`} className="font-sans text-gray text-sm link-highlight">
           view public page →
         </Link>
+        {initial.hasOriginal && <Link href={`/admin/activities/${id}/clean`} className="font-sans text-gray text-sm link-highlight">clean track</Link>}
         <button onClick={remove} className="font-sans text-gray text-sm link-highlight">
           hide activity
         </button>
