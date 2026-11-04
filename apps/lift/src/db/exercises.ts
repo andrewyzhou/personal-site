@@ -4,7 +4,7 @@ import { db, type Tx } from "./client";
 import { notify } from "./events";
 import { writeOutbox } from "./outbox";
 import { customExercises, sets, templateExercises, workoutExercises, workouts, type CustomExerciseRow } from "./schema";
-import { customToExercise } from "../lib/custom";
+import { customToExercise, isCustomInUse, type CustomUsage } from "../lib/custom";
 import { buildExerciseLookup, catalogCollision, isSearchable, searchCatalog, type ExerciseLookup } from "../lib/library";
 import { mergeLinkMap, planMerge, type MergeCheck } from "../lib/merge";
 import { cleanName, nameKeyLoose, validateName } from "../lib/names";
@@ -190,21 +190,18 @@ export function setCustomArchived(id: string, archived: boolean, now = Date.now(
   return updateCustomExercise(id, { archived }, now);
 }
 
-export interface CustomUsage {
-  workoutExercises: number;
-  templateExercises: number;
-}
+export type { CustomUsage };
 
 export function getCustomUsage(id: string): CustomUsage {
   const w = db.select({ n: count() }).from(workoutExercises).where(eq(workoutExercises.exerciseId, id)).get();
   const t = db.select({ n: count() }).from(templateExercises).where(eq(templateExercises.exerciseId, id)).get();
-  return { workoutExercises: Number(w?.n ?? 0), templateExercises: Number(t?.n ?? 0) };
+  const m = db.select({ n: count() }).from(customExercises).where(eq(customExercises.mergedInto, id)).get();
+  return { workoutExercises: Number(w?.n ?? 0), templateExercises: Number(t?.n ?? 0), mergedFrom: Number(m?.n ?? 0) };
 }
 
-/** hard delete only when nothing points at it; otherwise the caller should offer archive */
+/** hard delete only when nothing points at it (merged customs included); otherwise the caller should offer archive */
 export function deleteCustomExercise(id: string): "deleted" | "in_use" | "missing" {
-  const usage = getCustomUsage(id);
-  if (usage.workoutExercises || usage.templateExercises) return "in_use";
+  if (isCustomInUse(getCustomUsage(id))) return "in_use";
   return write((tx) => {
     const gone = tx.delete(customExercises).where(eq(customExercises.id, id)).returning({ id: customExercises.id }).get();
     if (!gone) return "missing";

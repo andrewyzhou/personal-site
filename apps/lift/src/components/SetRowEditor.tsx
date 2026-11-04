@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import type { SetRow } from "../db/schema";
 import { deleteSet, toggleComplete, updateSet, type SetPatch } from "../db/workouts";
 import { createDebouncedCommit, type DebouncedCommit } from "../lib/debounce";
-import { formatCount, formatDecimal, parseCount, parseDecimal } from "../lib/numbers";
+import { MAX_NOTE_LENGTH, clampNumber, formatCount, formatDecimal, parseCount, parseDecimal } from "../lib/numbers";
 import { flushPendingWrites, registerFlush } from "../lib/pending";
 import { KIND_LABEL, RPE_VALUES, formatRpe, nextKind } from "../lib/sets";
 import { useColors } from "./theme";
@@ -37,8 +37,8 @@ export function SetRowEditor({ set, label, previous, onCompleted }: Props) {
   if (!commits.current) {
     const save = (patch: SetPatch) => updateSet(set.id, patch);
     commits.current = {
-      weight: createDebouncedCommit((t) => save({ weight: parseDecimal(t) })),
-      reps: createDebouncedCommit((t) => save({ reps: parseCount(t) })),
+      weight: createDebouncedCommit((t) => save({ weight: clampNumber(parseDecimal(t), "weight") })),
+      reps: createDebouncedCommit((t) => save({ reps: clampNumber(parseCount(t), "reps") })),
       note: createDebouncedCommit((t) => save({ note: t.trim() ? t : null })),
     };
   }
@@ -97,7 +97,12 @@ export function SetRowEditor({ set, label, previous, onCompleted }: Props) {
             setWeight(t);
             commits.current!.weight.set(t);
           }}
-          onBlur={() => commits.current!.weight.flush()}
+          onBlur={() => {
+            commits.current!.weight.flush();
+            // show the clamped value rather than the typo that was cut down
+            const n = parseDecimal(weight);
+            if (n !== clampNumber(n, "weight")) setWeight(formatDecimal(clampNumber(n, "weight")));
+          }}
           keyboardType="decimal-pad"
           placeholder={set.unit}
           placeholderTextColor={c.muted}
@@ -110,7 +115,11 @@ export function SetRowEditor({ set, label, previous, onCompleted }: Props) {
             setReps(t);
             commits.current!.reps.set(t);
           }}
-          onBlur={() => commits.current!.reps.flush()}
+          onBlur={() => {
+            commits.current!.reps.flush();
+            const n = parseCount(reps);
+            if (n !== clampNumber(n, "reps")) setReps(formatCount(clampNumber(n, "reps")));
+          }}
           keyboardType="number-pad"
           placeholder="reps"
           placeholderTextColor={c.muted}
@@ -168,6 +177,7 @@ export function SetRowEditor({ set, label, previous, onCompleted }: Props) {
             onBlur={() => commits.current!.note.flush()}
             placeholder="note"
             placeholderTextColor={c.muted}
+            maxLength={MAX_NOTE_LENGTH}
             multiline
             style={[styles.note, { backgroundColor: c.input, color: c.text }]}
           />

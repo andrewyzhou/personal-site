@@ -84,7 +84,9 @@ function schedule(timer: RestTimer): void {
   enqueue(async () => {
     if (!(await ensurePermission())) return;
     // still the same timer? a skip/adjust may have happened during the prompt
-    if (current?.endsAt !== timer.endsAt || timer.endsAt - Date.now() < 1000) return;
+    if (current?.endsAt !== timer.endsAt) return;
+    // too close to fire: drop the one an earlier start left behind, or it rings late
+    if (timer.endsAt - Date.now() < 1000) return Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
     await Notifications.scheduleNotificationAsync({
       identifier: NOTIFICATION_ID,
       content: {

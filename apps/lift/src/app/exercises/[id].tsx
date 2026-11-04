@@ -29,7 +29,8 @@ export default function ExerciseDetail() {
   const c = useColors();
   const version = useDbVersion();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const exercise = useMemo(() => (id ? lookupExercise(id) : undefined), [id]);
+  // version too: a rename of a custom exercise must show here
+  const exercise = useMemo(() => (id ? lookupExercise(id) : undefined), [id, version]);
   const unit = useMemo(() => getUnit(), [version]);
   const history = useMemo(() => (id ? loadHistory(id) : null), [id, version]);
 

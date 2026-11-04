@@ -1,7 +1,9 @@
 // pure template logic: planned sets, editor save planning, ordering.
 
 import type { PlannedSetPayload, SetKind, WeightUnit } from "lift-core";
-import { DEFAULT_UNIT, SET_KINDS, prefillSet, type SetValues } from "./sets";
+import { cleanNote, clampNumber } from "./numbers";
+import { clampRestS } from "./rest";
+import { DEFAULT_UNIT, SET_KINDS, pickPrevious, prefillSet, type SetValues } from "./sets";
 
 export type PlannedSet = PlannedSetPayload;
 
@@ -40,13 +42,14 @@ export function parsePlannedSets(json: string | null | undefined): PlannedSet[] 
 /** fixed key order so an unchanged plan serializes to the same text (no spurious updates) */
 export function serializePlannedSets(planned: readonly PlannedSet[]): string {
   return JSON.stringify(
+    // clamped so a typo can't serialize into a row the server rejects for good
     planned.map((p) => ({
       kind: p.kind,
-      weight: p.weight,
+      weight: clampNumber(p.weight, "weight"),
       unit: p.unit,
-      reps: p.reps,
-      durationS: p.durationS,
-      distanceM: p.distanceM,
+      reps: clampNumber(p.reps, "reps"),
+      durationS: clampNumber(p.durationS, "durationS"),
+      distanceM: clampNumber(p.distanceM, "distanceM"),
     }))
   );
 }
@@ -56,21 +59,34 @@ export function emptyPlannedSet(unit: WeightUnit = DEFAULT_UNIT, previous?: Plan
   return { kind: "normal", weight: null, unit, reps: null, durationS: null, distanceM: null };
 }
 
+type PreviousValues = Pick<SetValues, "weight" | "unit" | "reps" | "durationS" | "distanceM">;
+
 /**
- * set values for a workout started from a template. an exercise with no plan
- * still gets one empty set, the same as adding it by hand.
+ * set values for a workout started from a template. a field the plan leaves
+ * empty falls back to last session's set (same position, else its last), so
+ * "3 sets, no numbers" still opens with what was lifted. an exercise with no
+ * plan gets one set, the same as adding it by hand.
  */
-export function setsFromPlanned(planned: readonly PlannedSet[], unit: WeightUnit = DEFAULT_UNIT): SetValues[] {
-  if (!planned.length) return [prefillSet(undefined, unit)];
-  return planned.map((p) => ({
-    kind: p.kind,
-    weight: p.weight,
-    unit: p.unit ?? unit,
-    reps: p.reps,
-    durationS: p.durationS,
-    distanceM: p.distanceM,
-    rpe: null,
-  }));
+export function setsFromPlanned(
+  planned: readonly PlannedSet[],
+  unit: WeightUnit = DEFAULT_UNIT,
+  previous: readonly PreviousValues[] = []
+): SetValues[] {
+  if (!planned.length) return [prefillSet(pickPrevious(previous, 0), unit)];
+  return planned.map((p, i) => {
+    const prev = pickPrevious(previous, i);
+    // a borrowed weight keeps its own unit, or 100 kg would turn into 100 lb
+    const borrowWeight = p.weight == null && prev?.weight != null;
+    return {
+      kind: p.kind,
+      weight: borrowWeight ? prev!.weight : p.weight,
+      unit: borrowWeight ? prev!.unit : (p.unit ?? unit),
+      reps: p.reps ?? prev?.reps ?? null,
+      durationS: p.durationS ?? prev?.durationS ?? null,
+      distanceM: p.distanceM ?? prev?.distanceM ?? null,
+      rpe: null,
+    };
+  });
 }
 
 export interface LoggedSetLike {
@@ -222,9 +238,9 @@ export function planTemplateSave(
       exerciseId: d.exerciseId,
       position: i,
       supersetGroup: groups[i] ?? null,
-      restS: d.restS,
+      restS: d.restS == null ? null : clampRestS(d.restS),
       plannedSets: serializePlannedSets(d.plannedSets),
-      notes: d.notes?.trim() ? d.notes.trim() : null,
+      notes: cleanNote(d.notes),
     };
     const prev = d.id ? byId.get(d.id) : undefined;
     if (!prev || kept.has(prev.id)) {
