@@ -10,12 +10,22 @@ import type { EditInput, PublicColumns, RepublishDeps, RepublishResult, SourceIn
 
 // columns that exist before migrations 0002/0003 (processing_version,
 // published_inputs_hash, canonical_track_key are added by 0002)
-export type LegacyActivityRow = Omit<ActivityRow, "processingVersion" | "publishedInputsHash" | "canonicalTrackKey">;
+// (and the privacy columns added by 0005)
+type V2Column =
+  | "processingVersion" | "publishedInputsHash" | "canonicalTrackKey"
+  | "mapHidden" | "hrHidden" | "publishedLocalTime" | "publishedStartUtc"
+  | "fogEvents" | "fogShapes" | "trackBbox" | "needsRepublish";
+export type LegacyActivityRow = Omit<ActivityRow, V2Column>;
 
 // explicit select list for db.select(...): never names a v2 column
 export function legacyActivityColumns() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { processingVersion, publishedInputsHash, canonicalTrackKey, ...legacy } = getTableColumns(activities);
+  const {
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    processingVersion, publishedInputsHash, canonicalTrackKey,
+    mapHidden, hrHidden, publishedLocalTime, publishedStartUtc, fogEvents, fogShapes, trackBbox, needsRepublish,
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+    ...legacy
+  } = getTableColumns(activities);
   return legacy;
 }
 
@@ -52,7 +62,20 @@ export function legacyEdits(row: Pick<LegacyActivityRow, "polyline" | "fitSha256
 
 // pre-migration rows look like never-republished ones
 export function toActivityRow(row: LegacyActivityRow): ActivityRow {
-  return { ...row, processingVersion: 0, publishedInputsHash: null, canonicalTrackKey: null };
+  return {
+    ...row,
+    processingVersion: 0,
+    publishedInputsHash: null,
+    canonicalTrackKey: null,
+    mapHidden: false,
+    hrHidden: false,
+    publishedLocalTime: null,
+    publishedStartUtc: null,
+    fogEvents: null,
+    fogShapes: null,
+    trackBbox: null,
+    needsRepublish: false,
+  };
 }
 
 export function legacyDeps(io: {

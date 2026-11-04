@@ -133,6 +133,8 @@ describe("computePublicColumns", () => {
         bounds: legacy.bounds,
         trimStartM: s,
         trimEndM: e,
+        fogEvents: null,
+        fogShapes: null,
       });
     }
   });
@@ -173,6 +175,8 @@ function fakeRow(over: Partial<ActivityRow> = {}): ActivityRow {
     sufferScore: null, gear: null, polyline: null, cardPolyline: null, bounds: null, trimStartM: 0, trimEndM: 0,
     fitBlobUrl: null, fitBlobPathname: null, fitSha256: null, fileType: "fit", source: "upload", externalId: null,
     dedupeKey: "k", hidden: false, processingVersion: 0, publishedInputsHash: null, canonicalTrackKey: null,
+    mapHidden: false, hrHidden: false, publishedLocalTime: null, publishedStartUtc: null, fogEvents: null,
+    fogShapes: null, trackBbox: null, needsRepublish: false,
     createdAt: new Date(), updatedAt: new Date(), ...over,
   };
 }
@@ -284,11 +288,12 @@ describe("republish", () => {
     expect((await republish(7, { deps })).status).toBe("fresh");
   });
 
-  it("leaves trackless activities untouched", async () => {
+  it("leaves route/stat columns of trackless activities untouched", async () => {
     sources = [src({ kind: "summary", rawSha256: null })];
     const res = await republish(7, { deps });
     expect(res.status).toBe("no-source");
-    expect(writes).toHaveLength(0);
+    expect(writes).toHaveLength(1);
+    expect(Object.keys(writes[0]).sort()).toEqual(["needsRepublish", "processingVersion", "publishedInputsHash", "publishedLocalTime", "publishedStartUtc", "updatedAt"]);
   });
 
   it("skips a device file with no timed points (empty gpx shell)", async () => {
@@ -297,7 +302,7 @@ describe("republish", () => {
     raw.set(shellSha, shell);
     sources = [src({ id: 2, rawSha256: shellSha })];
     expect((await republish(7, { deps })).status).toBe("no-source");
-    expect(writes).toHaveLength(0);
+    expect(writes.every((w) => !("polyline" in w))).toBe(true);
   });
 
   it("reports not-found", async () => {
