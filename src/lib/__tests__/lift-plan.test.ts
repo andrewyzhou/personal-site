@@ -25,7 +25,7 @@ vi.mock("lift-core", async (orig) => {
   };
 });
 
-import { planStrongIngest } from "@/lib/lift/plan";
+import { pickEditTarget, planStrongIngest, type EditCandidate, type EditLookup } from "@/lib/lift/plan";
 import { customExerciseId, guessEquipment, guessTracking, sha256Hex } from "@/lib/lift/rows";
 
 const LB = 2.2046226218;
@@ -367,6 +367,122 @@ describe("planStrongIngest", () => {
     expect(plan.workout).toBeNull();
     expect(plan.summary).toBeNull();
     expect(plan.ingest).toMatchObject({ status: "empty", workoutId: null, rawText: "hello there" });
+  });
+});
+
+describe("planStrongIngest edit options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    parse.mockReturnValue(pushDay());
+    resolve.mockImplementation((n: string) => ({ "Bench Press (Barbell)": BENCH, "Pull Up": PULLUP })[n]);
+    muscleLoad.mockReturnValue({ raw: {}, normalized: {} });
+  });
+
+  it("lands on a given workout id but keeps the share's own slug and ingest id", () => {
+    const plan = planStrongIngest(RAW, { source: "telegram", workoutId: "strong-OldSlug" });
+    expect(plan.ingest).toMatchObject({ id: `ing_${sha256Hex(RAW).slice(0, 24)}`, workoutId: "strong-OldSlug", strongSlug: "AbCdEf123" });
+    expect(plan.workout!.workout).toMatchObject({ id: "strong-OldSlug", strongSlug: "AbCdEf123" });
+    expect(plan.workout!.workoutExercises.map((we) => we.id)).toEqual(["strong-OldSlug:0", "strong-OldSlug:1"]);
+    expect(plan.workout!.sets[0].id).toBe("strong-OldSlug:0:0");
+  });
+
+  it("stores extra warnings on the ingest row", () => {
+    const extra = { line: 0, message: "2 workouts already start at that minute", text: "a, b" };
+    const plan = planStrongIngest(RAW, { source: "api", extraWarnings: [extra] });
+    expect(plan.warnings).toContainEqual(extra);
+    expect(plan.ingest.warnings).toContainEqual(extra);
+  });
+
+  it("lists working sets per exercise for the summary, warm-ups left out", () => {
+    const [bench, pull] = planStrongIngest(RAW, { source: "api" }).summary!.exercises;
+    expect(bench.sets).toEqual([
+      { weight: 185, unit: "lb", reps: 5, durationS: null, distance: null, distanceUnit: null, bodyweight: false },
+      { weight: 185, unit: "lb", reps: 5, durationS: null, distance: null, distanceUnit: null, bodyweight: false },
+    ]);
+    expect(pull.sets.map((s) => [s.weight, s.reps, s.bodyweight])).toEqual([
+      [null, 12, true],
+      [25, 8, true],
+    ]);
+  });
+});
+
+describe("pickEditTarget", () => {
+  const SHARE: EditLookup = {
+    plannedId: "strong-NewSlug",
+    slug: "NewSlug",
+    title: "Full Body B",
+    startedLocal: "2026-11-02T19:18",
+    exerciseNames: ["Squat (Barbell)", "Deadlift (Barbell)", "Bicep Curl (Dumbbell)"],
+  };
+  function cand(over: Partial<EditCandidate>): EditCandidate {
+    return {
+      id: "strong-caterxeu",
+      title: "Full Body B",
+      startedLocal: "2026-11-02T19:18",
+      strongSlug: "caterxeu",
+      source: "strong-text",
+      deletedAt: null,
+      exerciseNames: ["Squat (Barbell)", "Deadlift (Barbell)", "Bicep Curl (Dumbbell)"],
+      ...over,
+    };
+  }
+
+  it("is new with nothing stored", () => {
+    expect(pickEditTarget(SHARE, [])).toEqual({ kind: "new" });
+  });
+
+  it("rewrites its own id when it exists (a same-link edit), noting a deleted one", () => {
+    expect(pickEditTarget(SHARE, [cand({ id: "strong-NewSlug", strongSlug: "NewSlug" }), cand({})])).toEqual({
+      kind: "existing",
+      workoutId: "strong-NewSlug",
+      deleted: false,
+    });
+    expect(pickEditTarget(SHARE, [cand({ id: "strong-NewSlug", deletedAt: new Date() })])).toMatchObject({ deleted: true });
+  });
+
+  it("follows its link to whichever workout already holds it", () => {
+    expect(pickEditTarget({ ...SHARE, startedLocal: "2026-11-02T20:00" }, [cand({ strongSlug: "NewSlug" })])).toEqual({
+      kind: "existing",
+      workoutId: "strong-caterxeu",
+      deleted: false,
+    });
+  });
+
+  it("treats a new link at the same minute with the same title as an edit, even with new exercises", () => {
+    const share = { ...SHARE, exerciseNames: ["Leg Press", "Row (Cable)"] };
+    expect(pickEditTarget(share, [cand({})])).toMatchObject({ kind: "existing", workoutId: "strong-caterxeu" });
+  });
+
+  it("treats a renamed workout as an edit when most exercises carry over", () => {
+    const renamed = { ...SHARE, title: "Legs + Arms", exerciseNames: ["Squat (Barbell)", "Deadlift (Barbell)", "Leg Curl"] };
+    // 2 of 3 names
+    expect(pickEditTarget(renamed, [cand({})])).toMatchObject({ kind: "existing", workoutId: "strong-caterxeu" });
+    const mostlyNew = { ...renamed, exerciseNames: ["Squat (Barbell)", "Leg Curl", "Calf Raise", "Leg Press"] };
+    // 1 of 4
+    expect(pickEditTarget(mostlyNew, [cand({})])).toEqual({ kind: "new" });
+    // exactly half counts
+    expect(pickEditTarget({ ...renamed, exerciseNames: ["squat barbell", "Leg Curl"] }, [cand({ exerciseNames: ["Squat (Barbell)", "Row"] })])).toMatchObject({
+      kind: "existing",
+    });
+  });
+
+  it("ignores other minutes, deleted workouts, app workouts and dateless shares", () => {
+    expect(pickEditTarget(SHARE, [cand({ startedLocal: "2026-11-02T19:19" })])).toEqual({ kind: "new" });
+    expect(pickEditTarget(SHARE, [cand({ deletedAt: new Date() })])).toEqual({ kind: "new" });
+    expect(pickEditTarget(SHARE, [cand({ source: "app" })])).toEqual({ kind: "new" });
+    expect(pickEditTarget({ ...SHARE, startedLocal: null }, [cand({})])).toEqual({ kind: "new" });
+    expect(pickEditTarget(SHARE, [cand({ source: "strong-csv", id: "strong-csv1" })])).toMatchObject({ workoutId: "strong-csv1" });
+  });
+
+  it("doesn't guess between several matches", () => {
+    expect(pickEditTarget(SHARE, [cand({ id: "strong-b" }), cand({ id: "strong-a", strongSlug: "a" })])).toEqual({
+      kind: "ambiguous",
+      workoutIds: ["strong-a", "strong-b"],
+    });
+    // a different workout at the same minute doesn't count against the match
+    expect(
+      pickEditTarget(SHARE, [cand({}), cand({ id: "strong-core", title: "Core", strongSlug: "c", exerciseNames: ["Plank"] })])
+    ).toMatchObject({ kind: "existing", workoutId: "strong-caterxeu" });
   });
 });
 

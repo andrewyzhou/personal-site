@@ -1,4 +1,4 @@
-import { eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import {
@@ -14,10 +14,21 @@ import {
 } from "@/lib/db";
 import { log } from "@/lib/log";
 import { linkWorkout } from "./link";
-import { planStrongIngest, type IngestPlan, type IngestSource, type IngestSummary, type WorkoutPlan } from "./plan";
-import { formatIngestSummary, type LinkedActivity } from "./summary";
+import {
+  pickEditTarget,
+  planStrongIngest,
+  type EditCandidate,
+  type EditLookup,
+  type IngestPlan,
+  type IngestSource,
+  type IngestSummary,
+  type PlanOptions,
+  type WorkoutPlan,
+} from "./plan";
+import { formatIngestDetails, formatIngestSummary, type LinkedActivity } from "./summary";
 
-export type IngestStatus = "created" | "duplicate" | "empty";
+/** 'updated': an edited re-share rewrote a workout that was already logged */
+export type IngestStatus = "created" | "updated" | "duplicate" | "empty";
 
 export interface IngestResult {
   status: IngestStatus;
@@ -27,6 +38,8 @@ export interface IngestResult {
   summary: IngestSummary | null;
   /** one-line human summary (or the reason nothing was logged) */
   text: string;
+  /** multi-line breakdown: the one-liner, each exercise, the watch link, warnings */
+  details: string;
   links: LinkedActivity[];
   warnings: LiftWarning[];
 }
@@ -163,15 +176,70 @@ async function safeLinks(fn: () => Promise<LinkedActivity[]>, workoutId: string)
   }
 }
 
+/**
+ * rows that could be the workout a share edits: its own id, the same strong
+ * link, or a live strong workout starting the same minute. pickEditTarget
+ * re-checks every condition, so this only has to be a superset.
+ */
+export function editCandidatesWhere(plannedId: string, slug: string | null, startedLocal: string | null): SQL {
+  const t = liftWorkouts;
+  const conds: (SQL | undefined)[] = [eq(t.id, plannedId)];
+  if (slug) conds.push(eq(t.strongSlug, slug));
+  if (startedLocal) conds.push(and(eq(t.startedLocal, startedLocal), like(t.source, "strong%"), isNull(t.deletedAt)));
+  return or(...conds)!;
+}
+
+export async function loadEditCandidates(db: Db, share: EditLookup): Promise<EditCandidate[]> {
+  const rows = await db
+    .select({
+      id: liftWorkouts.id,
+      title: liftWorkouts.title,
+      startedLocal: liftWorkouts.startedLocal,
+      strongSlug: liftWorkouts.strongSlug,
+      source: liftWorkouts.source,
+      deletedAt: liftWorkouts.deletedAt,
+    })
+    .from(liftWorkouts)
+    .where(editCandidatesWhere(share.plannedId, share.slug, share.startedLocal));
+  // names only matter for same-minute matches that aren't already decided by id or slug
+  const needNames = rows.filter((r) => r.id !== share.plannedId && r.startedLocal === share.startedLocal).map((r) => r.id);
+  const names = new Map<string, string[]>();
+  if (needNames.length) {
+    const ex = await db
+      .select({ workoutId: liftWorkoutExercises.workoutId, nameRaw: liftWorkoutExercises.nameRaw })
+      .from(liftWorkoutExercises)
+      .where(inArray(liftWorkoutExercises.workoutId, needNames));
+    for (const e of ex) {
+      if (!needNames.includes(e.workoutId)) continue;
+      names.set(e.workoutId, [...(names.get(e.workoutId) ?? []), e.nameRaw]);
+    }
+  }
+  return rows.map((r) => ({ ...r, exerciseNames: names.get(r.id) ?? [] }));
+}
+
+export function ambiguousWarning(ids: readonly string[]): LiftWarning {
+  return {
+    line: 0,
+    message: `${ids.length} workouts already start at that minute, so this was logged as a new one`,
+    text: ids.join(", "),
+  };
+}
+
 export async function ingestStrongText(rawText: string, opts: { source: IngestSource }): Promise<IngestResult> {
   let plan = planStrongIngest(rawText, { source: opts.source });
   const db = getDb();
+  let redirects: ReadonlyMap<string, string> | undefined;
+  const replan = (extra: Omit<PlanOptions, "source">) =>
+    planStrongIngest(rawText, { source: opts.source, redirects, ...extra });
 
   // exercises merged on the phone keep resolving to the merge target
   const customIds = plan.summary?.exercises.filter((e) => e.custom).map((e) => e.exerciseId) ?? [];
   if (customIds.length) {
-    const redirects = await loadMergeRedirects(db, customIds);
-    if (redirects.size) plan = planStrongIngest(rawText, { source: opts.source, redirects });
+    const found = await loadMergeRedirects(db, customIds);
+    if (found.size) {
+      redirects = found;
+      plan = replan({});
+    }
   }
 
   const [existing] = await db
@@ -179,6 +247,32 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
     .from(liftIngests)
     .where(eq(liftIngests.rawSha256, plan.sha256))
     .limit(1);
+
+  let updated = false;
+  if (plan.workout) {
+    const plannedId = plan.workout.workout.id;
+    let target: string | undefined;
+    if (existing?.workoutId) {
+      // the same bytes land where they did last time (an edit may have moved them)
+      target = existing.workoutId;
+    } else {
+      const share: EditLookup = {
+        plannedId,
+        slug: plan.ingest.strongSlug ?? null,
+        title: plan.workout.workout.title,
+        startedLocal: plan.parsed?.startedLocal ?? null,
+        exerciseNames: plan.workout.workoutExercises.map((we) => we.nameRaw),
+      };
+      const pick = pickEditTarget(share, await loadEditCandidates(db, share));
+      if (pick.kind === "existing") {
+        target = pick.workoutId;
+        updated = !pick.deleted;
+      } else if (pick.kind === "ambiguous") {
+        plan = replan({ extraWarnings: [ambiguousWarning(pick.workoutIds)] });
+      }
+    }
+    if (target && target !== plannedId) plan = replan({ workoutId: target });
+  }
 
   // the batch is idempotent, so a seen sha still writes: that un-deletes a
   // soft-deleted workout, restores A after an edited B, and lets an old
@@ -195,6 +289,7 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
       workoutId: null,
       summary: null,
       text: plan.rejected ?? EMPTY_TEXT,
+      details: plan.rejected ?? EMPTY_TEXT,
       links: [],
       warnings: plan.warnings,
     };
@@ -203,15 +298,19 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
   const workout = plan.workout.workout;
   // an old 'empty' row for this sha never logged anything, so this is new
   const duplicate = Boolean(existing?.workoutId);
+  if (duplicate) updated = false;
+  const status: IngestStatus = duplicate ? "duplicate" : updated ? "updated" : "created";
   const links = await safeLinks(() => linkWorkout(workout), workout.id);
-  log.info("lift:ingest", `${ingestId} -> ${workout.id} (${links.length} links${duplicate ? ", re-share" : ""})`);
+  log.info("lift:ingest", `${ingestId} -> ${workout.id} (${links.length} links, ${status})`);
+  const fmt = { duplicate, updated };
   return {
-    status: duplicate ? "duplicate" : "created",
+    status,
     duplicate,
     ingestId,
     workoutId: workout.id,
     summary: plan.summary,
-    text: formatIngestSummary(plan.summary, links, { duplicate }),
+    text: formatIngestSummary(plan.summary, links, fmt),
+    details: formatIngestDetails(plan.summary, links, { ...fmt, workoutId: workout.id, warnings: plan.warnings }),
     links,
     warnings: plan.warnings,
   };
