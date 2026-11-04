@@ -1,27 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { parseTrackFile, unwrapTrackFile, type ParsedTrackFile } from "@/lib/fit";
-import {
-  dedupeKey,
-  findByDedupeKey,
-  fitBlobPathname,
-  localDateTime,
-  sha256Hex,
-  computePublished,
-} from "@/lib/activities";
-import { r2Put } from "@/lib/r2";
+import { parseTrackFile, type ParsedTrackFile } from "@/lib/fit";
+import { dedupeKey, findByDedupeKey, localDateTime, computePublished } from "@/lib/activities";
+import { storeOriginal, type StoredOriginal } from "@/lib/activity-sources";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MAX_MULTIPART_BYTES = 4 * 1024 * 1024; // vercel request cap is 4.5mb
-
-const CONTENT_TYPES: Record<string, string> = {
-  fit: "application/octet-stream",
-  gpx: "application/gpx+xml",
-  tcx: "application/xml",
-};
 
 // preview track for the trim ui: uniform stride sample keeping per-point extras
 // aligned — [lat, lng, cumDistM, tOffsetS, eleM|null, hr|null]
@@ -75,10 +62,7 @@ export async function POST(request: Request) {
     }
 
     let parsed: ParsedTrackFile;
-    let inner: { bytes: Uint8Array; fileType: string };
     try {
-      // unwrap once for content-addressed storage of the inner track bytes
-      inner = unwrapTrackFile(bytes, filename);
       parsed = parseTrackFile(bytes, filename);
     } catch (error) {
       log.warn("admin:parse", "decode failed", error);
@@ -88,16 +72,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // originals are retained no matter what happens next; content-addressed path
+    // originals are retained no matter what happens next; content addressing
     // makes re-parse and re-upload idempotent
-    const sha = sha256Hex(inner.bytes);
-    const pathname = fitBlobPathname(sha, parsed.fileType, parsed.startDateUtc);
-    let fitBlobUrl: string;
+    let stored: StoredOriginal;
     try {
-      const put = await r2Put(pathname, inner.bytes, CONTENT_TYPES[parsed.fileType]);
-      fitBlobUrl = put.url;
+      stored = await storeOriginal(bytes, filename, parsed.startDateUtc, { provider: "upload", filename });
     } catch (error) {
-      log.error("admin:parse", "r2 write failed", error);
+      log.error("admin:parse", "original write failed", error);
       return NextResponse.json({ ok: false, error: "storage write failed" }, { status: 502 });
     }
 
@@ -119,9 +100,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       draft: {
-        fitBlobUrl,
-        fitBlobPathname: pathname,
-        fitSha256: sha,
+        rawSha256: stored.rawSha256,
+        // legacy public copy, only before the private store exists
+        fitBlobUrl: stored.legacy?.url ?? null,
+        fitBlobPathname: stored.legacy?.pathname ?? null,
+        fitSha256: stored.legacy?.sha256 ?? null,
         fileType: parsed.fileType,
         sportType: parsed.sportType,
         suggestedName: parsed.suggestedName,

@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // fake drizzle: select(...).from().where().limit() resolves to byIdRows;
 // update(...).set(v).where() records v
-const { byIdRows, updates, findSame, insert, r2Put } = vi.hoisted(() => ({
+const { byIdRows, updates, findSame, insert, sources, bySource, storeOriginal, storeRaw, republish } = vi.hoisted(() => ({
   byIdRows: { value: [] as { id: number }[] },
   updates: [] as Record<string, unknown>[],
   findSame: vi.fn(),
   insert: vi.fn(),
-  r2Put: vi.fn(),
+  sources: [] as Record<string, unknown>[],
+  bySource: vi.fn(),
+  storeOriginal: vi.fn(),
+  storeRaw: vi.fn(),
+  republish: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -24,16 +28,18 @@ vi.mock("@/lib/activities", async (orig) => ({
   insertActivity: (v: unknown) => insert(v),
 }));
 
-vi.mock("@/lib/r2", () => ({
-  r2Head: async () => false,
-  r2Put: (...a: unknown[]) => r2Put(...a),
-  r2PublicUrl: (p: string) => `https://r2.test/${p}`,
+vi.mock("@/lib/activity-sources", () => ({
+  addActivitySource: async (s: Record<string, unknown>) => void sources.push(s),
+  findActivityIdBySource: (p: string, id: string) => bySource(p, id),
+  storeOriginal: (...a: unknown[]) => storeOriginal(...a),
+  storeRawPayload: (...a: unknown[]) => storeRaw(...a),
 }));
+
+vi.mock("@/lib/republish", () => ({ republish: (id: number) => republish(id) }));
 
 vi.mock("@/lib/cache", () => ({ invalidateCache: vi.fn() }));
 
 vi.mock("@/lib/fit", () => ({
-  unwrapTrackFile: (b: Uint8Array) => ({ bytes: b, fileType: "fit" }),
   parseTrackFile: () => ({
     fileType: "fit",
     sportType: "Run",
@@ -53,6 +59,10 @@ vi.mock("@/lib/fit", () => ({
 
 import { pullIntervalsActivities } from "@/lib/intervals";
 
+const FILE_SHA = "f".repeat(64);
+const JSON_SHA = "a".repeat(64);
+const LEGACY = { pathname: "activities/fit/2026/abc.fit", url: "https://r2.test/activities/fit/2026/abc.fit", sha256: "b".repeat(64) };
+
 const activity = (over: Record<string, unknown> = {}) => ({
   id: "i100",
   name: "Berkeley Running",
@@ -64,10 +74,16 @@ const activity = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+let fetched: string[] = [];
+
 function mockApi(list: unknown[], file: Uint8Array | null = new Uint8Array([1, 2, 3])) {
+  fetched = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    fetched.push(url);
     if (url.includes("/activities?")) return new Response(JSON.stringify(list));
+    if (url.endsWith("/fit-file")) throw new Error("re-encoded file must not be fetched");
     if (url.endsWith("/file")) return file ? new Response(new Blob([new Uint8Array(file)])) : new Response("", { status: 404 });
+    if (/\/activity\/i\d+$/.test(url)) return new Response('{"id":"i100","icu_training_load":42}');
     throw new Error(`unexpected ${url}`);
   }));
 }
@@ -76,20 +92,55 @@ beforeEach(() => {
   vi.clearAllMocks();
   byIdRows.value = [];
   updates.length = 0;
+  sources.length = 0;
   findSame.mockResolvedValue(null);
+  bySource.mockResolvedValue(null);
   insert.mockResolvedValue({ inserted: true, id: 1 });
+  storeOriginal.mockResolvedValue({ rawSha256: FILE_SHA, legacy: null });
+  storeRaw.mockResolvedValue(JSON_SHA);
+  republish.mockResolvedValue({ status: "published" });
   process.env.INTERVALS_ICU_API_KEY = "k";
 });
 
 describe("pullIntervalsActivities", () => {
-  it("inserts a new garmin activity with its original stored in r2", async () => {
+  it("stores the original from /file and the activity json, links both, then republishes", async () => {
     mockApi([activity()]);
     const r = await pullIntervalsActivities();
     expect(r).toMatchObject({ inserted: 1, upgraded: 0, skipped: 0, failures: [] });
-    expect(r2Put).toHaveBeenCalledOnce();
+
+    expect(fetched.some((u) => u.endsWith("/activity/i100/file"))).toBe(true);
+    expect(fetched.some((u) => u.includes("fit-file"))).toBe(false);
+
+    const [bytes, filename, , meta] = storeOriginal.mock.calls[0];
+    expect(Array.from(bytes as Uint8Array)).toEqual([1, 2, 3]);
+    expect(filename).toBe("i100.fit");
+    expect(meta).toMatchObject({ provider: "intervals-icu", externalId: "i100" });
+
+    const [jsonBytes, kind] = storeRaw.mock.calls[0];
+    expect(new TextDecoder().decode(jsonBytes as Uint8Array)).toBe('{"id":"i100","icu_training_load":42}');
+    expect(kind).toBe("intervals-activity");
+
     const row = insert.mock.calls[0][0];
     expect(row).toMatchObject({ source: "intervals-icu", externalId: "i100", name: "Berkeley Running", sportType: "Run" });
-    expect(row.fitBlobPathname).toMatch(/^activities\/fit\/2026\//);
+    // raw store mode: no legacy public copy on the row
+    expect(row.fitBlobPathname).toBeNull();
+
+    expect(sources).toEqual([
+      { activityId: 1, provider: "intervals-icu", externalId: "i100", kind: "device-file", rawSha256: FILE_SHA },
+      { activityId: 1, provider: "intervals-icu", externalId: "i100", kind: "intervals-activity", rawSha256: JSON_SHA },
+    ]);
+    expect(republish).toHaveBeenCalledWith(1);
+  });
+
+  it("writes the legacy fit columns only in fallback mode", async () => {
+    storeOriginal.mockResolvedValue({ rawSha256: LEGACY.sha256, legacy: LEGACY });
+    storeRaw.mockResolvedValue(null);
+    mockApi([activity()]);
+    await pullIntervalsActivities();
+    expect(insert.mock.calls[0][0]).toMatchObject({ fitBlobPathname: LEGACY.pathname, fitSha256: LEGACY.sha256 });
+    expect(sources).toEqual([
+      { activityId: 1, provider: "intervals-icu", externalId: "i100", kind: "device-file", rawSha256: LEGACY.sha256 },
+    ]);
   });
 
   it("skips strava-sourced stubs without touching them", async () => {
@@ -105,15 +156,38 @@ describe("pullIntervalsActivities", () => {
     expect(await pullIntervalsActivities()).toMatchObject({ inserted: 0, skipped: 1 });
   });
 
-  it("upgrades a strava-api row with the original's route + stats, keeping its name", async () => {
+  it("skips activities already attached to another row as a source", async () => {
+    bySource.mockResolvedValue(9);
+    mockApi([activity()]);
+    expect(await pullIntervalsActivities()).toMatchObject({ inserted: 0, upgraded: 0, skipped: 1 });
+    expect(bySource).toHaveBeenCalledWith("intervals-icu", "i100");
+    expect(fetched.some((u) => u.includes("/activity/"))).toBe(false);
+    expect(storeOriginal).not.toHaveBeenCalled();
+    expect(republish).not.toHaveBeenCalled();
+  });
+
+  it("upgrades a strava-api row by attaching the original and republishing, never writing stats", async () => {
     findSame.mockResolvedValue({ id: 9, source: "strava-api", fitBlobPathname: null });
     mockApi([activity()]);
     const r = await pullIntervalsActivities();
     expect(r).toMatchObject({ inserted: 0, upgraded: 1 });
     expect(insert).not.toHaveBeenCalled();
-    expect(updates[0]).toHaveProperty("polyline");
-    expect(updates[0]).toHaveProperty("fitBlobPathname");
-    expect(updates[0]).not.toHaveProperty("name");
+    expect(updates).toHaveLength(0);
+    expect(sources.map((s) => [s.activityId, s.kind])).toEqual([
+      [9, "device-file"],
+      [9, "intervals-activity"],
+    ]);
+    expect(republish).toHaveBeenCalledWith(9);
+  });
+
+  it("upgrade in fallback mode sets only the legacy file columns", async () => {
+    storeOriginal.mockResolvedValue({ rawSha256: LEGACY.sha256, legacy: LEGACY });
+    findSame.mockResolvedValue({ id: 9, source: "strava-api", fitBlobPathname: null });
+    mockApi([activity()]);
+    await pullIntervalsActivities();
+    expect(updates).toHaveLength(1);
+    expect(Object.keys(updates[0]).sort()).toEqual(["fileType", "fitBlobPathname", "fitBlobUrl", "fitSha256", "updatedAt"]);
+    expect(republish).toHaveBeenCalledWith(9);
   });
 
   it("leaves rows that already have an original file alone", async () => {
@@ -121,6 +195,7 @@ describe("pullIntervalsActivities", () => {
     mockApi([activity()]);
     expect(await pullIntervalsActivities()).toMatchObject({ skipped: 1, upgraded: 0 });
     expect(updates).toHaveLength(0);
+    expect(sources).toHaveLength(0);
   });
 
   it("falls back to summary stats when there is no file", async () => {
@@ -134,6 +209,17 @@ describe("pullIntervalsActivities", () => {
       utcOffsetMin: -420,
       movingTimeS: 3000,
     });
+    expect(storeOriginal).not.toHaveBeenCalled();
+    expect(sources.map((s) => s.kind)).toEqual(["summary", "intervals-activity"]);
+    expect(republish).not.toHaveBeenCalled();
+  });
+
+  it("does not attach sources when the insert hits an existing row", async () => {
+    insert.mockResolvedValue({ inserted: false, id: 3 });
+    mockApi([activity()]);
+    expect(await pullIntervalsActivities()).toMatchObject({ inserted: 0, skipped: 1 });
+    expect(sources).toHaveLength(0);
+    expect(republish).not.toHaveBeenCalled();
   });
 
   it("reports a rejected api key as an error", async () => {

@@ -20,9 +20,10 @@ import {
 type PreviewPoint = [number, number, number, number, number | null, number | null];
 
 interface Draft {
-  fitBlobUrl: string;
-  fitBlobPathname: string;
-  fitSha256: string;
+  rawSha256: string;
+  fitBlobUrl: string | null; // legacy public copy (pre-cutover only)
+  fitBlobPathname: string | null;
+  fitSha256: string | null;
   fileType: string;
   sportType: string;
   suggestedName: string;
@@ -211,7 +212,8 @@ export default function UploadFlow() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fitBlobPathname: draft.fitBlobPathname,
+          rawSha256: draft.rawSha256,
+          fitBlobPathname: draft.fitBlobPathname ?? undefined,
           name,
           description: description || null,
           sportType,

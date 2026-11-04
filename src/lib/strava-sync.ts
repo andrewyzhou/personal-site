@@ -1,7 +1,7 @@
 // strava api → neon sync. pulls activities newer than the latest stored one,
-// rebuilds the track from the streams api, and runs it through the same
-// trim/publish pipeline as uploads and the archive import. insert-only for new
-// activities; strava edits (rename, description, type) patch existing rows.
+// keeps the detail + streams responses as raw objects linked as sources, and
+// lets republish() build the published route/stats from them. insert-only for
+// new activities; strava edits (rename, description, type) patch existing rows.
 // server-only.
 
 import { desc, eq, inArray } from "drizzle-orm";
@@ -19,6 +19,8 @@ import { cumulativeDistances, type TrackRecord } from "./geo";
 import type { ParsedTrackFile } from "./fit";
 import { getAccessToken, isStravaApiEnabled } from "./strava";
 import { invalidateCache } from "./cache";
+import { addActivitySource, findActivityIdBySource, storeRawPayload } from "./activity-sources";
+import { republish } from "./republish";
 
 const API = "https://www.strava.com/api/v3";
 const FETCH_TIMEOUT_MS = 10000;
@@ -59,7 +61,8 @@ type Streams = Partial<Record<
   { data: unknown[] }
 >>;
 
-async function stravaGet<T>(token: string, pathAndQuery: string): Promise<T> {
+// the exact response bytes (kept as raw objects) plus their parsed json
+async function stravaGetRaw<T>(token: string, pathAndQuery: string): Promise<{ bytes: Uint8Array; data: T }> {
   const response = await fetch(`${API}${pathAndQuery}`, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -68,8 +71,18 @@ async function stravaGet<T>(token: string, pathAndQuery: string): Promise<T> {
     const body = await response.text();
     throw new Error(`strava ${pathAndQuery.split("?")[0]}: ${response.status} ${response.statusText} — ${body}`);
   }
-  return response.json() as Promise<T>;
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return { bytes, data: JSON.parse(new TextDecoder().decode(bytes)) as T };
 }
+
+async function stravaGet<T>(token: string, pathAndQuery: string): Promise<T> {
+  return (await stravaGetRaw<T>(token, pathAndQuery)).data;
+}
+
+const fetchDetail = (token: string, id: number) => stravaGetRaw<StravaDetail>(token, `/activities/${id}`);
+
+const storeDetail = (bytes: Uint8Array, stravaId: number) =>
+  storeRawPayload(bytes, "strava-detail", { stravaId });
 
 async function listSince(token: string, after: number): Promise<{ id: number; start_date: string }[]> {
   const all: { id: number; start_date: string }[] = [];
@@ -136,7 +149,12 @@ function summaryStats(d: StravaDetail) {
   };
 }
 
-async function buildRow(token: string, detail: StravaDetail): Promise<NewActivityRow> {
+// the insert row (default trim; republish then owns the published columns)
+// plus the raw streams response when one was fetched
+async function buildRow(
+  token: string,
+  detail: StravaDetail
+): Promise<{ row: NewActivityRow; streamsBytes: Uint8Array | null }> {
   const meta = {
     name: detail.name || "workout",
     description: detail.description || null,
@@ -148,15 +166,17 @@ async function buildRow(token: string, detail: StravaDetail): Promise<NewActivit
   // "only you" activities on strava stay off the site
   const hidden = detail.private === true;
 
+  let streamsBytes: Uint8Array | null = null;
   if (detail.map?.summary_polyline) {
-    const streams = await stravaGet<Streams>(
+    const streams = await stravaGetRaw<Streams>(
       token,
       `/activities/${detail.id}/streams?keys=time,latlng,altitude,distance,heartrate,cadence,watts,velocity_smooth&key_by_type=true`
     );
-    const parsed = streamsToTrack(detail, streams);
+    streamsBytes = streams.bytes;
+    const parsed = streamsToTrack(detail, streams.data);
     if (parsed) {
       const published = computePublished(parsed, DEFAULT_PRIVACY_TRIM_M, DEFAULT_PRIVACY_TRIM_M);
-      return { ...buildActivityValues(parsed, published, meta), fileType: null, hidden };
+      return { row: { ...buildActivityValues(parsed, published, meta), fileType: null, hidden }, streamsBytes };
     }
   }
 
@@ -165,7 +185,7 @@ async function buildRow(token: string, detail: StravaDetail): Promise<NewActivit
   const utcOffsetMin = Math.round(detail.utc_offset / 60);
   const { localDate, localTime } = localDateTime(startDateUtc, utcOffsetMin);
   const s = summaryStats(detail);
-  return {
+  const row: NewActivityRow = {
     name: meta.name,
     description: meta.description,
     gear: meta.gear,
@@ -193,6 +213,7 @@ async function buildRow(token: string, detail: StravaDetail): Promise<NewActivit
     fileType: null,
     dedupeKey: dedupeKey(startDateUtc.getTime() / 1000, s.elapsedTimeS),
   };
+  return { row, streamsBytes };
 }
 
 export interface SyncResult {
@@ -232,23 +253,40 @@ export async function syncStravaActivities({ dryRun = false } = {}): Promise<Syn
   const result: SyncResult = { inserted: 0, merged: 0, skipped: 0, failures: [], more: todo.length > MAX_NEW_PER_RUN };
   for (const { id } of todo.slice(0, MAX_NEW_PER_RUN)) {
     try {
-      const detail = await stravaGet<StravaDetail>(token, `/activities/${id}`);
+      const { bytes: detailBytes, data: detail } = await fetchDetail(token, id);
       // same workout already in from garmin (intervals.icu / upload): keep its
-      // original-file route and stats, take the name etc. from strava
+      // original-file route and stats, take the name etc. from strava. the
+      // detail is linked but not republished (a device file always outranks it).
       const same = await findSameActivity(new Date(detail.start_date));
       if (same) {
-        if (!dryRun) await setStravaMetadata(same.id, detail);
+        if (!dryRun) {
+          const detailSha = await storeDetail(detailBytes, id);
+          if (detailSha) {
+            await addActivitySource({ activityId: same.id, provider: "strava", externalId: String(id), kind: "strava-detail", rawSha256: detailSha });
+          }
+          await setStravaMetadata(same.id, detail);
+        }
         result.merged++;
         continue;
       }
-      const row = await buildRow(token, detail);
+      const { row, streamsBytes } = await buildRow(token, detail);
       if (dryRun) {
         (result.preview ??= []).push(row);
         continue;
       }
+      const detailSha = await storeDetail(detailBytes, id);
+      const streamsSha = streamsBytes ? await storeRawPayload(streamsBytes, "strava-streams", { stravaId: id }) : null;
       const outcome = await insertActivity(row);
-      if (outcome.inserted) result.inserted++;
-      else result.skipped++;
+      if (!outcome.inserted) {
+        result.skipped++;
+        continue;
+      }
+      const base = { activityId: outcome.id, provider: "strava" as const, externalId: String(id) };
+      if (detailSha) await addActivitySource({ ...base, kind: "strava-detail", rawSha256: detailSha });
+      if (streamsSha) await addActivitySource({ ...base, kind: "strava-streams", rawSha256: streamsSha });
+      if (!detailSha && !streamsSha) await addActivitySource({ ...base, kind: "summary" });
+      await republish(outcome.id);
+      result.inserted++;
     } catch (error) {
       result.failures.push({ id, error: (error as Error).message });
       // a failed early activity must not let later ones advance the watermark past it
@@ -284,14 +322,23 @@ async function setStravaMetadata(rowId: number, detail: StravaDetail): Promise<v
 // whether it was synced from strava or merged into a garmin-sourced one
 export async function applyStravaUpdate(stravaId: number): Promise<boolean> {
   const token = await getAccessToken();
-  const detail = await stravaGet<StravaDetail>(token, `/activities/${stravaId}`);
+  const { bytes, data: detail } = await fetchDetail(token, stravaId);
   const byId = await getDb()
     .select({ id: activities.id })
     .from(activities)
     .where(eq(activities.externalId, String(stravaId)))
     .limit(1);
-  const rowId = byId[0]?.id ?? (await findSameActivity(new Date(detail.start_date)))?.id;
+  const rowId =
+    byId[0]?.id ??
+    (await findActivityIdBySource("strava", String(stravaId))) ??
+    (await findSameActivity(new Date(detail.start_date)))?.id;
   if (rowId === undefined) return false;
+  // keep the fresh detail; not republished here, so an update can never swap
+  // a row's route to strava's
+  const detailSha = await storeDetail(bytes, stravaId);
+  if (detailSha) {
+    await addActivitySource({ activityId: rowId, provider: "strava", externalId: String(stravaId), kind: "strava-detail", rawSha256: detailSha });
+  }
   await setStravaMetadata(rowId, detail);
   await invalidateCache("activities_list", "activities_latest");
   return true;

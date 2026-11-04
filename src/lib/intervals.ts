@@ -1,10 +1,10 @@
 // intervals.icu → neon pull. garmin pushes every activity to intervals.icu (an
 // official garmin partner) within a minute or two of a watch sync, and its api
-// serves the original .fit — so this is the garmin import path that doesn't
-// depend on strava. originals go to r2, then the same trim/publish pipeline as
-// uploads. never destructive: insert-only, plus upgrading strava-api rows (no
-// original file) to the .fit route/stats while keeping their strava metadata.
-// server-only.
+// serves the original file — so this is the garmin import path that doesn't
+// depend on strava. the original and the activity json are kept as raw objects,
+// linked as sources, and republish() builds the published route/stats. never
+// destructive: insert-only, plus attaching the original to strava-api rows (no
+// file) while keeping their strava metadata. server-only.
 
 import { eq } from "drizzle-orm";
 import { getDb, activities } from "./db";
@@ -13,19 +13,24 @@ import {
   computePublished,
   dedupeKey,
   findSameActivity,
-  fitBlobPathname,
   insertActivity,
   localDateTime,
-  sha256Hex,
   DEFAULT_PRIVACY_TRIM_M,
 } from "./activities";
-import { parseTrackFile, unwrapTrackFile } from "./fit";
-import { r2Head, r2Put, r2PublicUrl } from "./r2";
+import { parseTrackFile } from "./fit";
+import {
+  addActivitySource,
+  findActivityIdBySource,
+  storeOriginal,
+  storeRawPayload,
+  type StoredOriginal,
+} from "./activity-sources";
+import { republish } from "./republish";
 import { invalidateCache } from "./cache";
 
 const API = "https://intervals.icu/api/v1";
 const FETCH_TIMEOUT_MS = 15000;
-// each new activity is a file download + parse + r2 put; keep a run well
+// each new activity is a file download + parse + raw put; keep a run well
 // inside the 60s function limit and let the next run continue
 const MAX_NEW_PER_RUN = 10;
 const DEFAULT_LOOKBACK_DAYS = 7;
@@ -94,7 +99,8 @@ async function listActivities(oldest: string): Promise<IntervalsActivity[]> {
     .sort((a, b) => a.start_date!.localeCompare(b.start_date!));
 }
 
-// original file bytes, or null when the activity has none (manual entries)
+// original file bytes as served, or null when the activity has none (manual
+// entries). always /file (the original upload), never /fit-file (a re-encode).
 async function downloadOriginal(id: string): Promise<Uint8Array | null> {
   const response = await intervalsFetch(`/activity/${id}/file`);
   if (response.status === 404) return null;
@@ -105,30 +111,42 @@ async function downloadOriginal(id: string): Promise<Uint8Array | null> {
   return bytes.length > 0 ? bytes : null;
 }
 
-// parse an original + store it in r2; returns the publishable row values
+// the activity json, kept as the exact bytes received; null when not stored
+async function storeActivityJson(id: string): Promise<string | null> {
+  const response = await intervalsFetch(`/activity/${id}`);
+  if (!response.ok) {
+    throw new Error(`intervals.icu activity ${id}: ${response.status} ${await response.text()}`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return storeRawPayload(bytes, "intervals-activity", { provider: "intervals-icu", externalId: id });
+}
+
+// parse an original + keep its bytes. the insert row carries the default trim;
+// republish then owns the published columns.
 async function fromOriginal(a: IntervalsActivity, bytes: Uint8Array) {
   const filename = `${a.id}.${a.file_type || "fit"}`;
   const parsed = parseTrackFile(bytes, filename);
-  const inner = unwrapTrackFile(bytes, filename);
-  const sha = sha256Hex(inner.bytes);
-  const pathname = fitBlobPathname(sha, parsed.fileType, parsed.startDateUtc);
-  if (!(await r2Head(pathname))) {
-    await r2Put(pathname, inner.bytes, "application/octet-stream");
-  }
+  const stored = await storeOriginal(bytes, filename, parsed.startDateUtc, {
+    provider: "intervals-icu",
+    externalId: a.id,
+    url: `${API}/activity/${a.id}/file`,
+  });
   const hasGps = parsed.records.some((r) => r.lat !== null);
   const trim = hasGps ? DEFAULT_PRIVACY_TRIM_M : 0;
   const published = computePublished(parsed, trim, trim);
-  return buildActivityValues(parsed, published, {
+  const values = buildActivityValues(parsed, published, {
     name: a.name || parsed.suggestedName,
     description: a.description || null,
     sportType: a.type || undefined,
     source: "intervals-icu",
     externalId: a.id,
-    fitBlobUrl: r2PublicUrl(pathname),
-    fitBlobPathname: pathname,
-    fitSha256: sha,
+    // legacy public copy, only before the private store exists
+    fitBlobUrl: stored.legacy?.url ?? null,
+    fitBlobPathname: stored.legacy?.pathname ?? null,
+    fitSha256: stored.legacy?.sha256 ?? null,
     utcOffsetMinFallback: offsetMin(a),
   });
+  return { values, stored };
 }
 
 // no file: summary stats only
@@ -163,6 +181,19 @@ function fromSummary(a: IntervalsActivity) {
   };
 }
 
+// link what we kept to the row: the original (or a summary marker) + the json
+async function attachSources(
+  activityId: number,
+  externalId: string,
+  stored: StoredOriginal | null,
+  jsonSha: string | null
+): Promise<void> {
+  const base = { activityId, provider: "intervals-icu" as const, externalId };
+  if (stored) await addActivitySource({ ...base, kind: "device-file", rawSha256: stored.rawSha256 });
+  else await addActivitySource({ ...base, kind: "summary" });
+  if (jsonSha) await addActivitySource({ ...base, kind: "intervals-activity", rawSha256: jsonSha });
+}
+
 export interface PullResult {
   inserted: number;
   upgraded: number; // strava-api row given the original file's route + stats
@@ -184,12 +215,13 @@ export async function pullIntervalsActivities({ days = DEFAULT_LOOKBACK_DAYS } =
       break;
     }
     try {
+      // pulled before: either its own row, or attached to another row as a source
       const existingById = await db
         .select({ id: activities.id })
         .from(activities)
         .where(eq(activities.externalId, a.id))
         .limit(1);
-      if (existingById.length > 0) {
+      if (existingById.length > 0 || (await findActivityIdBySource("intervals-icu", a.id)) !== null) {
         result.skipped++;
         continue;
       }
@@ -206,48 +238,44 @@ export async function pullIntervalsActivities({ days = DEFAULT_LOOKBACK_DAYS } =
       const bytes = await downloadOriginal(a.id);
 
       if (same) {
-        // strava-api row: swap in the original's route + stats, keep strava's
-        // name/description/type and the row's identity
+        // strava-api row: attach the original as its best track source and let
+        // republish rebuild route + stats. strava's name/description/type and
+        // the row's identity stay.
         if (!bytes) {
           result.skipped++;
           continue;
         }
-        const v = await fromOriginal(a, bytes);
-        await db
-          .update(activities)
-          .set({
-            distanceM: v.distanceM,
-            movingTimeS: v.movingTimeS,
-            elapsedTimeS: v.elapsedTimeS,
-            elevGainM: v.elevGainM,
-            avgSpeedMs: v.avgSpeedMs,
-            maxSpeedMs: v.maxSpeedMs,
-            avgHr: v.avgHr,
-            maxHr: v.maxHr,
-            avgCadence: v.avgCadence,
-            avgWatts: v.avgWatts,
-            maxWatts: v.maxWatts,
-            kilojoules: v.kilojoules,
-            polyline: v.polyline,
-            cardPolyline: v.cardPolyline,
-            bounds: v.bounds,
-            trimStartM: v.trimStartM,
-            trimEndM: v.trimEndM,
-            fitBlobUrl: v.fitBlobUrl,
-            fitBlobPathname: v.fitBlobPathname,
-            fitSha256: v.fitSha256,
-            fileType: v.fileType,
-            updatedAt: new Date(),
-          })
-          .where(eq(activities.id, same.id));
+        const { values, stored } = await fromOriginal(a, bytes);
+        const jsonSha = await storeActivityJson(a.id);
+        if (stored.legacy) {
+          // pre-cutover: republish finds the original through these columns
+          await db
+            .update(activities)
+            .set({
+              fitBlobUrl: stored.legacy.url,
+              fitBlobPathname: stored.legacy.pathname,
+              fitSha256: stored.legacy.sha256,
+              fileType: values.fileType,
+              updatedAt: new Date(),
+            })
+            .where(eq(activities.id, same.id));
+        }
+        await attachSources(same.id, a.id, stored, jsonSha);
+        await republish(same.id);
         result.upgraded++;
         continue;
       }
 
-      const values = bytes ? await fromOriginal(a, bytes) : fromSummary(a);
-      const outcome = await insertActivity(values);
-      if (outcome.inserted) result.inserted++;
-      else result.skipped++;
+      const jsonSha = await storeActivityJson(a.id);
+      const built = bytes ? await fromOriginal(a, bytes) : null;
+      const outcome = await insertActivity(built ? built.values : fromSummary(a));
+      if (!outcome.inserted) {
+        result.skipped++;
+        continue;
+      }
+      await attachSources(outcome.id, a.id, built?.stored ?? null, jsonSha);
+      if (built) await republish(outcome.id);
+      result.inserted++;
     } catch (error) {
       result.failures.push({ id: a.id, error: (error as Error).message });
     }

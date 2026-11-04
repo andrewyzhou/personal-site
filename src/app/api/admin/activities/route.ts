@@ -6,7 +6,11 @@ import {
   buildActivityValues,
   computePublished,
   insertActivity,
+  sha256Hex,
 } from "@/lib/activities";
+import { addActivityEdit, addActivitySource } from "@/lib/activity-sources";
+import { getRawStore, isRawStoreConfigured, isSha256 } from "@/lib/raw-store";
+import { republish } from "@/lib/republish";
 import { getDb, activityPhotos } from "@/lib/db";
 import { invalidateCache } from "@/lib/cache";
 import { r2Get, r2PublicUrl } from "@/lib/r2";
@@ -16,7 +20,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 interface PublishBody {
-  fitBlobPathname?: string;
+  rawSha256?: string;
+  fitBlobPathname?: string; // legacy public copy (pre-cutover drafts)
   name?: string;
   description?: string | null;
   sportType?: string;
@@ -27,9 +32,43 @@ interface PublishBody {
   photos?: { pathname: string; url: string; width?: number; height?: number; caption?: string | null }[];
 }
 
-// publish. stateless and authoritative: the server re-fetches the original from
-// r2, re-parses, applies the trim itself, and recomputes all published stats —
-// the client's preview numbers are never trusted.
+// the stored original: private raw store by sha when it exists, else the
+// legacy public path from the draft
+async function loadOriginal(body: PublishBody): Promise<
+  | { bytes: Uint8Array; filename: string; rawSha256: string; legacyPathname: string | null }
+  | { error: string; status: number }
+> {
+  if (typeof body.rawSha256 === "string" && isSha256(body.rawSha256) && isRawStoreConfigured()) {
+    const store = getRawStore();
+    try {
+      const bytes = await store.get(body.rawSha256);
+      const manifest = await store.manifestRow(body.rawSha256).catch(() => null);
+      return {
+        bytes,
+        filename: manifest?.originalFilename || `${body.rawSha256}.fit`,
+        rawSha256: body.rawSha256,
+        legacyPathname: null,
+      };
+    } catch (error) {
+      log.error("admin:publish", "could not re-read original from the raw store", error);
+      return { error: "could not re-read original file", status: 502 };
+    }
+  }
+  if (typeof body.fitBlobPathname === "string" && body.fitBlobPathname.startsWith("activities/fit/")) {
+    try {
+      const bytes = await r2Get(body.fitBlobPathname);
+      return { bytes, filename: body.fitBlobPathname, rawSha256: sha256Hex(bytes), legacyPathname: body.fitBlobPathname };
+    } catch (error) {
+      log.error("admin:publish", "could not re-read original from storage", error);
+      return { error: "could not re-read original file", status: 502 };
+    }
+  }
+  return { error: "rawSha256 or fitBlobPathname is required", status: 400 };
+}
+
+// publish. stateless and authoritative: the server re-reads the original,
+// records it as the activity's source plus the trim as an edit, and republish
+// computes every published stat — the client's preview numbers are never trusted.
 export async function POST(request: Request) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
@@ -41,28 +80,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid json body" }, { status: 400 });
   }
 
-  if (!body.fitBlobPathname || typeof body.fitBlobPathname !== "string") {
-    return NextResponse.json({ ok: false, error: "fitBlobPathname is required" }, { status: 400 });
+  if (!body.rawSha256 && (!body.fitBlobPathname || typeof body.fitBlobPathname !== "string")) {
+    return NextResponse.json({ ok: false, error: "rawSha256 or fitBlobPathname is required" }, { status: 400 });
   }
   if (!body.name || typeof body.name !== "string") {
     return NextResponse.json({ ok: false, error: "name is required" }, { status: 400 });
   }
 
   try {
-    let bytes: Uint8Array;
-    try {
-      bytes = await r2Get(body.fitBlobPathname);
-    } catch (error) {
-      log.error("admin:publish", "could not re-read original from storage", error);
-      return NextResponse.json(
-        { ok: false, error: "could not re-read original file" },
-        { status: 502 }
-      );
+    const original = await loadOriginal(body);
+    if ("error" in original) {
+      return NextResponse.json({ ok: false, error: original.error }, { status: original.status });
     }
 
-    const parsed = parseTrackFile(bytes, body.fitBlobPathname);
-    const published = computePublished(parsed, body.trimStartM ?? 0, body.trimEndM ?? 0);
-    const sha = body.fitBlobPathname.split("/").pop()?.split(".")[0] ?? null;
+    const trimStartM = Math.max(0, Number(body.trimStartM) || 0);
+    const trimEndM = Math.max(0, Number(body.trimEndM) || 0);
+    const parsed = parseTrackFile(original.bytes, original.filename);
+    const published = computePublished(parsed, trimStartM, trimEndM);
+    const legacy = original.legacyPathname;
 
     const values = buildActivityValues(parsed, published, {
       name: body.name.trim(),
@@ -70,9 +105,10 @@ export async function POST(request: Request) {
       sportType: body.sportType,
       gear: body.gear?.trim() || null,
       source: "upload",
-      fitBlobUrl: r2PublicUrl(body.fitBlobPathname),
-      fitBlobPathname: body.fitBlobPathname,
-      fitSha256: sha,
+      // legacy public copy only; the raw store is reached through the source row
+      fitBlobUrl: legacy ? r2PublicUrl(legacy) : null,
+      fitBlobPathname: legacy,
+      fitSha256: legacy ? original.rawSha256 : null,
       utcOffsetMinFallback: body.utcOffsetMinFallback,
     });
 
@@ -82,6 +118,22 @@ export async function POST(request: Request) {
         { ok: false, error: "duplicate activity", id: outcome.id },
         { status: 409 }
       );
+    }
+
+    await addActivitySource({
+      activityId: outcome.id,
+      provider: "upload",
+      kind: "device-file",
+      rawSha256: original.rawSha256,
+    });
+    // always recorded, even 0/0, so the default privacy trim never applies to an upload
+    await addActivityEdit(outcome.id, "trim", { startM: trimStartM, endM: trimEndM });
+    let status = "not-run";
+    try {
+      status = (await republish(outcome.id)).status;
+    } catch (error) {
+      // the inserted row already carries the same trim's stats; a later rebuild catches up
+      log.error("admin:publish", `republish failed for activity ${outcome.id}`, error);
     }
 
     if (body.photos && body.photos.length > 0) {
@@ -109,7 +161,7 @@ export async function POST(request: Request) {
     revalidatePath(`/activities/${outcome.id}`);
     log.info(
       "admin:publish",
-      `published ${outcome.id} (${values.sportType}, ${Math.round(values.distanceM ?? 0)}m, trim ${values.trimStartM}/${values.trimEndM})`
+      `published ${outcome.id} (${values.sportType}, trim ${trimStartM}/${trimEndM}, republish ${status})`
     );
 
     return NextResponse.json({ ok: true, id: outcome.id, url: `/activities/${outcome.id}` }, { status: 201 });
