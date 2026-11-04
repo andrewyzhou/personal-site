@@ -4,6 +4,7 @@ import {
   formatIngestSummary,
   formatLocalDay,
   formatVolume,
+  formatWatch,
   sportLabel,
   type LinkedActivity,
 } from "@/lib/lift/summary";
@@ -127,6 +128,26 @@ describe("timingFromLinks", () => {
       endedAt: new Date("2026-11-05T03:15:00Z"),
       durationS: 65 * 60,
     });
+  });
+
+  it("2026-11-02 (real): an overrun link pins the start from the workout's wall time and the watch offset", () => {
+    const overrun = rec({
+      activityId: 496,
+      role: "overrun",
+      deltaMin: -317,
+      localTime: "14:01",
+      startDateUtc: new Date("2026-11-02T22:01:00Z"),
+      utcOffsetMin: -480,
+      elapsedS: 21909,
+    });
+    expect(timingFromLinks([overrun], "2026-11-02T19:18")).toEqual({
+      startedAt: new Date("2026-11-03T03:18:00Z"),
+      utcOffsetMin: -480,
+      endedAt: null,
+      durationS: null,
+    });
+    expect(timingFromLinks([overrun])).toBeNull();
+    expect(formatWatch([overrun])).toBe("watch: linked (inside weight training from 14:01)");
   });
 
   it("is null without a primary", () => {

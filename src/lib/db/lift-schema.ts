@@ -217,7 +217,7 @@ export const liftWorkoutActivities = pgTable(
     activityId: bigint("activity_id", { mode: "number" })
       .notNull()
       .references(() => activities.id, { onDelete: "cascade" }),
-    role: text("role").notNull(), // 'primary' | 'duplicate' | 'continuation'
+    role: text("role").notNull(), // 'primary' | 'duplicate' | 'continuation' | 'overrun'
     method: text("method").notNull(), // 'auto' | 'manual'
     deltaMin: integer("delta_min").notNull().default(0),
     createdAt: createdAt(),

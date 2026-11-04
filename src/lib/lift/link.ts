@@ -18,14 +18,31 @@ export interface LinkedRecording extends LinkedActivity {
 export interface WorkoutTiming {
   startedAt: Date;
   utcOffsetMin: number;
-  endedAt: Date;
-  durationS: number;
+  endedAt: Date | null;
+  durationS: number | null;
 }
 
-/** timing from the primary recording plus any continuations; null without a primary */
-export function timingFromLinks(links: readonly LinkedRecording[]): WorkoutTiming | null {
+const LOCAL_START_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+
+/**
+ * timing from the primary recording plus any continuations. with only an
+ * overrun link (watch left running) the recording's offset pins the start, but
+ * its end says nothing about when the workout ended.
+ */
+export function timingFromLinks(links: readonly LinkedRecording[], startedLocal?: string): WorkoutTiming | null {
   const primary = links.find((l) => l.role === "primary");
-  if (!primary) return null;
+  if (!primary) {
+    const overrun = links.find((l) => l.role === "overrun");
+    const m = startedLocal ? LOCAL_START_RE.exec(startedLocal) : null;
+    if (!overrun || !m) return null;
+    const wallMs = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    return {
+      startedAt: new Date(wallMs - overrun.utcOffsetMin * 60_000),
+      utcOffsetMin: overrun.utcOffsetMin,
+      endedAt: null,
+      durationS: null,
+    };
+  }
   const startMs = primary.startDateUtc.getTime();
   let endMs = startMs + primary.elapsedS * 1000;
   for (const l of links) {
@@ -151,7 +168,7 @@ export async function linkWorkout(workout: { id: string; startedLocal: string })
     links = await loadLinks(workout.id);
   }
 
-  const timing = timingFromLinks(links);
+  const timing = timingFromLinks(links, workout.startedLocal);
   if (timing) {
     await db
       .update(liftWorkouts)
