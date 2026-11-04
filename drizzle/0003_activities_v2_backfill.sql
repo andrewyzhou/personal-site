@@ -22,7 +22,8 @@ SELECT
 FROM "activities" a
 ON CONFLICT DO NOTHING;
 --> statement-breakpoint
--- the current trim becomes an explicit edit for every activity with a route, so
+-- the current trim becomes an explicit edit for every activity with a route or
+-- an original (legacy imports trimmed gps-less files too), so
 -- republish reproduces it exactly (including deliberate 0 m trims) instead of
 -- falling back to the default for new activities
 INSERT INTO "activity_edits" ("activity_id", "kind", "params", "note", "created_at")
@@ -33,7 +34,7 @@ SELECT
 	'backfilled from legacy trim columns',
 	a."created_at"
 FROM "activities" a
-WHERE a."polyline" IS NOT NULL
+WHERE (a."polyline" IS NOT NULL OR a."fit_sha256" IS NOT NULL)
 	AND NOT EXISTS (
 		SELECT 1 FROM "activity_edits" e WHERE e."activity_id" = a."id" AND e."kind" = 'trim'
 	);
