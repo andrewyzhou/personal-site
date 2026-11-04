@@ -1,16 +1,19 @@
 // privacy zone crud (server-only). geometry is never edited in place: a shape
 // change inserts a new row (replaces_id = old id) and archives the old one, so
 // every earlier shape stays restorable. name/enabled change in place. nothing
-// is ever deleted. callers mark the returned `touched` polygons stale.
+// is ever deleted.
 //
 // neon-http has no transactions, so every multi-step change orders its writes
 // so a partial failure leaves extra fog active (two versions), never none.
+// staleness is marked twice: `markStale` runs on every affected geometry (old
+// from the db + new from the request) BEFORE the first write, and callers mark
+// the returned `touched` again after, so a failure part-way never leaves new
+// geometry live with nothing flagged.
 
 import { asc, eq, inArray } from "drizzle-orm";
 import { getDb, privacyZones, type PrivacyZoneRow } from "../db";
 import { isValidPolygon } from "./fog";
 
-export const MAX_ZONE_RINGS = 10;
 export const MAX_RING_VERTICES = 500;
 export const MAX_ZONE_NAME = 100;
 
@@ -76,7 +79,9 @@ function ringArea(ring: number[][]): number {
 // anything posted → a clean closed polygon, or an error message
 export function normalizePolygon(raw: unknown): { polygon: number[][][] } | { error: string } {
   if (!isValidPolygon(raw)) return { error: "polygon must be rings of [lng, lat] with at least 3 points" };
-  if (raw.length > MAX_ZONE_RINGS) return { error: `at most ${MAX_ZONE_RINGS} rings` };
+  // one outer ring only: holes and overlapping parts (even-odd) would leave
+  // pieces of the drawn zone visible, and the editor only edits ring 0
+  if (raw.length !== 1) return { error: "a zone must be a single ring (no holes or extra parts)" };
   const out: number[][][] = [];
   for (const ring of raw) {
     const pts: number[][] = [];
@@ -182,6 +187,22 @@ export function planRestore(target: ZoneRow, rows: ZoneRow[]): RestorePlan {
   return { unarchiveId: target.id, archiveIds };
 }
 
+// every active version in the same lineage as `id`, newest first
+export function activeInLineage(rows: ZoneRow[], id: number): ZoneRow[] {
+  const roots = lineageRoots(rows);
+  const root = roots.get(id);
+  if (root === undefined) return [];
+  return rows.filter((r) => !r.archivedAt && roots.get(r.id) === root).sort((a, b) => b.id - a.id);
+}
+
+// a retried shape edit (the first attempt's response was lost, or it failed
+// before archiving the old version): the newest active version already has
+// exactly this polygon. returns that version, or null for a real edit.
+export function alreadyApplied(rows: ZoneRow[], id: number, polygon: number[][][]): ZoneRow | null {
+  const newest = activeInLineage(rows, id)[0];
+  return newest && newest.id !== id && samePolygon(newest.polygon, polygon) ? newest : null;
+}
+
 // ---------------------------------------------------------------------------
 // io
 
@@ -211,27 +232,66 @@ export interface ZoneMutation {
   touched: number[][][][]; // every geometry whose fog may have changed
 }
 
+// marks activities near these geometries stale (stale.ts markStaleForZones)
+export type MarkStale = (polygons: number[][][][]) => Promise<unknown>;
+
+export interface MutationOptions {
+  // runs before the first write; a failure aborts the mutation
+  markStale?: MarkStale;
+}
+
+const premark = async (opts: MutationOptions, touched: number[][][][]) => {
+  if (opts.markStale && touched.length) await opts.markStale(touched);
+};
+
 export async function listZones(): Promise<ZoneGroup[]> {
   return groupZones(await allRows());
 }
 
-export async function createZone(name: string, polygon: number[][][]): Promise<ZoneMutation> {
+export async function createZone(name: string, polygon: number[][][], opts: MutationOptions = {}): Promise<ZoneMutation> {
+  await premark(opts, [polygon]);
   const rows = await getDb().insert(privacyZones).values({ name, polygon, enabled: true }).returning(columns);
   return { zone: rows[0], touched: [polygon] };
 }
 
-export async function updateZone(id: number, patch: ZonePatch): Promise<ZoneMutation> {
+export async function updateZone(id: number, patch: ZonePatch, opts: MutationOptions = {}): Promise<ZoneMutation> {
   const db = getDb();
-  const current = await loadZone(id);
-  const plan = planUpdate(current, patch);
+  const all = await allRows();
+  const current = all.find((r) => r.id === id);
+  if (!current) throw new ZoneError(404, "zone not found");
   const now = new Date();
+  const lineage = activeInLineage(all, id);
+
+  // a retried shape edit: return the version it already made (finishing the
+  // archive step if that's what failed) instead of forking a second one
+  const done = patch.polygon ? alreadyApplied(all, id, patch.polygon) : null;
+  if (done) {
+    const others = lineage.filter((r) => r.id !== done.id);
+    const plan = planUpdate(done, { name: patch.name, enabled: patch.enabled });
+    const touched = [done.polygon, ...others.map((r) => r.polygon)];
+    await premark(opts, touched);
+    if (others.length) {
+      await db.update(privacyZones).set({ archivedAt: now, updatedAt: now }).where(inArray(privacyZones.id, others.map((r) => r.id)));
+    }
+    if (!plan.set) return { zone: done, touched };
+    const rows = await db.update(privacyZones).set({ ...plan.set, updatedAt: now }).where(eq(privacyZones.id, done.id)).returning(columns);
+    return { zone: rows[0], touched };
+  }
+
+  const plan = planUpdate(current, patch);
   if (plan.insert) {
+    // any other active version of this zone (left by an earlier partial edit)
+    // is archived too, so exactly one version stays in effect
+    const archiveIds = [plan.archiveId!, ...lineage.filter((r) => r.id !== id).map((r) => r.id)];
+    const touched = [current.polygon, plan.insert.polygon, ...lineage.filter((r) => r.id !== id).map((r) => r.polygon)];
+    await premark(opts, touched);
     // new version first: if archiving the old one fails, both stay active
     const rows = await db.insert(privacyZones).values(plan.insert).returning(columns);
-    await db.update(privacyZones).set({ archivedAt: now, updatedAt: now }).where(eq(privacyZones.id, plan.archiveId!));
-    return { zone: rows[0], touched: [current.polygon, plan.insert.polygon] };
+    await db.update(privacyZones).set({ archivedAt: now, updatedAt: now }).where(inArray(privacyZones.id, archiveIds));
+    return { zone: rows[0], touched };
   }
   if (plan.set) {
+    await premark(opts, [current.polygon]);
     const rows = await db
       .update(privacyZones)
       .set({ ...plan.set, updatedAt: now })
@@ -242,9 +302,10 @@ export async function updateZone(id: number, patch: ZonePatch): Promise<ZoneMuta
   return { zone: current, touched: [] };
 }
 
-export async function archiveZone(id: number): Promise<ZoneMutation> {
+export async function archiveZone(id: number, opts: MutationOptions = {}): Promise<ZoneMutation> {
   const current = await loadZone(id);
   if (current.archivedAt) return { zone: current, touched: [] };
+  await premark(opts, [current.polygon]);
   const now = new Date();
   const rows = await getDb()
     .update(privacyZones)
@@ -254,12 +315,15 @@ export async function archiveZone(id: number): Promise<ZoneMutation> {
   return { zone: rows[0], touched: [current.polygon] };
 }
 
-export async function restoreZone(id: number): Promise<ZoneMutation> {
+export async function restoreZone(id: number, opts: MutationOptions = {}): Promise<ZoneMutation> {
   const db = getDb();
   const all = await allRows();
   const target = all.find((r) => r.id === id);
   if (!target) throw new ZoneError(404, "zone not found");
   const plan = planRestore(target, all);
+  const archived = all.filter((r) => plan.archiveIds.includes(r.id)).map((r) => r.polygon);
+  const touched = [target.polygon, ...archived];
+  await premark(opts, touched);
   const now = new Date();
   // unarchive first: a failure in between leaves two versions active, not none
   const rows = await db
@@ -270,6 +334,5 @@ export async function restoreZone(id: number): Promise<ZoneMutation> {
   if (plan.archiveIds.length) {
     await db.update(privacyZones).set({ archivedAt: now, updatedAt: now }).where(inArray(privacyZones.id, plan.archiveIds));
   }
-  const archived = all.filter((r) => plan.archiveIds.includes(r.id)).map((r) => r.polygon);
-  return { zone: rows[0], touched: [target.polygon, ...archived] };
+  return { zone: rows[0], touched };
 }

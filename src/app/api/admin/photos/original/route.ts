@@ -10,8 +10,9 @@ export const runtime = "nodejs";
 
 // step 1 of keeping a photo's untouched original: a presigned put straight
 // into the private raw bucket (originals are routinely over vercel's 4.5mb body
-// cap). the url is scoped to rawKey(sha): the checksum and If-None-Match are
-// signed in, so r2 only accepts exactly these bytes, once. step 2 is finalize.
+// cap). the url is scoped to rawKey(sha): the checksum, the declared size and
+// If-None-Match are signed in, so r2 only accepts exactly these bytes, once.
+// step 2 is finalize.
 
 interface StartBody {
   sha256?: unknown;
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
 
     const { url, headers } = await r2PresignPutIn(rawBucket(), rawKey(sha256), {
       expiresSeconds: 900,
+      // signed: r2 refuses a body of any other size
+      contentLength: size,
       headers: {
         "if-none-match": "*",
         "x-amz-checksum-sha256": Buffer.from(sha256, "hex").toString("base64"),

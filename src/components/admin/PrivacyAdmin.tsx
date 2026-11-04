@@ -129,10 +129,9 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
 
   async function saveShape() {
     if (mode.kind !== "edit") return;
-    const current = activeZones.find((z) => z.id === mode.id);
-    const holes = current ? current.polygon.slice(1) : [];
+    // zones are a single ring: holes would leave part of the zone visible
     const ok = await mutate(
-      () => call(`/api/admin/privacy/zones/${mode.id}`, "PATCH", { polygon: [closeRing(mode.ring), ...holes] }),
+      () => call(`/api/admin/privacy/zones/${mode.id}`, "PATCH", { polygon: [closeRing(mode.ring)] }),
       "shape saved as a new version"
     );
     if (ok) {

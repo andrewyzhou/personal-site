@@ -58,6 +58,9 @@ export async function POST(request: Request) {
     if (stableStringify(next) === stableStringify(current)) {
       return NextResponse.json({ ok: true, settings: current, unchanged: true, marked: 0, pending: await countPending() });
     }
+    // marked before the insert too: a failure after it never leaves new
+    // settings live with nothing flagged
+    await markAllStale();
     await getDb().insert(privacySettings).values({ settings: next });
     const marked = await markAllStale();
     return NextResponse.json({ ok: true, settings: next, marked, pending: await countPending() });

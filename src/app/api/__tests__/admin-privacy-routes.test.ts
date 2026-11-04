@@ -99,7 +99,7 @@ describe("zones", () => {
     zonesLib.createZone.mockResolvedValue({ zone: { id: 9 }, touched: [sq] });
     const res = await createZoneRoute(req("POST", { name: " home ", polygon: [sq[0].slice(0, 4)] }));
     expect(res.status).toBe(200);
-    expect(zonesLib.createZone).toHaveBeenCalledWith("home", sq);
+    expect(zonesLib.createZone).toHaveBeenCalledWith("home", sq, { markStale: stale.markStaleForZones });
     expect(stale.markStaleForZones).toHaveBeenCalledWith([sq]);
     expect(await res.json()).toEqual({ ok: true, zone: { id: 9 }, marked: 3, pending: 7 });
   });
@@ -117,7 +117,7 @@ describe("zones", () => {
     zonesLib.updateZone.mockResolvedValue({ zone: { id: 10 }, touched: [sq, sq2] });
     const res = await patchZoneRoute(req("PATCH", { polygon: sq2, enabled: false }), ctx());
     expect(res.status).toBe(200);
-    expect(zonesLib.updateZone).toHaveBeenCalledWith(4, { polygon: sq2, enabled: false });
+    expect(zonesLib.updateZone).toHaveBeenCalledWith(4, { polygon: sq2, enabled: false }, { markStale: stale.markStaleForZones });
     expect(stale.markStaleForZones).toHaveBeenCalledWith([sq, sq2]);
     expect((await res.json()).pending).toBe(7);
   });
@@ -143,7 +143,7 @@ describe("zones", () => {
     zonesLib.archiveZone.mockResolvedValue({ zone: { id: 4 }, touched: [sq] });
     const res = await deleteZoneRoute(req("DELETE"), ctx());
     expect(res.status).toBe(200);
-    expect(zonesLib.archiveZone).toHaveBeenCalledWith(4);
+    expect(zonesLib.archiveZone).toHaveBeenCalledWith(4, { markStale: stale.markStaleForZones });
     expect(stale.markStaleForZones).toHaveBeenCalledWith([sq]);
   });
 
@@ -151,7 +151,17 @@ describe("zones", () => {
     zonesLib.restoreZone.mockResolvedValue({ zone: { id: 4 }, touched: [sq, sq2] });
     const res = await restoreZoneRoute(req("POST"), ctx());
     expect(res.status).toBe(200);
+    expect(zonesLib.restoreZone).toHaveBeenCalledWith(4, { markStale: stale.markStaleForZones });
     expect(stale.markStaleForZones).toHaveBeenCalledWith([sq, sq2]);
+  });
+
+  it("rejects zones with holes or several parts", async () => {
+    const res = await createZoneRoute(req("POST", { polygon: [sq[0], sq2[0]] }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/single ring/);
+    expect((await patchZoneRoute(req("PATCH", { polygon: [sq[0], sq2[0]] }), ctx())).status).toBe(400);
+    expect(zonesLib.createZone).not.toHaveBeenCalled();
+    expect(zonesLib.updateZone).not.toHaveBeenCalled();
   });
 });
 
@@ -160,7 +170,7 @@ describe("settings", () => {
     const res = await getSettingsRoute(req("GET"));
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.settings.distance.mode).toBe("include-rounded");
+    expect(body.settings.distance.mode).toBe("visible-only");
     expect(body.pending).toBe(7);
   });
 
@@ -170,7 +180,8 @@ describe("settings", () => {
     expect(inserted).toEqual([
       { settings: { distance: { mode: "visible-only", roundToM: 100 }, coarsenStartMin: 15, defaultTrimM: expect.any(Number) } },
     ]);
-    expect(stale.markAllStale).toHaveBeenCalledTimes(1);
+    // before the insert and after it
+    expect(stale.markAllStale).toHaveBeenCalledTimes(2);
     expect(await res.json()).toMatchObject({ ok: true, marked: 12, pending: 7 });
   });
 

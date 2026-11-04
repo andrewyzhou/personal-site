@@ -135,16 +135,26 @@ export function r2BucketFetch(bucket: string, key: string, init?: RequestInit): 
 // presigned browser PUT into any bucket. `headers` are signed into the url, so
 // the browser must send exactly these (and r2 enforces them, e.g. a checksum
 // or If-None-Match: * for write-once keys). content-type is never signed.
+// `contentLength` is signed too, so r2 rejects a body of any other size; it is
+// not in the returned headers because the browser sets content-length itself
+// from the body (and refuses to let scripts set it).
 export async function r2PresignPutIn(
   bucket: string,
   key: string,
-  opts: { expiresSeconds?: number; headers?: Record<string, string> } = {}
+  opts: { expiresSeconds?: number; headers?: Record<string, string>; contentLength?: number } = {}
 ): Promise<{ url: string; headers: Record<string, string> }> {
   const url = new URL(`${endpointFor(bucket)}/${encodeKey(key)}`);
   url.searchParams.set("X-Amz-Expires", String(opts.expiresSeconds ?? 600));
   const headers = opts.headers ?? {};
-  const signed = await client().sign(new Request(url.toString(), { method: "PUT", headers }), {
-    aws: { signQuery: true },
+  const toSign: Record<string, string> = { ...headers };
+  if (opts.contentLength !== undefined) {
+    if (!Number.isSafeInteger(opts.contentLength) || opts.contentLength < 0) throw new Error("bad content length");
+    toSign["content-length"] = String(opts.contentLength);
+  }
+  // allHeaders: aws4fetch skips content-length by default; only the headers
+  // listed here are on the request, so nothing else gets signed
+  const signed = await client().sign(new Request(url.toString(), { method: "PUT", headers: toSign }), {
+    aws: { signQuery: true, allHeaders: true },
   });
   return { url: signed.url, headers };
 }

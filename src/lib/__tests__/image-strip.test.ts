@@ -20,6 +20,7 @@ import {
   PNG_PARTS,
   pngChunk,
   riffChunk,
+  seg,
   strippedJpeg,
   WEBP_PARTS,
   webpFile,
@@ -80,6 +81,27 @@ describe("jpeg", () => {
     );
   });
 
+  it("allowlist: drops JPGn extensions (0xf0–0xfd), TEM, jfxx and unknown APPn; keeps sof2, dri, dac, dnl", () => {
+    const p = JPEG_PARTS;
+    const sof2 = seg(0xc2, [8, 0, 8, 0, 8, 1, 1, 0x11, 0]);
+    const dri = seg(0xdd, [0, 4]);
+    const dac = seg(0xcc, [0x00, 0x10]);
+    const dnl = seg(0xdc, [0, 8]);
+    const jfxx = seg(0xe0, concatBytes(new TextEncoder().encode("JFXX\0"), [0x10, 1, 2, 3]));
+    const junk = [0xf0, 0xf7, 0xfd].map((m) => seg(m, new TextEncoder().encode("GPSLatitude 37.87")));
+    const src = concatBytes(p.soi, p.app0, jfxx, [0xff, 0x01], ...junk, p.dqt, sof2, dri, dac, p.dht, p.sos, p.scan, dnl, p.eoi);
+    const out = stripJpeg(src);
+    expect(Array.from(out)).toEqual(Array.from(concatBytes(p.soi, p.app0, p.dqt, sof2, dri, dac, p.dht, p.sos, p.scan, dnl, p.eoi)));
+    expect(text(out)).not.toContain("GPS");
+  });
+
+  it("cuts an embedded jfif thumbnail and zeroes its size", () => {
+    const p = JPEG_PARTS;
+    const withThumb = seg(0xe0, [...new TextEncoder().encode("JFIF"), 0, 1, 1, 0, 0, 1, 0, 1, 2, 1, 9, 9, 9, 8, 8, 8]);
+    const out = stripJpeg(concatBytes(p.soi, withThumb, p.dqt, p.sof, p.sos, p.scan, p.eoi));
+    expect(Array.from(out)).toEqual(Array.from(concatBytes(p.soi, p.app0, p.dqt, p.sof, p.sos, p.scan, p.eoi)));
+  });
+
   it("refuses truncated or scanless files", () => {
     const p = JPEG_PARTS;
     expect(() => stripJpeg(concatBytes(p.soi, p.app0, p.dqt))).toThrow(ImageStripError);
@@ -107,6 +129,18 @@ describe("webp", () => {
     expect(Array.from(out)).toEqual(Array.from(webpFile([vp8])));
   });
 
+  it("allowlist: drops unknown chunks, keeps alpha and animation chunks", () => {
+    const p = WEBP_PARTS;
+    const alph = riffChunk("ALPH", [0, 1, 2]);
+    const anim = riffChunk("ANIM", [0, 0, 0, 0, 0, 0]);
+    const anmf = riffChunk("ANMF", new Array(16).fill(1));
+    const unknown = riffChunk("XYZW", new TextEncoder().encode("GPSLatitude 37.87"));
+    const lower = riffChunk("meta", [1, 2, 3, 4]);
+    const out = stripWebp(webpFile([p.vp8x(0x10 | 0x02), p.iccp, unknown, anim, anmf, lower, alph, p.vp8l]));
+    expect(Array.from(out)).toEqual(Array.from(webpFile([p.vp8x(0x10 | 0x02), p.iccp, anim, anmf, alph, p.vp8l])));
+    expect(text(out)).not.toContain("GPS");
+  });
+
   it("refuses a webp without image data", () => {
     expect(() => stripWebp(webpFile([WEBP_PARTS.vp8x(0), riffChunk("EXIF", TIFF)]))).toThrow(ImageStripError);
   });
@@ -120,6 +154,30 @@ describe("png", () => {
     expect(Array.from(out)).toEqual(Array.from(concatBytes(p.sig, p.ihdr, p.idat, p.iend)));
     expect(hasLocationMetadata(src)).toBe(true);
     expect(hasLocationMetadata(out)).toBe(false);
+  });
+
+  it("allowlist: drops tIME and private/unknown chunks", () => {
+    const p = PNG_PARTS;
+    const time = pngChunk("tIME", [0x07, 0xea, 10, 3, 8, 2, 52]);
+    const priv = pngChunk("prVt", new TextEncoder().encode("GPSLatitude 37.87"));
+    const unknownCritical = pngChunk("ZZZZ", [1, 2, 3]);
+    const caBX = pngChunk("caBX", [1, 2, 3]);
+    const out = stripPng(concatBytes(p.sig, p.ihdr, time, priv, caBX, unknownCritical, p.idat, p.iend));
+    expect(Array.from(out)).toEqual(Array.from(concatBytes(p.sig, p.ihdr, p.idat, p.iend)));
+    expect(hasLocationMetadata(concatBytes(p.sig, p.ihdr, priv, p.idat, p.iend))).toBe(true);
+  });
+
+  it("keeps color, display and apng chunks in order", () => {
+    const p = PNG_PARTS;
+    const keep = [
+      pngChunk("cHRM", new Array(32).fill(0)), pngChunk("gAMA", [0, 0, 0xb1, 0x8f]), pngChunk("sBIT", [8, 8, 8]),
+      pngChunk("sRGB", [0]), pngChunk("PLTE", [0, 0, 0]), pngChunk("tRNS", [0]), pngChunk("bKGD", [0]),
+      pngChunk("pHYs", [0, 0, 0x0b, 0x13, 0, 0, 0x0b, 0x13, 1]), pngChunk("acTL", [0, 0, 0, 1, 0, 0, 0, 0]),
+      pngChunk("fcTL", new Array(26).fill(0)),
+    ];
+    const fdat = pngChunk("fdAT", [0, 0, 0, 1, 0x78, 0x9c]);
+    const src = concatBytes(p.sig, p.ihdr, ...keep, p.idat, fdat, p.iend);
+    expect(Array.from(stripPng(src))).toEqual(Array.from(src));
   });
 
   it("keeps an iCCP profile", () => {

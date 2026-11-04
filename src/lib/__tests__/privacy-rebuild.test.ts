@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../cache", () => ({ invalidateCache: vi.fn() }));
 
-import { republishPending, type RebuildDeps } from "../privacy/rebuild";
+import { DEFAULT_REBUILD_BUDGET_MS, republishPending, type RebuildDeps } from "../privacy/rebuild";
 import type { RepublishResult } from "../republish";
 
 function deps(over: Partial<RebuildDeps> & { statuses?: Record<number, RepublishResult["status"] | Error> } = {}) {
@@ -29,14 +29,14 @@ function deps(over: Partial<RebuildDeps> & { statuses?: Record<number, Republish
 }
 
 describe("republishPending", () => {
-  it("republishes pending rows, invalidates caches once, revalidates written pages", async () => {
+  it("republishes pending rows, invalidates caches and revalidates each written page", async () => {
     const d = deps({ statuses: { 3: "fresh", 2: "no-source" } });
     const revalidate = vi.fn();
     const r = await republishPending({ deps: d, revalidate });
     expect(r.results.map((x) => [x.id, x.status])).toEqual([
       [5, "published"], [4, "published"], [3, "fresh"], [2, "no-source"], [1, "published"],
     ]);
-    expect(d.invalidate).toHaveBeenCalledTimes(1);
+    expect(d.invalidate).toHaveBeenCalledTimes(4);
     expect(revalidate.mock.calls.map((c) => c[0])).toEqual(["/activities/5", "/activities/4", "/activities/2", "/activities/1"]);
     expect(r.remaining).toBe(0);
     expect(r.timedOut).toBe(false);
@@ -73,6 +73,41 @@ describe("republishPending", () => {
     expect(d.selectPending).toHaveBeenCalledWith(2, [9]);
     expect(d.invalidate).not.toHaveBeenCalled();
     expect(revalidate).not.toHaveBeenCalled();
+  });
+
+  it("each page is revalidated right after its own write, before the next republish", async () => {
+    const order: string[] = [];
+    const d = deps({ statuses: { 4: "fresh" } });
+    const inner = d.republish;
+    d.republish = vi.fn(async (id: number) => {
+      order.push(`republish ${id}`);
+      return inner(id);
+    });
+    await republishPending({ deps: d, limit: 3, revalidate: (p) => order.push(`revalidate ${p}`) });
+    expect(order).toEqual(["republish 5", "revalidate /activities/5", "republish 4", "republish 3", "revalidate /activities/3"]);
+  });
+
+  it("pages written before a later failure are already revalidated", async () => {
+    const d = deps();
+    const revalidate = vi.fn();
+    (d.republish as ReturnType<typeof vi.fn>).mockImplementation(async (id: number) => {
+      if (id === 3) throw new Error("boom");
+      return { status: "published", id };
+    });
+    await republishPending({ deps: d, limit: 3, revalidate });
+    expect(revalidate.mock.calls.map((c) => c[0])).toEqual(["/activities/5", "/activities/4"]);
+  });
+
+  it("the default budget leaves headroom under the 60 s function limit", async () => {
+    const d = deps();
+    (d.republish as ReturnType<typeof vi.fn>).mockImplementation(async (id: number) => {
+      d.tick(10_000);
+      return { status: "published", id };
+    });
+    const r = await republishPending({ deps: d });
+    expect(DEFAULT_REBUILD_BUDGET_MS).toBeLessThanOrEqual(30_000);
+    expect(r.results).toHaveLength(3);
+    expect(r.timedOut).toBe(true);
   });
 
   it("a revalidate failure doesn't fail the batch", async () => {

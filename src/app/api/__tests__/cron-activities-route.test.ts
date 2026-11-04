@@ -10,7 +10,7 @@ vi.mock("@/lib/admin-auth", async () => {
 vi.mock("@/lib/strava", () => ({ isStravaApiEnabled: () => true }));
 vi.mock("@/lib/strava-sync", () => ({ syncStravaActivities: () => sync() }));
 vi.mock("@/lib/intervals", () => ({ isIntervalsConfigured: () => true, pullIntervalsActivities: () => pull() }));
-vi.mock("@/lib/privacy/rebuild", () => ({ DEFAULT_REBUILD_BUDGET_MS: 40_000, republishPending: (o: unknown) => rebuild(o) }));
+vi.mock("@/lib/privacy/rebuild", () => ({ DEFAULT_REBUILD_BUDGET_MS: 45_000, republishPending: (o: unknown) => rebuild(o) }));
 
 import { GET } from "@/app/api/cron/activities/route";
 
@@ -36,8 +36,35 @@ describe("GET /api/cron/activities", () => {
     expect(body).toMatchObject({ ok: true, strava: { imported: 1 }, intervals: { imported: 2 }, rebuild: { processed: 1, failed: 0, remaining: 0 } });
     const opts = rebuild.mock.calls[0][0];
     expect(opts.timeBudgetMs).toBeGreaterThan(5_000);
-    expect(opts.timeBudgetMs).toBeLessThanOrEqual(40_000);
+    // at most 30 s, even if the library default is larger
+    expect(opts.timeBudgetMs).toBeLessThanOrEqual(30_000);
     expect(typeof opts.revalidate).toBe("function");
+  });
+
+  it("nothing starts after 35 s of the run: slow imports shrink or skip the rebuild", async () => {
+    const t0 = 1_000_000;
+    const now = vi.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(t0);
+      sync.mockImplementation(async () => {
+        now.mockReturnValue(t0 + 20_000);
+        return { imported: 1 };
+      });
+      await call();
+      expect(rebuild.mock.calls[0][0].timeBudgetMs).toBe(15_000);
+
+      rebuild.mockClear();
+      now.mockReturnValue(t0);
+      sync.mockImplementation(async () => {
+        now.mockReturnValue(t0 + 31_000);
+        return { imported: 1 };
+      });
+      const body = await (await call()).json();
+      expect(rebuild).not.toHaveBeenCalled();
+      expect(body.rebuild).toEqual({ skipped: "no time left" });
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("a rebuild failure never fails the cron", async () => {

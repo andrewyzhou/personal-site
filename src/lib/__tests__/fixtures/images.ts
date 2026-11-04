@@ -82,7 +82,7 @@ export function buildTiff(opts: {
   return new Uint8Array([...buf, ...data]);
 }
 
-const seg = (marker: number, payload: Uint8Array | number[]) => {
+export const seg = (marker: number, payload: Uint8Array | number[]) => {
   const p = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
   return concatBytes([0xff, marker, ((p.length + 2) >> 8) & 0xff, (p.length + 2) & 0xff], p);
 };

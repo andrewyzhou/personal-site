@@ -1,10 +1,14 @@
 // metadata stripping for every image that becomes public. pure, byte-level, no
 // re-encode: pixels and color profiles are kept exactly, everything that can
-// carry location, time, device or editing history is dropped.
-//   jpeg: drop APP1 (exif/xmp), APP3–APP15 (iptc, makernotes…) except an adobe
-//         APP14, non-icc APP2 (mpf, flashpix), COM, and anything after EOI
-//   webp: drop EXIF and XMP chunks, clear the vp8x flags, fix the riff size
-//   png:  drop eXIf, tEXt, iTXt, zTXt
+// carry location, time, device or editing history is dropped. allowlists, not
+// denylists: anything not known to be pixel or color data goes.
+//   jpeg: keep SOI/EOI, SOFn, DHT, DQT, DRI, DAC, DNL, DHP, EXP, SOS + scan,
+//         RSTn, APP0 jfif (thumbnail cut), APP2 icc, APP14 adobe. drop the rest
+//         (exif/xmp, iptc, mpf, COM, JPGn extensions…) and anything after EOI
+//   webp: keep VP8, VP8L, VP8X, ALPH, ANIM, ANMF, ICCP; clear the vp8x
+//         exif/xmp flags, fix the riff size
+//   png:  keep the image, color and apng chunks only (no text, time, exif or
+//         private chunks)
 // malformed input throws ImageStripError: callers reject rather than publish
 // bytes they couldn't fully parse.
 
@@ -117,14 +121,35 @@ function* jpegSegments(bytes: Uint8Array): Generator<JpegSegment> {
   throw new ImageStripError("missing EOI");
 }
 
-function keepJpegSegment(seg: JpegSegment): boolean {
+// SOF0–3, 5–7, 9–11, 13–15 (0xc4 is DHT, 0xc8 is JPG, 0xcc is DAC)
+const isSof = (m: number) => m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc;
+const isRst = (m: number) => m >= 0xd0 && m <= 0xd7;
+const JPEG_KEEP = new Set([
+  0xd8, 0xd9, // SOI, EOI
+  0xc4, 0xdb, 0xdd, 0xcc, 0xdc, 0xde, 0xdf, // DHT, DQT, DRI, DAC, DNL, DHP, EXP
+  0xda, // SOS (+ its scan data)
+]);
+const JFIF_LEN = 14; // "JFIF\0", version, units, density x/y, thumbnail w/h
+
+// the bytes to publish for a segment, or null to drop it
+function keepJpegSegment(bytes: Uint8Array, seg: JpegSegment): Uint8Array | null {
   const m = seg.marker;
-  if (m === 0xe0) return true; // APP0 jfif / jfxx
-  if (m === 0xe2) return ascii(seg.payload, 0, 12) === "ICC_PROFILE\0"; // icc only, never mpf/flashpix
-  if (m === 0xee) return ascii(seg.payload, 0, 5) === "Adobe"; // color transform flag
-  if (m >= 0xe1 && m <= 0xef) return false; // APP1 exif/xmp, APP13 iptc, the rest
-  if (m === 0xfe) return false; // COM
-  return true;
+  const raw = bytes.subarray(seg.start, seg.end);
+  if (isSof(m) || isRst(m) || JPEG_KEEP.has(m)) return raw;
+  if (m === 0xe0) {
+    // jfif only (jfxx is a thumbnail). an embedded thumbnail could show the
+    // uncropped photo, so it's cut and its size zeroed
+    const p = seg.payload;
+    if (ascii(p, 0, 5) !== "JFIF\0" || p.length < JFIF_LEN) return null;
+    if (p.length === JFIF_LEN && p[12] === 0 && p[13] === 0) return raw;
+    const out = new Uint8Array(4 + JFIF_LEN);
+    out.set([0xff, 0xe0, 0, JFIF_LEN + 2]);
+    out.set(p.subarray(0, 12), 4);
+    return out;
+  }
+  if (m === 0xe2) return ascii(seg.payload, 0, 12) === "ICC_PROFILE\0" ? raw : null; // icc only, never mpf/flashpix
+  if (m === 0xee) return ascii(seg.payload, 0, 5) === "Adobe" ? raw : null; // color transform flag
+  return null;
 }
 
 export function stripJpeg(bytes: Uint8Array): Uint8Array {
@@ -134,7 +159,8 @@ export function stripJpeg(bytes: Uint8Array): Uint8Array {
   for (const seg of jpegSegments(bytes)) {
     if (seg.marker === 0xd9) sawEoi = true;
     if (seg.marker === 0xda) sawSos = true;
-    if (keepJpegSegment(seg)) parts.push(bytes.subarray(seg.start, seg.end));
+    const kept = keepJpegSegment(bytes, seg);
+    if (kept) parts.push(kept);
   }
   if (!sawSos || !sawEoi) throw new ImageStripError("jpeg has no image data");
   return concat(parts);
@@ -143,7 +169,11 @@ export function stripJpeg(bytes: Uint8Array): Uint8Array {
 // ---------------------------------------------------------------------------
 // png
 
-const PNG_DROP = new Set(["eXIf", "tEXt", "iTXt", "zTXt"]);
+const PNG_KEEP = new Set([
+  "IHDR", "PLTE", "IDAT", "IEND", // critical
+  "tRNS", "gAMA", "cHRM", "sRGB", "iCCP", "sBIT", "pHYs", "bKGD", // color / display
+  "acTL", "fcTL", "fdAT", // apng
+]);
 
 interface PngChunk {
   type: string;
@@ -172,7 +202,7 @@ export function stripPng(bytes: Uint8Array): Uint8Array {
   let sawData = false;
   for (const c of pngChunks(bytes)) {
     if (c.type === "IDAT") sawData = true;
-    if (!PNG_DROP.has(c.type)) parts.push(bytes.subarray(c.start, c.end));
+    if (PNG_KEEP.has(c.type)) parts.push(bytes.subarray(c.start, c.end));
   }
   if (!sawData) throw new ImageStripError("png has no image data");
   return concat(parts);
@@ -181,7 +211,7 @@ export function stripPng(bytes: Uint8Array): Uint8Array {
 // ---------------------------------------------------------------------------
 // webp
 
-const WEBP_DROP = new Set(["EXIF", "XMP "]);
+const WEBP_KEEP = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ANIM", "ANMF", "ICCP"]);
 const VP8X_EXIF = 0x08;
 const VP8X_XMP = 0x04;
 
@@ -213,7 +243,7 @@ export function stripWebp(bytes: Uint8Array): Uint8Array {
   let sawData = false;
   for (const c of webpChunks(bytes)) {
     if (c.fourcc === "VP8 " || c.fourcc === "VP8L" || c.fourcc === "ANIM") sawData = true;
-    if (WEBP_DROP.has(c.fourcc)) continue;
+    if (!WEBP_KEEP.has(c.fourcc)) continue;
     let chunk = bytes.subarray(c.start, c.end);
     if (c.fourcc === "VP8X") {
       if (c.data.length < 10) throw new ImageStripError("short VP8X chunk");
@@ -291,7 +321,7 @@ export function hasLocationMetadata(bytes: Uint8Array): boolean {
     if (format === "png") {
       for (const c of pngChunks(bytes)) {
         if (c.type === "eXIf" && tiffHasGps(c.data)) return true;
-        if (PNG_DROP.has(c.type) && XMP_GPS_RE.test(latin1(c.data))) return true;
+        if (!PNG_KEEP.has(c.type) && XMP_GPS_RE.test(latin1(c.data))) return true;
       }
       return false;
     }

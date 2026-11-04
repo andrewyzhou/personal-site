@@ -9,7 +9,9 @@ import { log } from "../log";
 import { republish, type RepublishResult } from "../republish";
 import { countPending, pendingWhere } from "./stale";
 
-export const DEFAULT_REBUILD_BUDGET_MS = 40_000; // function limit is 60 s
+// no new republish starts after this; the function limit is 60 s, so one slow
+// republish still fits
+export const DEFAULT_REBUILD_BUDGET_MS = 30_000;
 export const DEFAULT_REBUILD_LIMIT = 50;
 const MAX_EXCLUDE = 1000;
 
@@ -81,6 +83,20 @@ export async function republishPending(opts: RebuildOptions = {}): Promise<Rebui
   const exclude = (opts.excludeIds ?? []).filter((n) => Number.isInteger(n)).slice(0, MAX_EXCLUDE);
   const started = deps.now();
 
+  const afterWrite = async (id: number) => {
+    try {
+      await deps.invalidate();
+    } catch (error) {
+      log.warn("privacy:rebuild", "cache invalidation failed", error);
+    }
+    if (!opts.revalidate) return;
+    try {
+      opts.revalidate(`/activities/${id}`);
+    } catch (error) {
+      log.warn("privacy:rebuild", `revalidate ${id} failed`, error);
+    }
+  };
+
   const ids = await deps.selectPending(limit, exclude);
   const results: RebuildItem[] = [];
   let timedOut = false;
@@ -89,28 +105,19 @@ export async function republishPending(opts: RebuildOptions = {}): Promise<Rebui
       timedOut = true;
       break;
     }
+    let item: RebuildItem;
     try {
       await deps.markAttempted(id);
       const r = await deps.republish(id);
-      results.push({ id, status: r.status });
+      item = { id, status: r.status };
     } catch (error) {
       log.error("privacy:rebuild", `republish ${id} failed`, error);
-      results.push({ id, status: "error", error: (error as Error).message });
+      item = { id, status: "error", error: (error as Error).message };
     }
-  }
-
-  const wrote = results.filter((r) => WROTE.has(r.status));
-  if (wrote.length) {
-    await deps.invalidate();
-    if (opts.revalidate) {
-      for (const r of wrote) {
-        try {
-          opts.revalidate(`/activities/${r.id}`);
-        } catch (error) {
-          log.warn("privacy:rebuild", `revalidate ${r.id} failed`, error);
-        }
-      }
-    }
+    results.push(item);
+    // caches and the page go fresh as soon as each row is written: a batch cut
+    // off by the function limit still leaves every rewritten page current
+    if (WROTE.has(item.status)) await afterWrite(id);
   }
 
   return {

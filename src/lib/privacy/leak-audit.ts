@@ -6,7 +6,7 @@
 
 import exifr from "exifr";
 import { decodeMultiPolyline } from "../polyline";
-import { ZONE_EDGE_BUFFER_M, distanceToPolygonEdgeM, pointInPolygon, type ZoneInput } from "./fog";
+import { ZONE_EDGE_BUFFER_M, distanceToPolygonEdgeM, pointInPolygon, segmentTouchesPolygon, type ZoneInput } from "./fog";
 
 export type Severity = "leak" | "warning";
 
@@ -134,7 +134,28 @@ export function checkPolyline(encoded: unknown, zones: ZoneInput[], where: strin
   const points = segments.flat();
   const bad = points.filter((p) => !isLatLng(p)).length;
   const out: Finding[] = bad ? [{ severity: "warning", where, message: `${bad} decoded point(s) out of range` }] : [];
-  return [...out, ...checkPoints(points.filter(isLatLng), zones, where)];
+  return [...out, ...checkPoints(points.filter(isLatLng), zones, where), ...checkChords(segments, zones, where)];
+}
+
+// a map draws a straight line between consecutive points of a segment (never
+// across a segment break): any such line touching a zone shows its inside
+export function checkChords(segments: [number, number][][], zones: ZoneInput[], where: string): Finding[] {
+  if (zones.length === 0) return [];
+  let crossing = 0;
+  const ids = new Set<number>();
+  for (const seg of segments) {
+    for (let i = 1; i < seg.length; i++) {
+      const a = seg[i - 1], b = seg[i];
+      if (!isLatLng(a) || !isLatLng(b)) continue;
+      const hit = zones.filter((z) => segmentTouchesPolygon(a, b, z.polygon));
+      if (hit.length === 0) continue;
+      crossing++;
+      for (const z of hit) ids.add(z.id);
+    }
+  }
+  if (!crossing) return [];
+  const list = [...ids].sort((x, y) => x - y).join(",");
+  return [{ severity: "leak", where, message: `${crossing} drawn line(s) between points touch zone(s) ${list}` }];
 }
 
 export function checkBounds(bounds: unknown, zones: ZoneInput[], where: string): Finding[] {
@@ -153,40 +174,29 @@ export function checkBounds(bounds: unknown, zones: ZoneInput[], where: string):
   );
 }
 
-const FOG_SHAPE_DECIMALS = 4;
-
-// fog shapes are the touched zones' public outline: outer ring only (inner
-// rings would describe the inside) and vertices rounded to ~10 m
+// zone shapes are never published: any served fog shape (even an empty list)
+// outlines a private place
 export function checkFogShapes(shapes: unknown, where: string): Finding[] {
   if (shapes === null || shapes === undefined) return [];
-  if (!Array.isArray(shapes)) return [{ severity: "leak", where, message: "fog shapes are not an array" }];
-  const out: Finding[] = [];
-  const scale = 10 ** FOG_SHAPE_DECIMALS;
-  shapes.forEach((poly, i) => {
-    if (!Array.isArray(poly)) {
-      out.push({ severity: "leak", where, message: `fog shape ${i} is not a polygon` });
-      return;
-    }
-    if (poly.length > 1) out.push({ severity: "leak", where, message: `fog shape ${i} has ${poly.length} rings (outer ring only)` });
-    let unrounded = 0;
-    let malformed = 0;
-    for (const ring of poly) {
-      if (!Array.isArray(ring)) {
-        malformed++;
-        continue;
-      }
-      for (const p of ring) {
-        if (!Array.isArray(p) || typeof p[0] !== "number" || typeof p[1] !== "number") {
-          malformed++;
-          continue;
-        }
-        for (const v of [p[0], p[1]]) if (Math.abs(v * scale - Math.round(v * scale)) > 1e-6) unrounded++;
-      }
-    }
-    if (malformed) out.push({ severity: "leak", where, message: `fog shape ${i} has ${malformed} malformed vertex/ring(s)` });
-    if (unrounded) out.push({ severity: "leak", where, message: `fog shape ${i} has ${unrounded} coordinate(s) finer than ${FOG_SHAPE_DECIMALS} decimals` });
-  });
-  return out;
+  const n = Array.isArray(shapes) ? shapes.length : 1;
+  return [{ severity: "leak", where, message: `zone shapes are published (${n}); fog shapes must be null` }];
+}
+
+// fog events are published only as an aggregate: an entry/exit point marks the
+// zone edge, so one is worth a look even when it sits outside every zone
+export function checkFogEvents(events: unknown, zones: ZoneInput[], where: string): Finding[] {
+  if (!Array.isArray(events)) return [];
+  const edge: [number, number][] = [];
+  let withPoints = 0;
+  for (const e of events as { entry?: unknown; exit?: unknown }[]) {
+    const pts = [e?.entry, e?.exit].filter((p) => p !== null && p !== undefined);
+    if (pts.length) withPoints++;
+    for (const p of pts) if (isLatLng(p)) edge.push([p[0], p[1]]);
+  }
+  const out: Finding[] = withPoints
+    ? [{ severity: "warning", where, message: `${withPoints} fog event(s) carry entry/exit points` }]
+    : [];
+  return [...out, ...checkPoints(edge, zones, where, "fog edge point(s)")];
 }
 
 export interface PublicActivityLike {
@@ -207,13 +217,7 @@ export function checkPublicActivity(a: PublicActivityLike, zones: ZoneInput[], w
   out.push(...checkPolyline(a.cardPolyline, zones, `${where} cardPolyline`));
   out.push(...checkBounds(a.bounds, zones, `${where} bounds`));
   out.push(...checkFogShapes(a.fogShapes, `${where} fogShapes`));
-  if (Array.isArray(a.fogEvents)) {
-    const edge: [number, number][] = [];
-    for (const e of a.fogEvents as { entry?: unknown; exit?: unknown }[]) {
-      for (const p of [e?.entry, e?.exit]) if (isLatLng(p)) edge.push([p[0], p[1]]);
-    }
-    out.push(...checkPoints(edge, zones, `${where} fogEvents`, "fog edge point(s)"));
-  }
+  out.push(...checkFogEvents(a.fogEvents, zones, `${where} fogEvents`));
   if (Array.isArray(a.photos)) {
     const pins: [number, number][] = [];
     for (const p of a.photos as { pin?: unknown }[]) if (isLatLng(p?.pin)) pins.push([p.pin[0], p.pin[1]]);

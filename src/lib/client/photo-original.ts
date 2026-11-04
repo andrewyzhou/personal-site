@@ -40,6 +40,18 @@ async function postJson(url: string, body: unknown): Promise<{ res: Response; js
   return { res, json };
 }
 
+// headers the presign asks the browser to send. content-length and host are
+// set by the browser (scripts can't), so they're never passed along
+export function putHeaders(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== "string" || ["content-length", "host"].includes(k.toLowerCase())) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
 // keeps the untouched original privately; never throws
 async function keepOriginal(file: File): Promise<{ status: OriginalStatus; sha256: string | null; meta: PhotoExifMeta }> {
   const local = () => readPhotoExif(file);
@@ -57,9 +69,11 @@ async function keepOriginal(file: File): Promise<{ status: OriginalStatus; sha25
     if (!start.res.ok || !start.json?.ok) throw new Error(String(start.json?.error ?? start.res.status));
 
     if (!start.json.exists) {
+      // the signed content-length is the declared file.size; fetch sends exactly
+      // that for a File body, so it's never set by hand here
       const put = await fetch(String(start.json.url), {
         method: "PUT",
-        headers: { ...(start.json.headers as Record<string, string>), "Content-Type": file.type || "application/octet-stream" },
+        headers: { ...putHeaders(start.json.headers), "Content-Type": file.type || "application/octet-stream" },
         body: file,
       });
       // 412: someone stored the same bytes first (write-once), which is fine
