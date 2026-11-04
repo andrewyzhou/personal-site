@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { getDb, activities } from "@/lib/db";
+import { isPublic, publicStartUtc } from "@/lib/public-activity";
 import { getCachedData } from "@/lib/cache";
 import { log } from "@/lib/log";
 import { formatDistance, formatDuration, formatTimeAgo } from "@/lib/strava";
@@ -18,7 +19,8 @@ interface LatestActivity {
 }
 
 // shape-identical replacement for /api/strava (Currently's workout sentence);
-// the response passes isStravaActivity() in src/lib/validate.ts unchanged
+// the response passes isStravaActivity() in src/lib/validate.ts unchanged.
+// startDate is the published (possibly coarsened) start, never the raw one.
 async function fetchLatest(): Promise<LatestActivity | null> {
   const rows = await getDb()
     .select()
@@ -26,8 +28,8 @@ async function fetchLatest(): Promise<LatestActivity | null> {
     .where(eq(activities.hidden, false))
     .orderBy(desc(activities.startDateUtc))
     .limit(1);
-  if (rows.length === 0) return null;
-  const row = rows[0];
+  const row = rows.find(isPublic);
+  if (!row) return null;
   return {
     id: row.id,
     name: row.name,
@@ -35,7 +37,7 @@ async function fetchLatest(): Promise<LatestActivity | null> {
     distance: row.distanceM,
     movingTime: row.movingTimeS,
     elapsedTime: row.elapsedTimeS,
-    startDate: row.startDateUtc.toISOString(),
+    startDate: publicStartUtc(row).toISOString(),
   };
 }
 

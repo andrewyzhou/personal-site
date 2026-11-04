@@ -7,6 +7,7 @@ import { getDb, activities, activityPhotos, type ActivityRow } from "@/lib/db";
 import RouteMap from "@/components/RouteMap";
 import ActivityPhotoCarousel from "@/components/ActivityPhotoCarousel";
 import EngagementSection from "@/components/EngagementSection";
+import { isPublic, publicActivityDetail } from "@/lib/public-activity";
 import {
   DURATION_ONLY_TYPES,
   PACE_TYPES,
@@ -31,13 +32,22 @@ async function loadActivity(idStr: string): Promise<ActivityRow | null> {
     .from(activities)
     .where(and(eq(activities.id, id), eq(activities.hidden, false)))
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row && isPublic(row) ? row : null;
 }
 
+// title only: no description/route/time in metadata
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const row = await loadActivity(id);
   return { title: row ? `${row.name} · activity · andrew zhou` : "activity · andrew zhou" };
+}
+
+// "in the fog · 14 min": total hidden time, whole minutes
+function fogLine(fogEvents: { durationS: number }[] | null): string | null {
+  const totalS = (fogEvents ?? []).reduce((s, e) => s + (Number.isFinite(e.durationS) ? e.durationS : 0), 0);
+  const min = Math.round(totalS / 60);
+  return min > 0 ? `in the fog · ${min} min` : null;
 }
 
 export default async function ActivityPage({ params }: { params: Promise<{ id: string }> }) {
@@ -45,37 +55,46 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
   const row = await loadActivity(id);
   if (!row) notFound();
 
-  const photos = await getDb()
+  // public columns only: the exif time/gps (taken_at, gps_*) never leave the db
+  const photoRows = await getDb()
     .select({
-      url: activityPhotos.blobUrl,
+      blobUrl: activityPhotos.blobUrl,
       width: activityPhotos.width,
       height: activityPhotos.height,
       caption: activityPhotos.caption,
+      pinLat: activityPhotos.pinLat,
+      pinLng: activityPhotos.pinLng,
     })
     .from(activityPhotos)
     .where(eq(activityPhotos.activityId, row.id))
     .orderBy(asc(activityPhotos.position));
 
-  const { dateLine, timeLine } = formatLocalDateLine(row.localDate, row.localTime);
-  const durationOnly = DURATION_ONLY_TYPES.has(row.sportType);
+  // everything rendered below comes from the public serializer (hide map /
+  // hide hr / coarsened start applied there)
+  const a = publicActivityDetail(row, photoRows);
+  // hide map → fogEvents is null here, so nothing about fog is shown either
+  const fog = fogLine(a.fogEvents);
+
+  const { dateLine, timeLine } = formatLocalDateLine(a.date, a.startTime);
+  const durationOnly = DURATION_ONLY_TYPES.has(a.type);
 
   const stats: { label: string; value: string }[] = [];
-  stats.push({ label: "time", value: formatClockDuration(row.movingTimeS || row.elapsedTimeS) });
-  if (!durationOnly && row.distanceM > 100) {
-    stats.push({ label: "distance", value: formatMiles(row.distanceM) });
-    if (PACE_TYPES.has(row.sportType)) {
-      stats.push({ label: "avg pace", value: formatPace(row.avgSpeedMs) });
-    } else if (SPEED_TYPES.has(row.sportType)) {
-      stats.push({ label: "avg speed", value: formatMph(row.avgSpeedMs) });
+  stats.push({ label: "time", value: formatClockDuration(a.duration || a.elapsedTime) });
+  if (!durationOnly && a.distance > 100) {
+    stats.push({ label: "distance", value: formatMiles(a.distance) });
+    if (PACE_TYPES.has(a.type)) {
+      stats.push({ label: "avg pace", value: formatPace(a.averageSpeed) });
+    } else if (SPEED_TYPES.has(a.type)) {
+      stats.push({ label: "avg speed", value: formatMph(a.averageSpeed) });
     }
-    if (row.elevGainM > 1) stats.push({ label: "elevation", value: formatFeet(row.elevGainM) });
+    if (a.totalElevationGain > 1) stats.push({ label: "elevation", value: formatFeet(a.totalElevationGain) });
   }
-  if (row.avgHr !== null) stats.push({ label: "avg hr", value: `${Math.round(row.avgHr)} bpm` });
-  if (row.maxHr !== null) stats.push({ label: "max hr", value: `${Math.round(row.maxHr)} bpm` });
-  if (row.avgCadence !== null && !durationOnly)
-    stats.push({ label: "cadence", value: `${Math.round(row.avgCadence)} spm` });
-  if (row.avgWatts !== null) stats.push({ label: "avg power", value: `${Math.round(row.avgWatts)} w` });
-  if (row.kilojoules !== null) stats.push({ label: "energy", value: `${Math.round(row.kilojoules)} kj` });
+  if (a.averageHeartrate !== null) stats.push({ label: "avg hr", value: `${Math.round(a.averageHeartrate)} bpm` });
+  if (a.maxHeartrate !== null) stats.push({ label: "max hr", value: `${Math.round(a.maxHeartrate)} bpm` });
+  if (a.averageCadence !== null && !durationOnly)
+    stats.push({ label: "cadence", value: `${Math.round(a.averageCadence)} spm` });
+  if (a.averageWatts !== null) stats.push({ label: "avg power", value: `${Math.round(a.averageWatts)} w` });
+  if (a.kilojoules !== null) stats.push({ label: "energy", value: `${Math.round(a.kilojoules)} kj` });
 
   return (
     <main className="site-container">
@@ -91,25 +110,30 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
             className="rounded-lg flex items-center justify-center shrink-0"
             style={{ width: "2.5rem", height: "2.5rem", border: "1px solid var(--theme-highlight-bg)" }}
           >
-            <Image src={`/icons/activities/${sportIcon(row.sportType)}.svg`} alt="" width={20} height={20} />
+            <Image src={`/icons/activities/${sportIcon(a.type)}.svg`} alt="" width={20} height={20} />
           </div>
           <h1 className="font-sans font-bold text-off-white text-4xl" style={{ letterSpacing: "-0.01em" }}>
-            {row.name}
+            {a.name}
           </h1>
         </div>
 
         <p className="font-sans text-gray text-lg">
-          {dateLine} · {timeLine} · {sportLabel(row.sportType)}
-          {row.gear ? ` · ${row.gear}` : ""}
+          {dateLine} · {timeLine} · {sportLabel(a.type)}
+          {a.gear ? ` · ${a.gear}` : ""}
         </p>
 
         <hr style={{ border: "none", borderTop: "1px solid var(--theme-divider)", margin: "1.5rem 0" }} />
 
-        {row.polyline && row.bounds && (
+        {(a.polyline && a.bounds) || fog ? (
           <div style={{ margin: "2rem 0" }}>
-            <RouteMap polyline={row.polyline} bounds={row.bounds} />
+            {a.polyline && a.bounds && <RouteMap polyline={a.polyline} bounds={a.bounds} fogShapes={a.fogShapes} />}
+            {fog && (
+              <p className="font-sans text-gray text-sm" style={{ marginTop: a.polyline ? "0.5rem" : 0 }}>
+                {fog}
+              </p>
+            )}
           </div>
-        )}
+        ) : null}
 
         <div className="grid grid-cols-3 gap-3" style={{ margin: "2rem 0" }}>
           {stats.map((s) => (
@@ -120,13 +144,13 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
           ))}
         </div>
 
-        {row.description && (
+        {a.description && (
           <p className="font-sans text-secondary text-base leading-relaxed" style={{ margin: "2rem 0" }}>
-            {row.description}
+            {a.description}
           </p>
         )}
 
-        <ActivityPhotoCarousel photos={photos} />
+        <ActivityPhotoCarousel photos={a.photos} />
 
         <EngagementSection target={`activity:${row.id}`} />
       </article>

@@ -134,6 +134,13 @@ describe("settings", () => {
     expect(coarsenStart(d, 15).toISOString()).toBe("2026-10-01T07:15:00.000Z");
     expect(publishedStart({ startDateUtc: d, utcOffsetMin: -420 }, { ...DEFAULT_PRIVACY_SETTINGS, coarsenStartMin: 60 }).publishedLocalTime).toBe("00:00");
   });
+
+  it("floors in local time, so a half-hour offset never moves the start to the previous day", () => {
+    // 18:50z at +05:30 is 00:20 local on oct 2
+    const s = publishedStart({ startDateUtc: new Date("2026-10-01T18:50:00Z"), utcOffsetMin: 330 }, { ...DEFAULT_PRIVACY_SETTINGS, coarsenStartMin: 60 });
+    expect(s.publishedLocalTime).toBe("00:00");
+    expect(s.publishedStartUtc.toISOString()).toBe("2026-10-01T18:30:00.000Z");
+  });
 });
 
 // ---------------------------------------------------------------------------

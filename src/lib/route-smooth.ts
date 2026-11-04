@@ -45,3 +45,44 @@ export function chaikin(pts: [number, number][], iterations = 2): [number, numbe
   }
   return out;
 }
+
+// one svg path for a multi-segment route: each segment starts with its own M,
+// so nothing is ever drawn between segments (fogged gaps stay gaps)
+export function multiQuadraticPathD(segments: [number, number][][], decimals: number): string {
+  return segments
+    .filter((s) => s.length >= 2)
+    .map((s) => quadraticPathD(s, decimals))
+    .join("");
+}
+
+// equirectangular projection shared by the svg thumbnails: every point of
+// every segment lands in one frame (so gaps keep their real size), y down,
+// origin at the min corner
+export interface ProjectedRoute {
+  segments: [number, number][][];
+  w: number;
+  h: number;
+}
+
+export function projectSegments(segments: [number, number][][]): ProjectedRoute | null {
+  if (!segments.some((s) => s.length >= 2)) return null;
+  const all = segments.flat();
+  const cos = Math.cos((all.reduce((s, p) => s + p[0], 0) / all.length) * (Math.PI / 180));
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [lat, lng] of all) {
+    const x = lng * cos;
+    const y = -lat;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  return {
+    segments: segments.map((s) => s.map(([lat, lng]): [number, number] => [lng * cos - minX, -lat - minY])),
+    w: maxX - minX || 1e-6,
+    h: maxY - minY || 1e-6,
+  };
+}
