@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
-import type { Equipment, SetKind, TrackingType, WeightUnit } from "lift-core";
+import type { Equipment, SetKind, SyncEntity, TrackingType, WeightUnit } from "lift-core";
 
 // local mirror of the server lift tables, shaped for the later push-only sync.
 // ids are client uuids so rows keep their identity when pushed. timestamps are
@@ -16,6 +16,9 @@ export const workouts = sqliteTable(
     title: text("title").notNull().default(""),
     startedAt: integer("started_at").notNull(),
     endedAt: integer("ended_at"),
+    // device offset at start (minutes east of utc), so the server can rebuild wall time
+    utcOffsetMin: integer("utc_offset_min"),
+    templateId: text("template_id"),
     status: text("status").$type<WorkoutStatus>().notNull().default("active"),
     notes: text("notes"),
     createdAt: integer("created_at").notNull(),
@@ -37,6 +40,8 @@ export const workoutExercises = sqliteTable(
     position: integer("position").notNull(),
     notes: text("notes"),
     supersetGroup: integer("superset_group"),
+    // rest seconds after each set; null = the app default
+    restS: integer("rest_s"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -78,11 +83,12 @@ export const customExercises = sqliteTable("custom_exercises", {
   primary: text("primary").notNull().default("[]"),
   secondary: text("secondary").notNull().default("[]"),
   archived: integer("archived").notNull().default(0),
+  mergedInto: text("merged_into"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
 
-export type OutboxEntity = "workout" | "workout_exercise" | "set" | "custom_exercise";
+export type OutboxEntity = SyncEntity;
 export type OutboxOp = "insert" | "update" | "delete";
 
 // every mutation appends here in the same transaction, so the future sync can
@@ -97,9 +103,79 @@ export const outbox = sqliteTable(
     payload: text("payload").notNull(),
     createdAt: integer("created_at").notNull(),
     syncedAt: integer("synced_at"),
+    // server refusal reason, kept for inspection; the row still counts as synced
+    rejected: text("rejected"),
   },
   (t) => [index("outbox_unsynced_idx").on(t.syncedAt, t.id)]
 );
+
+export const templateFolders = sqliteTable("template_folders", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const templates = sqliteTable(
+  "templates",
+  {
+    id: text("id").primaryKey(),
+    folderId: text("folder_id").references(() => templateFolders.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    notes: text("notes"),
+    position: integer("position").notNull().default(0),
+    archived: integer("archived").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("templates_folder_idx").on(t.folderId, t.position)]
+);
+
+export const templateExercises = sqliteTable(
+  "template_exercises",
+  {
+    id: text("id").primaryKey(),
+    templateId: text("template_id")
+      .notNull()
+      .references(() => templates.id, { onDelete: "cascade" }),
+    exerciseId: text("exercise_id").notNull(),
+    position: integer("position").notNull(),
+    supersetGroup: integer("superset_group"),
+    restS: integer("rest_s"),
+    // json array of PlannedSetPayload (lift-core sync.ts)
+    plannedSets: text("planned_sets").notNull().default("[]"),
+    notes: text("notes"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("template_exercises_template_idx").on(t.templateId, t.position)]
+);
+
+export const bodyweights = sqliteTable(
+  "bodyweights",
+  {
+    id: text("id").primaryKey(),
+    measuredAt: integer("measured_at").notNull(),
+    weight: real("weight").notNull(),
+    unit: text("unit").$type<WeightUnit>().notNull().default("lb"),
+    note: text("note"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("bodyweights_measured_idx").on(t.measuredAt)]
+);
+
+// small local settings: device id, sync cursor, default rest, unit, server url
+export const kv = sqliteTable("kv", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
+export type TemplateFolderRow = typeof templateFolders.$inferSelect;
+export type TemplateRow = typeof templates.$inferSelect;
+export type TemplateExerciseRow = typeof templateExercises.$inferSelect;
+export type BodyweightRow = typeof bodyweights.$inferSelect;
 
 export type WorkoutRow = typeof workouts.$inferSelect;
 export type WorkoutExerciseRow = typeof workoutExercises.$inferSelect;

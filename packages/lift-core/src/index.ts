@@ -5,3 +5,4 @@ export * from "./link";
 export * from "./catalog";
 export * from "./search";
 export * from "./muscles";
+export * from "./sync";
