@@ -169,7 +169,7 @@ describe("parseStrongText: short date, emoji, query-string link", () => {
     const nb = text
       .replace("6:12 PM", "6:12 PM")
       .replace("Set 1: 65 lb", "Set 1: 65 lb")
-      .replace(/\n/g, "\r\n");
+      .replace(/\r?\n/g, "\r\n");
     const w = parseStrongText(nb);
     expect(w.startedLocal).toBe("2026-11-04T18:12");
     expect(w.exercises[0].sets[0].weight).toBe(65);
