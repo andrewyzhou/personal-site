@@ -3,6 +3,8 @@ import { EB_Garamond, Funnel_Sans } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Analytics } from "@vercel/analytics/next";
 import CursorHalo from "@/components/CursorHalo";
+import { getSite } from "@/content/site";
+import { SiteProvider } from "@/content/SiteProvider";
 import "./globals.css";
 
 const funnelSans = Funnel_Sans({
@@ -18,9 +20,11 @@ const ebGaramond = EB_Garamond({
   display: "swap",
 });
 
+const site = getSite();
+
 export const metadata: Metadata = {
-  title: "andrew zhou",
-  description: "electrical engineering & computer science @ uc berkeley",
+  title: site.site.title,
+  description: site.site.description,
   icons: {
     icon: [
       { url: "/images/az-favicon.png", sizes: "512x512", type: "image/png" },
@@ -37,9 +41,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${funnelSans.variable} ${ebGaramond.variable} theme-dark`}>
       <body className="antialiased">
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <SiteProvider site={site}>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </SiteProvider>
         <CursorHalo />
         <Analytics />
       </body>

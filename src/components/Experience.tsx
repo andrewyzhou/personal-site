@@ -5,20 +5,12 @@ import Link from "next/link";
 import type { ExperienceItem } from "@/lib/items";
 import { courseHasDetail, semesterShortLabel, type Course, type Semester } from "@/lib/coursework";
 import SortControl from "@/components/SortControl";
+import { useSite } from "@/content/SiteProvider";
+import { plural } from "@/content/site-types";
 
 type Category = "bio" | "work" | "research" | "teaching" | "projects" | "library" | "blog" | "photos" | "coursework";
 
-const categories: { id: Category; label: string }[] = [
-  { id: "bio", label: "bio" },
-  { id: "work", label: "work" },
-  { id: "research", label: "research" },
-  { id: "teaching", label: "teaching" },
-  { id: "projects", label: "projects" },
-  { id: "library", label: "library" },
-  { id: "blog", label: "blog" },
-  { id: "photos", label: "photos" },
-  { id: "coursework", label: "coursework" },
-];
+const CATEGORY_IDS: Category[] = ["bio", "work", "research", "teaching", "projects", "library", "blog", "photos", "coursework"];
 
 
 export interface LibraryPreviewItem {
@@ -73,6 +65,8 @@ export default function Experience({
   teachingItems,
   projectsItems,
 }: ExperienceProps) {
+  const { experience: copy, home } = useSite();
+  const categories = CATEGORY_IDS.map((id) => ({ id, label: copy.tabs[id] }));
   const [activeCategory, setActiveCategory] = useState<Category>("bio");
   const [selectedItem, setSelectedItem] = useState<ExperienceItem | null>(null);
   const [contentKey, setContentKey] = useState(0);
@@ -93,7 +87,7 @@ export default function Experience({
           href={`/library/${e.slug}`}
           className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
-          read full notes →
+          {`${copy.open.library} →`}
         </Link>
       </div>
     ),
@@ -111,7 +105,7 @@ export default function Experience({
           href={`/blog/${e.slug}`}
           className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
-          read post →
+          {`${copy.open.blog} →`}
         </Link>
       </div>
     ),
@@ -125,12 +119,12 @@ export default function Experience({
     description: (
       <div className="flex flex-col gap-2">
         <p>{e.caption}</p>
-        <p className="font-sans text-gray text-sm italic">{e.count} photo{e.count === 1 ? "" : "s"}</p>
+        <p className="font-sans text-gray text-sm italic">{e.count}{` ${plural(e.count, copy.photoCount)}`}</p>
         <Link
           href={`/photos/${e.slug}`}
           className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
-          view set →
+          {`${copy.open.photos} →`}
         </Link>
       </div>
     ),
@@ -139,7 +133,7 @@ export default function Experience({
   // read hash on mount and set category
   useEffect(() => {
     const hash = window.location.hash.slice(1) as Category;
-    if (categories.some(c => c.id === hash)) {
+    if ((CATEGORY_IDS as string[]).includes(hash)) {
       setActiveCategory(hash);
     }
   }, []);
@@ -193,7 +187,7 @@ export default function Experience({
         description: courseHasDetail(course) ? (
           courseDetail(course)
         ) : (
-          <p className="font-sans text-gray text-lg italic">no writeup for this one (yet)</p>
+          <p className="font-sans text-gray text-lg italic">{copy.noWriteup}</p>
         ),
       }))
     )
@@ -263,7 +257,7 @@ export default function Experience({
           {/* left side - bio text */}
           <div className="w-full md:w-3/5">
             <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '1rem' }}>
-              about me
+              {home.about}
             </h3>
             <div>{bio}</div>
           </div>
@@ -292,8 +286,8 @@ export default function Experience({
         {activeCategory === "coursework" && (
           <SortControl
             options={[
-              { id: "semester", label: "by semester" },
-              { id: "az", label: "a–z" },
+              { id: "semester", label: copy.sort.semester },
+              { id: "az", label: copy.sort.az },
             ]}
             value={courseworkSort}
             onChange={(v) => setCourseworkSort(v as "semester" | "az")}
@@ -385,7 +379,7 @@ export default function Experience({
                 );
               })()}
             <p className="font-sans text-gray text-lg" style={{ marginTop: '2rem' }}>
-              * accredited courses taken outside of uc berkeley
+              {copy.courseworkFootnote}
             </p>
           </>
         ) : (
@@ -477,7 +471,7 @@ export default function Experience({
               href="/library"
               className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
-              see all library →
+              {`${copy.seeAll.library} →`}
             </Link>
           </div>
         )}
@@ -487,7 +481,7 @@ export default function Experience({
               href="/blog"
               className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
-              see all posts →
+              {`${copy.seeAll.blog} →`}
             </Link>
           </div>
         )}
@@ -497,7 +491,7 @@ export default function Experience({
               href="/photos"
               className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
-              see all photos →
+              {`${copy.seeAll.photos} →`}
             </Link>
           </div>
         )}

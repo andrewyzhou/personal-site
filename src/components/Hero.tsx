@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import SocialLinks from "./SocialLinks";
 import GoldenLogo from "./GoldenLogo";
+import { useSite } from "@/content/SiteProvider";
 
 const TYPING_SPEED = 35;
 
@@ -16,6 +17,7 @@ function getNextQuoteIndex(current: number, total: number): number {
 }
 
 export default function Hero({ quotes }: HeroProps) {
+  const { hero } = useSite();
   const [showLogo, setShowLogo] = useState(false);
   const [initialIndex] = useState(() => Math.floor(Math.random() * quotes.length));
   const [displayedQuote, setDisplayedQuote] = useState("");
@@ -126,8 +128,8 @@ export default function Hero({ quotes }: HeroProps) {
                   <GoldenLogo layout="vertical" className="w-full h-full" />
                 ) : (
                   <Image
-                    src="/images/headshot.png"
-                    alt="Andrew Zhou"
+                    src={hero.headshot.src}
+                    alt={hero.headshot.alt}
                     fill
                     className="object-cover object-top"
                     priority
@@ -142,13 +144,13 @@ export default function Hero({ quotes }: HeroProps) {
                 className="font-sans font-bold text-off-white text-6xl md:text-7xl"
                 style={{ letterSpacing: '-0.02em' }}
               >
-                hi, i&apos;m
+                {hero.greeting}
               </p>
               <p
                 className="font-sans font-bold text-off-white text-6xl md:text-7xl"
                 style={{ letterSpacing: '-0.02em' }}
               >
-                andrew
+                {hero.name}
               </p>
             </div>
           </div>
@@ -159,12 +161,15 @@ export default function Hero({ quotes }: HeroProps) {
 
         {/* right side - info */}
         <div className="text-center md:text-right">
-          <p className="font-sans font-semibold text-off-white text-lg leading-[1.35]">
-            electrical engineering &amp; computer science
-          </p>
-          <p className="font-sans font-semibold text-off-white text-lg leading-[1.35]" style={{ marginBottom: '0.5rem' }}>
-            @ uc berkeley
-          </p>
+          {hero.affiliation.map((line, i) => (
+            <p
+              key={line}
+              className="font-sans font-semibold text-off-white text-lg leading-[1.35]"
+              style={i === hero.affiliation.length - 1 ? { marginBottom: '0.5rem' } : undefined}
+            >
+              {line}
+            </p>
+          ))}
           <p className="font-sans italic text-gray text-lg leading-[1.35] max-w-md whitespace-pre-line">
             {displayedQuote}
             {showCursor && (

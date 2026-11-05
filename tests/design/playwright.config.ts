@@ -15,6 +15,7 @@ export default defineConfig({
   testMatch: /.*\.spec\.ts$/,
   outputDir: process.env.DESIGN_OUTPUT_DIR ?? "./.output",
   snapshotPathTemplate: `${process.env.DESIGN_SNAPSHOT_DIR ?? "{testDir}/__screenshots__"}/{platform}/{arg}{ext}`,
+  globalSetup: "./support/warm.ts",
   fullyParallel: true,
   workers: 2,
   retries: 0,

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { V1_ROUTES } from "./support/routes";
 import { settle, stage } from "./support/stage";
 
 // v1 is the site as it looked when the design system work began. every route
@@ -6,15 +7,6 @@ import { settle, stage } from "./support/stage";
 // committed baseline. a diff means a change leaked into v1: fix the change,
 // don't update the baseline (only the coordinator does that, deliberately).
 
-export const V1_ROUTES = [
-  { name: "home", path: "/" },
-  { name: "blog", path: "/blog" },
-  { name: "blog-post", path: "/blog/hello-world" },
-  { name: "library", path: "/library" },
-  { name: "library-entry", path: "/library/foundation" },
-  { name: "photos", path: "/photos" },
-  { name: "not-found", path: "/this-page-does-not-exist" },
-] as const;
 
 const VIEWPORTS = [
   { name: "1440", width: 1440, height: 900 },

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSite } from "@/content/SiteProvider";
+import { fillParts } from "@/content/site-types";
 
 const MOBILE_WEEKS = 24;
 const STACK_BREAKPOINT = 768;
@@ -96,6 +98,7 @@ interface GitHubActivityProps {
 }
 
 export default function GitHubActivity({ showHeading = true, mobileHeading = true }: GitHubActivityProps) {
+  const { github: copy } = useSite();
   const [data, setData] = useState<GitHubData | null>(null);
   const [loading, setLoading] = useState(true);
   const [weeksToShow, setWeeksToShow] = useState(52);
@@ -216,7 +219,7 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
     return (
       <div>
         <div className="text-gray text-lg font-sans">
-          failed to load github activity
+          {copy.failed}
         </div>
       </div>
     );
@@ -228,7 +231,7 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
     <div>
       {showHeading && (
         <h3 className={`font-sans font-bold text-off-white text-3xl${!mobileHeading ? ' hidden activity-stack:block' : ''}`} style={{ marginBottom: '0.5rem' }}>
-          activity
+          {copy.heading}
         </h3>
       )}
 
@@ -279,7 +282,7 @@ export default function GitHubActivity({ showHeading = true, mobileHeading = tru
       {/* latest commit info */}
       {data.latestCommit && (
         <p className="font-sans text-gray text-lg" style={{ marginTop: '0.5rem' }}>
-          this site was last deployed on {formatDate(data.latestCommit.date)} for commit {data.latestCommit.sha}
+          {fillParts(copy.deployed, { date: formatDate(data.latestCommit.date), sha: data.latestCommit.sha })}
         </p>
       )}
     </div>

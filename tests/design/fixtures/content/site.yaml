@@ -1,0 +1,118 @@
+# site-wide copy: every heading, label, link text and message the site shows
+# that isn't part of a specific entry. designs render these; they never hardcode
+# their own. see content/README.md for the full content model.
+#
+# arrows and separators (←, →, ·) are not content; designs add their own.
+
+site:
+  name: andrew zhou
+  title: andrew zhou
+  description: electrical engineering & computer science @ uc berkeley
+  footer: © andrew zhou 2025-2026
+  titleSeparator: " · "
+  notFoundTitle: not found
+
+nav:
+  home: home
+  blog: blog
+  library: library
+  photos: photos
+  previous: previous
+  next: next
+
+hero:
+  greeting: hi, i'm
+  name: andrew
+  headshot:
+    src: /images/headshot.png
+    alt: Andrew Zhou
+  affiliation:
+    - electrical engineering & computer science
+    - "@ uc berkeley"
+
+social:
+  - { name: github, url: "https://github.com/andrewyzhou", icon: /icons/github.svg }
+  - { name: linkedin, url: "https://linkedin.com/in/andrewyzhou", icon: /icons/linkedin.svg }
+  - { name: x, url: "https://x.com/andrewyzhou", icon: /icons/x.svg }
+  - { name: strava, url: "https://www.strava.com/athletes/161887324", icon: /icons/strava.svg }
+  - { name: spotify, url: "https://open.spotify.com/user/andrewfanbois", icon: /icons/spotify.svg }
+  - { name: resume, url: /resume.pdf }
+  - { name: cv, url: /cv.pdf }
+
+theme:
+  switchTo: Switch to {theme} mode
+  current: "{theme} mode"
+
+home:
+  about: about me
+  activity: activity
+  errors:
+    currently: couldn't load this section.
+    calendar: couldn't load the activity calendar.
+    github: couldn't load github activity.
+
+experience:
+  tabs:
+    bio: bio
+    work: work
+    research: research
+    teaching: teaching
+    projects: projects
+    library: library
+    blog: blog
+    photos: photos
+    coursework: coursework
+  open:
+    library: read full notes
+    blog: read post
+    photos: view set
+  seeAll:
+    library: see all library
+    blog: see all posts
+    photos: see all photos
+  photoCount:
+    one: photo
+    other: photos
+  noWriteup: no writeup for this one (yet)
+  sort:
+    semester: by semester
+    az: a–z
+  courseworkFootnote: "* accredited courses taken outside of uc berkeley"
+
+contact:
+  heading: contact
+  body: i love chatting—feel free to reach out about anything ai/ml, eecs, teaching, fitness, music, or honestly anything at all. the best way to reach me is by email. i read every message!
+  email: firstnamelastname [at] berkeley [dot] edu
+
+currently:
+  heading: currently
+  fetched: data last fetched
+  apiCalls: "total api calls:"
+
+github:
+  heading: activity
+  failed: failed to load github activity
+  deployed: this site was last deployed on {date} for commit {sha}
+
+pages:
+  blog:
+    title: blog
+    metaDescription: writing, photos, and notes on things i'm thinking about.
+    intro: writing, photos, and half-formed thoughts — on whatever i've been making, reading, or wandering into lately.
+    allTags: all
+    noMatch: no posts match these tags.
+  library:
+    title: library
+    metaDescription: books, videos, podcasts, and courses i've been learning from, with my notes.
+    intro: a running list of books, videos, podcasts, and courses i've been learning from — with summaries, commentary, and what stuck. mostly non-technical, occasionally technical, always honest.
+    allTags: all
+    noMatch: no entries match these tags.
+    originalSource: original source
+    inProgress: in progress
+    started: started
+    completed: completed
+  photos:
+    title: photos
+    metaDescription: photos i've taken.
+    intro: photos i've taken when i remember to bring a camera — film, phone, whatever. click into a set for the full thing.
+    empty: no photos yet.
