@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { MUSCLE_REGIONS, MUSCLE_REGION_LABELS, searchExercises, type Exercise } from "lift-core";
+import { MUSCLE_REGIONS, MUSCLE_REGION_LABELS, nlSearchExercises, type Exercise } from "lift-core";
 import { getCatalog, getUsageCounts, listCustomRows } from "../db/exercises";
 import { isCustomId } from "../lib/custom";
 import { formatList, humanize } from "../lib/format";
@@ -57,7 +57,8 @@ export function ExercisePicker({ onSelect, autoFocus, showFilters, excludeIds, o
     if (query.trim()) {
       // a filter can drop most hits, so search wider before filtering
       const limit = filter.kind === "all" && !excluded.size ? 50 : 500;
-      return searchExercises(query, { limit, usage, catalog })
+      // reads "cable shoulders" or "back no equipment" as filters, plain names as before
+      return nlSearchExercises(query, { limit, usage, catalog })
         .map((r) => r.exercise)
         .filter(keep)
         .slice(0, 50);
@@ -83,7 +84,7 @@ export function ExercisePicker({ onSelect, autoFocus, showFilters, excludeIds, o
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="search"
+        placeholder="search, e.g. cable shoulders"
         placeholderTextColor={c.muted}
         autoFocus={autoFocus}
         autoCorrect={false}

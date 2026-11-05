@@ -16,6 +16,7 @@ export const SYNC_ENTITIES = [
   "workout_exercise",
   "set",
   "bodyweight",
+  "program",
 ] as const;
 export type SyncEntity = (typeof SYNC_ENTITIES)[number];
 
@@ -140,6 +141,17 @@ export interface BodyweightPayload {
   updatedAt: number;
 }
 
+export interface ProgramPayload {
+  id: string;
+  name: string;
+  /** json text of ProgramData (programs.ts); template ids inside are not foreign keys */
+  data: string;
+  /** the program home's "next up" follows; the phone keeps at most one active */
+  active: 0 | 1;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface SyncPayloads {
   custom_exercise: CustomExercisePayload;
   template_folder: TemplateFolderPayload;
@@ -149,6 +161,7 @@ export interface SyncPayloads {
   workout_exercise: WorkoutExercisePayload;
   set: SetPayload;
   bodyweight: BodyweightPayload;
+  program: ProgramPayload;
 }
 
 export interface SyncMutation<E extends SyncEntity = SyncEntity> {
@@ -194,6 +207,7 @@ export interface SyncSnapshot {
   workoutExercises: WorkoutExercisePayload[];
   sets: SetPayload[];
   bodyweights: BodyweightPayload[];
+  programs: ProgramPayload[];
 }
 
 /** snapshot keys in fk order: parents before children, so a restore can insert in this order */
@@ -206,6 +220,8 @@ export const SNAPSHOT_ENTITIES = [
   "workoutExercises",
   "sets",
   "bodyweights",
+  // last: programs only reference templates by id inside their json
+  "programs",
 ] as const satisfies readonly (keyof SyncSnapshot)[];
 export type SnapshotEntity = (typeof SNAPSHOT_ENTITIES)[number];
 

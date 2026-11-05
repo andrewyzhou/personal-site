@@ -295,6 +295,7 @@ function snapshot(over: Partial<SyncSnapshot> = {}): SyncSnapshot {
       { id: "s2", workoutExerciseId: "we2", position: 0, kind: "normal", weight: 100, unit: "lb", reps: 5, durationS: null, distanceM: null, rpe: null, completed: 1, note: null, ...t },
     ],
     bodyweights: [],
+    programs: [{ id: "p1", name: "ppl", data: "{}", active: 1, ...t }],
     ...over,
   };
 }
@@ -311,8 +312,9 @@ describe("restore plan", () => {
       "workout_exercise",
       "set",
       "bodyweight",
+      "program",
     ]);
-    expect(wipeOrder(plan)[0]).toBe("bodyweight");
+    expect(wipeOrder(plan)[0]).toBe("program");
     expect(wipeOrder(plan).indexOf("set")).toBeLessThan(wipeOrder(plan).indexOf("workout"));
   });
   it("drops orphans, nulls missing folders, counts what lands", () => {

@@ -166,6 +166,21 @@ export const bodyweights = sqliteTable(
   (t) => [index("bodyweights_measured_idx").on(t.measuredAt)]
 );
 
+export const programs = sqliteTable(
+  "programs",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    // json text of lift-core ProgramData; parsed at the repository edge
+    data: text("data").notNull().default("{}"),
+    // the one program home's "next up" follows
+    active: integer("active").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [index("programs_active_idx").on(t.active)]
+);
+
 // small local settings: device id, sync cursor, default rest, unit, server url
 export const kv = sqliteTable("kv", {
   key: text("key").primaryKey(),
@@ -176,6 +191,7 @@ export type TemplateFolderRow = typeof templateFolders.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type TemplateExerciseRow = typeof templateExercises.$inferSelect;
 export type BodyweightRow = typeof bodyweights.$inferSelect;
+export type ProgramRow = typeof programs.$inferSelect;
 
 export type WorkoutRow = typeof workouts.$inferSelect;
 export type WorkoutExerciseRow = typeof workoutExercises.$inferSelect;

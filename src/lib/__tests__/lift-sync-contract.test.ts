@@ -10,7 +10,8 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { getTableColumns } from "drizzle-orm";
 import { getTableConfig, type SQLiteTable } from "drizzle-orm/sqlite-core";
-import { customExerciseId, getExercise, type SyncEntity, type SyncMutation } from "lift-core";
+import { customExerciseId, emptyProgram, getExercise, parseProgramData, serializeProgramData, type SyncEntity, type SyncMutation } from "lift-core";
+import { setDay } from "../../../apps/lift/src/lib/programs";
 import * as serverSchema from "@/lib/db/schema";
 import type {
   ExerciseRow,
@@ -64,6 +65,7 @@ const TABLE: Record<SyncEntity, SQLiteTable> = {
   template: phone.templates,
   template_exercise: phone.templateExercises,
   bodyweight: phone.bodyweights,
+  program: phone.programs,
 };
 
 class Outbox {
@@ -296,6 +298,24 @@ function v2Session(o: Outbox) {
   const tmp = customExerciseId("Typo Exercize");
   o.write("custom_exercise", "insert", { id: tmp, name: "Typo Exercize", primary: "[]", secondary: "[]", archived: 0, mergedInto: null, createdAt: tick(), updatedAt: t });
   o.write("custom_exercise", "delete", { id: tmp });
+
+  programSession(o, tick);
+}
+
+// programs.ts: createProgram, saveProgram, setActiveProgram, skip, delete. the
+// template ids inside point at a template that's already deleted: not an fk
+function programSession(o: Outbox, tick: () => number) {
+  const created = tick();
+  const data = emptyProgram(2, 3);
+  o.write("program", "insert", { id: "p1", name: "5x5", data: serializeProgramData(data), createdAt: created, updatedAt: created });
+  const filled = setDay(setDay(data, 0, 0, "t1"), 1, 0, "t1");
+  const ruled = { ...filled, rules: { te1: { kind: "linear" as const, sets: 5, reps: 5 } } };
+  o.write("program", "update", { id: "p1", name: "5x5", data: serializeProgramData(ruled), active: 0, createdAt: created, updatedAt: tick() });
+  const at = tick();
+  o.write("program", "update", { id: "p1", name: "5x5", data: serializeProgramData({ ...ruled, startedAt: at }), active: 1, createdAt: created, updatedAt: at });
+  o.write("program", "update", { id: "p1", name: "5x5", data: serializeProgramData({ ...ruled, startedAt: at, skipped: 1 }), active: 1, createdAt: created, updatedAt: tick() });
+  o.write("program", "insert", { id: "p2", name: "tmp", data: serializeProgramData(emptyProgram()), active: 0, createdAt: tick(), updatedAt: tick() });
+  o.write("program", "delete", { id: "p2" });
 }
 
 describe("phone outbox -> server push (v2 rows)", () => {
@@ -447,6 +467,17 @@ function snapshotRows() {
       set("strong-0123456789abcdef:0:0", "strong-0123456789abcdef:0", { weight: 25, bodyweight: true, kind: "failure" }),
     ],
     bodyweights: [{ id: "bw1", measuredAt: C, weight: 180, unit: "lb", note: null, createdAt: C, updatedAt: U }],
+    programs: [
+      {
+        id: "p1",
+        name: "5x5",
+        // jsonb hands back keys in its own order
+        data: { rules: { te1: { reps: 5, sets: 5, kind: "linear" } }, weeks: [{ days: [{ templateId: "t-gone" }, { templateId: null }] }], repeat: true, skipped: 0, version: 1, startedAt: C.getTime() } as never,
+        active: true,
+        createdAt: C,
+        updatedAt: U,
+      },
+    ],
   };
 }
 
@@ -534,6 +565,43 @@ describe("paged snapshot: server pages -> phone fetchSnapshot", () => {
       const ids = (s: typeof step) => (s.rows as { id: string }[]).map((r) => r.id).sort();
       expect(ids(step)).toEqual(ids(b.steps[i]));
     }
+  });
+});
+
+describe("programs across the contract", () => {
+  it("a phone program session alone pushes clean (no template needed server-side)", () => {
+    const o = new Outbox();
+    let t = T0;
+    programSession(o, () => (t += 1000));
+    const out = push(o);
+    expect(out.rejected).toEqual([]);
+    expect(out.appliedThrough).toBe(o.rows.length);
+  });
+
+  it("snapshot -> restore -> push back keeps the program", () => {
+    const snap = parseSnapshot(JSON.parse(JSON.stringify(buildSnapshot(snapshotRows(), new Date(), TZ))));
+    expect(snap.programs).toHaveLength(1);
+    const p = snap.programs[0]!;
+    expect(p.active).toBe(1);
+    const data = parseProgramData(p.data);
+    expect(data).toMatchObject({ version: 1, repeat: true, startedAt: C.getTime(), rules: { te1: { kind: "linear", sets: 5, reps: 5 } } });
+    // re-serialized in the phone's key order, so a no-op save on the phone stays a no-op
+    expect(p.data).toBe(serializeProgramData(data));
+    const step = restorePlan(snap).steps.find((s) => s.entity === "program")!;
+    expect(step.rows).toHaveLength(1);
+    const o = new Outbox();
+    o.write("program", "update", { ...p, name: "5x5 v2", updatedAt: U.getTime() + 1 });
+    expect(push(o).rejected).toEqual([]);
+  });
+
+  it("the server refuses program data that isn't a ProgramData", () => {
+    const o = new Outbox();
+    const base = { id: "p9", name: "x", active: 0, createdAt: T0, updatedAt: T0 };
+    o.write("program", "insert", { ...base, data: "not json" });
+    o.write("program", "insert", { ...base, data: JSON.stringify({ version: 1, weeks: "no" }) });
+    o.write("program", "insert", { ...base, data: serializeProgramData(emptyProgram()), active: 2 });
+    const reasons = push(o).rejected.map((r) => r.reason);
+    expect(reasons).toEqual(["payload.data is not valid json", "payload.data weeks must be an array", "payload.active must be 0 or 1"]);
   });
 });
 

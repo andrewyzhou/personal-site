@@ -81,6 +81,8 @@ export function restorePlan(s: SyncSnapshot): RestorePlan {
     { entity: "workout_exercise", rows: workoutExercises },
     { entity: "set", rows: sets },
     { entity: "bodyweight", rows: dedupe(s.bodyweights) },
+    // template ids inside a program aren't fks, so nothing to drop
+    { entity: "program", rows: dedupe(s.programs) },
   ];
   return { steps, dropped, counts: { workouts: workouts.length, sets: sets.length } };
 }
