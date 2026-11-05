@@ -88,14 +88,14 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
   }, [load]);
 
   // run a mutation, then refresh everything
-  async function mutate(fn: () => Promise<{ pending?: number }>, done: string) {
+  async function mutate(fn: () => Promise<MutationResult>, done: string | ((r: MutationResult) => string)) {
     setBusy(true);
     setMessage("");
     try {
       const r = await fn();
       if (typeof r.pending === "number") setPending(r.pending);
       if ((r.pending ?? 0) > 0) setAutoRebuild((n) => n + 1);
-      setMessage(done);
+      setMessage(typeof done === "function" ? done(r) : done);
       await load();
       return true;
     } catch (error) {
@@ -266,7 +266,8 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
   );
 }
 
-type Mutate = (fn: () => Promise<{ pending?: number }>, done: string) => Promise<boolean>;
+type MutationResult = { pending?: number; unchanged?: boolean };
+type Mutate = (fn: () => Promise<MutationResult>, done: string | ((r: MutationResult) => string)) => Promise<boolean>;
 
 function ZoneCard({
   group,
@@ -487,7 +488,7 @@ function SettingsForm({ initial, coarsenOptions, mutate }: { initial: Settings; 
                 coarsenStartMin: coarsen,
                 defaultTrimM: trim,
               }),
-            "settings saved — every activity will rebuild"
+            (r) => (r.unchanged ? "no changes to save" : "settings saved — rebuilding every activity")
           )
         }
       >
