@@ -19,6 +19,8 @@ export type SettingKey =
   | "serverUrl"
   | "deviceId"
   | "lastSyncResult"
+  /** json {workoutId, programId}: the program "start next day" last opened a workout for */
+  | "programWorkout"
   | "lastSyncAt";
 
 export function getSetting(key: SettingKey): string | null {

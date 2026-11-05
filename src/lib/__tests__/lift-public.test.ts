@@ -236,6 +236,45 @@ describe("serializeLiftWorkout", () => {
     expect(w.exercises[2].prs).toEqual([]);
     expect(w.prs).toHaveLength(4);
   });
+
+  it("weighted bodyweight sets: no e1rm, no volume pr, loads read with a plus", () => {
+    const pull = [ex(0, "pull-up"), ex(1, "squat-barbell")];
+    const pullSets = [
+      set(0, { weight: 25, reps: 8, bodyweight: true }),
+      set(0, { weight: 30, reps: 7, bodyweight: true }),
+      set(1, { weight: 225, reps: 3 }),
+    ];
+    const hits: PrHit[] = [
+      { exerciseId: "pull-up", kind: "e1rm", value: 20, previous: 15, set: { weight: 30, unit: "lb", reps: 7 } },
+      { exerciseId: "pull-up", kind: "weight", value: 13.6, previous: 11.3, set: { weight: 30, unit: "lb", reps: 7 } },
+      { exerciseId: "pull-up", kind: "reps_at_weight", value: 8, previous: 6, set: { weight: 25, unit: "lb", reps: 8 }, atWeightKg: 11.34 },
+      { exerciseId: "pull-up", kind: "volume", value: 180, previous: 150, set: null },
+      { exerciseId: "squat-barbell", kind: "e1rm", value: 112, previous: 100, set: { weight: 225, unit: "lb", reps: 3 } },
+      { exerciseId: "squat-barbell", kind: "volume", value: 306, previous: 300, set: null },
+    ];
+    detect.mockReturnValue(hits);
+    const history = [{ workoutId: "strong-abc", startedAt: 1, exerciseId: "pull-up", kind: "normal" as const, weight: 30, unit: "lb" as const, reps: 7, completed: true }];
+    const w = serializeLiftWorkout(workout(), pull, pullSets, { history })!;
+    const [p, sq] = w.exercises;
+    expect(p.topSet).toBe("+30 lb × 7");
+    expect(p.bestE1rm).toBeNull();
+    expect(p.working.map((g) => g.label)).toEqual(["1×8 @ +25 lb", "1×7 @ +30 lb"]);
+    expect(p.prs.map((x) => x.label)).toEqual(["heaviest +30 lb × 7", "8 reps @ +25 lb"]);
+    // a plain barbell lift in the same workout keeps all its records
+    expect(sq.prs.map((x) => x.kind)).toEqual(["e1rm", "volume"]);
+    expect(sq.bestE1rm).not.toBeNull();
+  });
+
+  it("unweighted and assisted bodyweight sets don't make an exercise relative", () => {
+    const dips = [ex(0, "dip")];
+    // an assisted set has a negative load and no records; a plain set has none at all
+    const dipSets = [set(0, { weight: -40, reps: 8, bodyweight: true }), set(0, { weight: null, reps: 12, bodyweight: true })];
+    detect.mockReturnValue([{ exerciseId: "dip", kind: "volume", value: 100, previous: 50, set: null }]);
+    const history = [{ workoutId: "strong-abc", startedAt: 1, exerciseId: "dip", kind: "normal" as const, weight: null, unit: null, reps: 12, completed: true }];
+    const w = serializeLiftWorkout(workout(), dips, dipSets, { history })!;
+    expect(w.exercises[0].prs.map((x) => x.kind)).toEqual(["volume"]);
+    expect(w.exercises[0].bestE1rm).toBeNull();
+  });
 });
 
 describe("privacy filters", () => {

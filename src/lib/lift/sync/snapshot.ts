@@ -4,6 +4,9 @@ import {
   SNAPSHOT_ENTITIES,
   SNAPSHOT_PAGE_MAX,
   SYNC_PROTOCOL_VERSION,
+  parseProgramData,
+  serializeProgramData,
+  type ProgramPayload,
   type SnapshotEntity,
   type SyncSnapshotPage,
   type BodyweightPayload,
@@ -26,6 +29,7 @@ import {
   exerciseMuscles,
   exercises,
   liftBodyweights,
+  liftPrograms,
   liftSets,
   liftTemplateExercises,
   liftTemplateFolders,
@@ -35,6 +39,7 @@ import {
   type ExerciseMuscleRow,
   type ExerciseRow,
   type LiftBodyweightRow,
+  type LiftProgramRow,
   type LiftSetRow,
   type LiftTemplateExerciseRow,
   type LiftTemplateFolderRow,
@@ -184,6 +189,18 @@ export function bodyweightPayload(row: LiftBodyweightRow): BodyweightPayload {
   };
 }
 
+export function programPayload(row: LiftProgramRow): ProgramPayload {
+  return {
+    id: row.id,
+    name: row.name,
+    // re-serialized through the tolerant parser: jsonb reorders keys, and an odd row still restores
+    data: serializeProgramData(parseProgramData(JSON.stringify(row.data ?? null))),
+    active: bit(row.active),
+    createdAt: ms(row.createdAt),
+    updatedAt: ms(row.updatedAt),
+  };
+}
+
 export interface SnapshotRows {
   customExercises: ExerciseRow[];
   muscles: ExerciseMuscleRow[];
@@ -194,6 +211,8 @@ export interface SnapshotRows {
   workoutExercises: LiftWorkoutExerciseRow[];
   sets: LiftSetRow[];
   bodyweights: LiftBodyweightRow[];
+  /** optional so callers that predate programs still build a snapshot */
+  programs?: LiftProgramRow[];
 }
 
 export function buildSnapshot(rows: SnapshotRows, now = new Date(), tz?: string): SyncSnapshot {
@@ -208,6 +227,7 @@ export function buildSnapshot(rows: SnapshotRows, now = new Date(), tz?: string)
     workoutExercises: rows.workoutExercises.map(workoutExercisePayload),
     sets: rows.sets.map(setPayload),
     bodyweights: rows.bodyweights.map(bodyweightPayload),
+    programs: (rows.programs ?? []).map(programPayload),
   };
 }
 
@@ -326,6 +346,11 @@ export async function loadSnapshotPage(q: SnapshotQuery, now = new Date()): Prom
       const t = liftBodyweights;
       const rows = await db.select().from(t).where(after(t.id)).orderBy(asc(t.id)).limit(n);
       return page(q.entity, rows.map(bodyweightPayload));
+    }
+    case "programs": {
+      const t = liftPrograms;
+      const rows = await db.select().from(t).where(after(t.id)).orderBy(asc(t.id)).limit(n);
+      return page(q.entity, rows.map(programPayload));
     }
   }
 }

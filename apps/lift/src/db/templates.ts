@@ -422,8 +422,17 @@ export interface StartFromTemplateResult {
   started: boolean;
 }
 
+export interface StartFromTemplateOptions {
+  /** rewrite an exercise's plan before it's prefilled (program progression) */
+  plannedFor?: (te: TemplateExerciseRow, planned: PlannedSet[], tx: Tx) => PlannedSet[];
+}
+
 /** creates an active workout prefilled from the template, unless one is already open */
-export function startWorkoutFromTemplate(templateId: string, now = Date.now()): StartFromTemplateResult | undefined {
+export function startWorkoutFromTemplate(
+  templateId: string,
+  now = Date.now(),
+  options: StartFromTemplateOptions = {}
+): StartFromTemplateResult | undefined {
   const unit = getPreferredUnit();
   return write((tx): StartFromTemplateResult | undefined => {
     const active = tx.select().from(workouts).where(eq(workouts.status, "active")).get();
@@ -470,7 +479,9 @@ export function startWorkoutFromTemplate(templateId: string, now = Date.now()): 
       writeOutbox(tx, "workout_exercise", we.id, "insert", we);
       // blank planned fields fill from last session, like adding the exercise by hand
       const previous = previousSessionSets(tx, te.exerciseId, workout.id);
-      setsFromPlanned(parsePlannedSets(te.plannedSets), unit, previous).forEach((values, j) => {
+      const base = parsePlannedSets(te.plannedSets);
+      const planned = options.plannedFor ? options.plannedFor(te, base, tx) : base;
+      setsFromPlanned(planned, unit, previous).forEach((values, j) => {
         const s = tx
           .insert(sets)
           .values({

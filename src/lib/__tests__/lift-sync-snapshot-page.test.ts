@@ -96,6 +96,28 @@ describe("loadSnapshotPage", () => {
     expect(page.rows).toMatchObject([{ id: "custom-aaaaaaaaaaaa", primary: '["quads"]', secondary: "[]" }]);
   });
 
+  it("pages programs, re-serializing their jsonb into ProgramData text", async () => {
+    const t = new Date(5).toISOString();
+    // id, name, data, active, created_at, updated_at
+    answers.push([["p1", "5x5", { weeks: [{ days: [{ templateId: "t1" }] }], version: 1, rules: {}, repeat: false, skipped: 0, startedAt: 7 }, true, t, t]]);
+    const page = await loadSnapshotPage({ entity: "programs", after: null, limit: 10 });
+    expect(calls[0].sql).toMatch(/from "lift_programs" order by "lift_programs"."id" asc limit \$1$/);
+    expect(page.rows).toEqual([
+      {
+        id: "p1",
+        name: "5x5",
+        data: '{"version":1,"weeks":[{"days":[{"templateId":"t1"}]}],"rules":{},"startedAt":7,"skipped":0,"repeat":false}',
+        active: 1,
+        createdAt: 5,
+        updatedAt: 5,
+      },
+    ]);
+  });
+
+  it("programs is the last snapshot entity", () => {
+    expect(SNAPSHOT_ENTITIES[SNAPSHOT_ENTITIES.length - 1]).toBe("programs");
+  });
+
   it("skips the muscle query for an empty page", async () => {
     await loadSnapshotPage({ entity: "customExercises", after: "zzz", limit: 10 });
     expect(calls).toHaveLength(1);

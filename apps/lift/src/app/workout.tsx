@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import type { ProgramData, SessionSet } from "lift-core";
+import { getPreferredUnit } from "../db/bodyweight";
 import { getExerciseLookup } from "../db/exercises";
+import { programForTemplate, recentSessions, templateExerciseRefs } from "../db/programs";
 import { clearPriorBests, getPriorBests } from "../db/prs";
 import type { SetRow } from "../db/schema";
 import { getDefaultRestS } from "../db/settings";
@@ -19,6 +22,7 @@ import { flushPendingWrites } from "../lib/pending";
 import { resolveRestS, shouldStartRest } from "../lib/rest";
 import { sessionPrFlags, type SetPrKind } from "../lib/prs";
 import { groupEdges } from "../lib/sets";
+import { progressionHint, ruleFor } from "../lib/programs";
 
 type Detail = NonNullable<ReturnType<typeof getWorkoutDetail>>;
 
@@ -35,6 +39,42 @@ function prFlagsOf(detail: Detail): Record<string, SetPrKind[]> {
     Object.assign(out, sessionPrFlags(getPriorBests(detail.workout.id, exerciseId), list));
   }
   return out;
+}
+
+/** workout exercise id -> "next: 190 lb × 5", for exercises the workout's program has a rule for */
+function useProgressionHints(detail: Detail | undefined, exerciseKey: string, version: number): Record<string, string> {
+  const workoutId = detail?.workout.id;
+  const templateId = detail?.workout.templateId ?? null;
+  // re-read per write, but compared as text so a set edit doesn't rebuild the setup
+  const rulesJson = useMemo(() => {
+    const rules = programForTemplate(templateId, workoutId ?? null)?.data.rules;
+    return rules && Object.keys(rules).length ? JSON.stringify(rules) : "";
+  }, [templateId, workoutId, version]);
+  const setup = useMemo(() => {
+    if (!rulesJson || !templateId) return null;
+    const rules = JSON.parse(rulesJson) as ProgramData["rules"];
+    return { rules, refs: templateExerciseRefs(templateId), unit: getPreferredUnit() };
+  }, [templateId, rulesJson]);
+  // history only changes when the exercise list does, not per keystroke
+  const histories = useMemo(() => {
+    const out: Record<string, SessionSet[][]> = {};
+    if (!setup || !detail) return out;
+    for (const e of detail.exercises) {
+      if (!out[e.row.exerciseId] && ruleFor(setup.rules, setup.refs, e.row.exerciseId)) {
+        out[e.row.exerciseId] = recentSessions(e.row.exerciseId, detail.workout.id, 5);
+      }
+    }
+    return out;
+  }, [setup, workoutId, exerciseKey]);
+  return useMemo(() => {
+    const out: Record<string, string> = {};
+    if (!setup || !detail) return out;
+    for (const e of detail.exercises) {
+      const rule = ruleFor(setup.rules, setup.refs, e.row.exerciseId);
+      if (rule) out[e.row.id] = progressionHint(rule, e.sets, histories[e.row.exerciseId] ?? [], setup.unit);
+    }
+    return out;
+  }, [setup, histories, detail]);
 }
 
 function useNow(intervalMs = 1000): number {
@@ -68,6 +108,7 @@ export default function Workout() {
     [detail?.workout.id, exerciseKey]
   );
   const defaultRestS = useMemo(() => getDefaultRestS(), [version]);
+  const hints = useProgressionHints(detail, exerciseKey, version);
   const timer = useRestTimer();
   // prior bests are cached per workout, so this is only in-memory math per write
   const prFlags = useMemo(() => (detail ? prFlagsOf(detail) : {}), [detail]);
@@ -181,6 +222,7 @@ export default function Workout() {
             onSetCompleted={onSetCompleted}
             prFlags={prFlags}
             celebrate={celebrate}
+            hint={hints[row.id]}
           />
         ))}
 

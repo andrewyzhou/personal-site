@@ -1,5 +1,6 @@
 import {
   MUSCLE_REGIONS,
+  checkProgramText,
   SYNC_ENTITIES,
   SYNC_MAX_BATCH,
   SYNC_PROTOCOL_VERSION,
@@ -197,6 +198,10 @@ const plannedSet: Check = (v) =>
 
 const muscle = oneOf(MUSCLE_REGIONS);
 
+// json text of lift-core's ProgramData, checked strictly so the jsonb column only holds real programs.
+// the phone runs the same check before saving, so what it keeps always syncs
+const programData: Check = (v) => checkProgramText(v);
+
 export const PAYLOAD_SHAPES: Record<SyncEntity, Shape> = {
   workout: {
     id,
@@ -274,6 +279,7 @@ export const PAYLOAD_SHAPES: Record<SyncEntity, Shape> = {
     note: nullable(text()),
     ...timestamps,
   },
+  program: { id, name: text(200, 1), data: programData, active: flag, ...timestamps },
 };
 
 const OPS: readonly SyncOp[] = ["insert", "update", "delete"];

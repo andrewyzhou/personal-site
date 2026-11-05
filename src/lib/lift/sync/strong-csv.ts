@@ -1,17 +1,23 @@
 import { nameKey, sha256Hex, type ParsedWorkout } from "lift-core";
 import type { LiftWarning, NewLiftIngestRow } from "@/lib/db/lift-schema";
-import { MAX_EXERCISES, MAX_SETS, planParsedWorkout, type WorkoutPlan } from "../plan";
+import { EDIT_OVERLAP, MAX_EXERCISES, MAX_SETS, planParsedWorkout, type IngestSummary, type WorkoutPlan } from "../plan";
 
 // pure half of the one-time strong csv import (scripts/lift-import-strong-csv.ts).
-// a csv workout is "already present" when a stored workout has the same start
-// minute and the same normalized title, the same key share-text ids hash.
+// a csv workout is "already present" when a stored workout starts the same
+// minute and has the same normalized title or mostly the same exercises, the
+// same rule a re-shared (edited) workout lands by.
 
 export const CSV_SOURCE = "strong-csv";
 
 export interface ExistingWorkoutKey {
   title: string;
   startedLocal: string;
+  id?: string;
+  /** nameRaw of its exercises; without them only the title can match */
+  exerciseNames?: readonly string[];
 }
+
+export type PresentReason = "title" | "exercises" | "repeat";
 
 const displayTitle = (title: string) => title.trim() || "workout";
 
@@ -40,27 +46,64 @@ export function csvIngestRow(csv: string, sha: string, warnings: LiftWarning[]):
 export interface CsvPartition {
   fresh: ParsedWorkout[];
   present: ParsedWorkout[];
+  /** parallel to present: why it matched and the stored workout it hit (null for a repeat inside the csv) */
+  matches: { by: PresentReason; existingId: string | null }[];
   /** no date, no exercises, or too big for one batch */
   unusable: { workout: ParsedWorkout; reason: string }[];
+}
+
+interface MinuteEntry {
+  id: string | null;
+  titleKey: string;
+  names: Set<string>;
+  fromCsv: boolean;
+}
+
+function overlap(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  const size = Math.max(a.size, b.size);
+  if (!size) return 0;
+  let both = 0;
+  for (const k of a) if (b.has(k)) both++;
+  return both / size;
 }
 
 export function partitionCsvWorkouts(
   workouts: readonly ParsedWorkout[],
   existing: readonly ExistingWorkoutKey[]
 ): CsvPartition {
-  const seen = new Set(existing.map((e) => dedupeKey(e.title, e.startedLocal)));
-  const out: CsvPartition = { fresh: [], present: [], unusable: [] };
+  const byMinute = new Map<string, MinuteEntry[]>();
+  const add = (minute: string, e: MinuteEntry) => {
+    const list = byMinute.get(minute);
+    if (list) list.push(e);
+    else byMinute.set(minute, [e]);
+  };
+  for (const e of existing) {
+    add(e.startedLocal.slice(0, 16), {
+      id: e.id ?? null,
+      titleKey: nameKey(displayTitle(e.title)),
+      names: new Set((e.exerciseNames ?? []).map(nameKey)),
+      fromCsv: false,
+    });
+  }
+  const out: CsvPartition = { fresh: [], present: [], matches: [], unusable: [] };
   for (const w of workouts) {
     const sets = w.exercises.reduce((n, e) => n + e.sets.length, 0);
     if (!w.startedLocal) out.unusable.push({ workout: w, reason: "no date" });
     else if (!w.exercises.length) out.unusable.push({ workout: w, reason: "no exercises" });
     else if (w.exercises.length > MAX_EXERCISES || sets > MAX_SETS) out.unusable.push({ workout: w, reason: "too big" });
     else {
-      const key = dedupeKey(w.title, w.startedLocal);
-      // a repeated row group in the csv itself counts as present too
-      if (seen.has(key)) out.present.push(w);
-      else {
-        seen.add(key);
+      const minute = w.startedLocal.slice(0, 16);
+      const titleKey = nameKey(displayTitle(w.title));
+      const names = new Set(w.exercises.map((e) => nameKey(e.name)));
+      const same = byMinute.get(minute) ?? [];
+      // a title match wins over an exercise match so the reported reason is the strongest one
+      const hit = same.find((e) => e.titleKey === titleKey) ?? same.find((e) => overlap(e.names, names) >= EDIT_OVERLAP);
+      if (hit) {
+        // a repeated row group in the csv itself counts as present too
+        out.present.push(w);
+        out.matches.push({ by: hit.fromCsv ? "repeat" : hit.titleKey === titleKey ? "title" : "exercises", existingId: hit.id });
+      } else {
+        add(minute, { id: null, titleKey, names, fromCsv: true });
         out.fresh.push(w);
       }
     }
@@ -77,9 +120,10 @@ export interface CsvPlanOptions {
 export function planCsvWorkouts(
   fresh: readonly ParsedWorkout[],
   opts: CsvPlanOptions
-): { plans: WorkoutPlan[]; customIds: string[]; warnings: LiftWarning[] } {
+): { plans: WorkoutPlan[]; summaries: IngestSummary[]; customIds: string[]; warnings: LiftWarning[] } {
   const warnings: LiftWarning[] = [];
   const customIds = new Set<string>();
+  const summaries: IngestSummary[] = [];
   const plans = fresh.map((parsed) => {
     const { workout, summary } = planParsedWorkout(parsed, {
       workoutId: csvWorkoutId(parsed.title, parsed.startedLocal!),
@@ -88,11 +132,12 @@ export function planCsvWorkouts(
       strongSlug: null,
       timezone: opts.timezone,
       redirects: opts.redirects,
-      durationS: (parsed as ParsedWorkout & { durationS?: number | null }).durationS ?? null,
+      durationS: parsed.durationS ?? null,
       warnings,
     });
     for (const e of summary.exercises) if (e.custom) customIds.add(e.exerciseId);
+    summaries.push(summary);
     return workout;
   });
-  return { plans, customIds: [...customIds], warnings };
+  return { plans, summaries, customIds: [...customIds], warnings };
 }

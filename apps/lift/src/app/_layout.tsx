@@ -81,6 +81,8 @@ export default function RootLayout() {
         <Stack.Screen name="summary/[id]" options={{ title: "summary" }} />
         <Stack.Screen name="templates/index" options={{ title: "templates" }} />
         <Stack.Screen name="templates/[id]" options={{ title: "template" }} />
+        <Stack.Screen name="programs/index" options={{ title: "programs" }} />
+        <Stack.Screen name="programs/[id]" options={{ title: "program" }} />
         <Stack.Screen name="custom-exercise/new" options={{ title: "new exercise" }} />
         <Stack.Screen name="custom-exercise/[id]" options={{ title: "edit exercise" }} />
         <Stack.Screen name="bodyweight" options={{ title: "bodyweight" }} />
