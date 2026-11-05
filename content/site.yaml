@@ -230,3 +230,37 @@ pages:
     fitnessAria: "fitness {fitness}, fatigue {fatigue} on {date}"
     fitnessCaption: "{from} – {to} · fitness {fitness} (solid) · fatigue {fatigue} (dashed) · form {form}"
     fitnessNote: "training load from heart rate: fitness is the 42-day average, fatigue the 7-day one."
+
+# shell and hub pages for the hub site (brand b). arrows and separators are
+# design chrome; everything else here is copy.
+shell:
+  menu: menu
+  theme: switch to {theme} mode
+hubPages:
+  home:
+    explore: explore
+    latest: latest training
+    seeAll: see all
+  writing:
+    all: all
+    posts: posts
+    notes: notes
+    post: post
+    note: note
+    empty: nothing here yet.
+  training:
+    all: all
+    runs: runs
+    rides: rides
+    hikes: hikes
+    walks: walks
+    lifts: lifts
+    other: other
+    thisWeek: this week
+    sessions: sessions
+    distanceYear: "distance in {year}"
+    total: on record
+    records: records
+    liftsOverview: lifts overview
+    empty: no sessions of this kind yet.
+    more: older sessions are on the calendar on the home page.

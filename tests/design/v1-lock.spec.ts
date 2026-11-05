@@ -1,3 +1,4 @@
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { V1_ROUTES } from "./support/routes";
 import { settle, stage } from "./support/stage";
@@ -29,8 +30,9 @@ for (const route of V1_ROUTES) {
           // two home elements rotate on intervals forever (hero quote, the
           // calendar's yearly stat); their phase at capture time isn't stable,
           // so their boxes are masked. everything else is compared exactly.
+          // the rotating hero quote is hidden (its italic overhang escaped a mask box)
+          stylePath: path.join(__dirname, "support", "capture.css"),
           mask: [
-            page.locator("p.whitespace-pre-line.italic"),
             page.locator('div.justify-between:has(> span.text-sm img[src*="/icons/activities/"])'),
           ],
         });

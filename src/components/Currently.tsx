@@ -34,7 +34,8 @@ interface LiteralBook {
   previousFetchedAt?: number | null;
 }
 
-export default function Currently() {
+// showHeading=false lets a page put this under its own section title
+export default function Currently({ showHeading = true }: { showHeading?: boolean } = {}) {
   const { currently: copy } = useSite();
   const [spotify, setSpotify] = useState<SpotifyTrack | null>(null);
   const [strava, setStrava] = useState<StravaActivity | null>(null);
@@ -601,9 +602,11 @@ export default function Currently() {
 
   return (
     <div>
-      <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
-        {copy.heading}
-      </h3>
+      {showHeading && (
+        <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
+          {copy.heading}
+        </h3>
+      )}
       <p className="font-sans text-gray text-lg leading-[1.35]">
         {displayedText.length > 0 ? (
           <>

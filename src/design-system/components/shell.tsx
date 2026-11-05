@@ -11,6 +11,8 @@ import { ThemeToggle } from "./ThemeToggle";
 export interface NavItem {
   label: string;
   href: string;
+  // other url prefixes that belong to this item (training also owns /activities)
+  match?: string[];
 }
 
 export interface ShellModel {

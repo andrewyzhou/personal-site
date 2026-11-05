@@ -59,6 +59,13 @@ const REQUIRED_STRINGS = [
   "github.heading",
   "github.failed",
   "github.deployed",
+  "shell.menu",
+  "shell.theme",
+  ...["explore", "latest", "seeAll"].map((k) => `hubPages.home.${k}`),
+  ...["all", "posts", "notes", "post", "note", "empty"].map((k) => `hubPages.writing.${k}`),
+  ...["all", "runs", "rides", "hikes", "walks", "lifts", "other", "thisWeek", "sessions", "distanceYear", "total", "records", "liftsOverview", "empty", "more"].map(
+    (k) => `hubPages.training.${k}`,
+  ),
   "pages.blog.title",
   "pages.blog.metaDescription",
   "pages.blog.intro",

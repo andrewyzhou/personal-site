@@ -1,4 +1,4 @@
-import { mdxComponents, type MDXModule } from "./components";
+import { mdxComponents, type MDXComponents, type MDXModule } from "./components";
 import type { ItemCategory } from "@/lib/items";
 
 async function loadItemModule(category: ItemCategory, slug: string): Promise<MDXModule> {
@@ -19,11 +19,13 @@ async function loadItemModule(category: ItemCategory, slug: string): Promise<MDX
 export default async function ItemContent({
   category,
   slug,
+  components = mdxComponents,
 }: {
   category: ItemCategory;
   slug: string;
+  components?: MDXComponents;
 }) {
   const mod = await loadItemModule(category, slug);
   const Content = mod.default;
-  return <Content components={mdxComponents} />;
+  return <Content components={components} />;
 }

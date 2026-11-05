@@ -596,3 +596,19 @@ textarea.ds-input { min-height: 5.5rem; resize: vertical; }
 @media (max-width: 639px) {
   .ds[data-stats="divided"] .ds-stat-grid[data-columns="4"] .ds-stat:nth-child(odd) { padding-left: 0; border-left: 0; }
 }
+
+/* ------------------------------------------------------------------ prose */
+/* authored content (mdx) inside a .ds-prose column */
+.ds-prose { display: flex; flex-direction: column; gap: var(--ds-space-4); min-width: 0; }
+.ds-prose > .ds-heading { margin-top: var(--ds-space-4); }
+.ds-prose-list { margin: 0; padding-left: var(--ds-space-5); display: flex; flex-direction: column; gap: var(--ds-space-1); color: var(--ds-fg-default); }
+.ds-prose-list li::marker { color: var(--ds-fg-subtle); }
+.ds-quote { margin: 0; padding-left: var(--ds-space-4); border-left: 2px solid var(--ds-border-strong); color: var(--ds-fg-muted); font-style: italic; }
+.ds-code { font-family: var(--ds-font-mono); font-size: 0.88em; background: var(--ds-bg-hover); padding: 0.1em 0.35em; border-radius: var(--ds-radius-sm); }
+.ds-pre { margin: 0; padding: var(--ds-space-4); background: var(--ds-bg-inset); border: 1px solid var(--ds-border); border-radius: var(--ds-radius-md); overflow-x: auto; font-size: var(--ds-text-sm); }
+.ds-pre .ds-code { background: none; padding: 0; }
+/* content written for the first site's two-column home carries responsive
+   spans ("on the right" on wide screens, "below" on phones). in the system
+   sections always stack, so "below" is the true wording at every width. */
+.ds-prose .hidden.md\:inline { display: none !important; }
+.ds-prose .md\:hidden { display: inline !important; }
