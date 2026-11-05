@@ -5,6 +5,7 @@ import type { ReplayData } from "@/lib/replay/build";
 import {
   buildReplayView,
   chartX,
+  fogMarks,
   formatDistance,
   formatElapsed,
   formatMetric,
@@ -88,6 +89,9 @@ export default function ActivityCharts({ replay, sportType, hoverT, onHoverT }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panels, view, width, xDomain[0], xDomain[1]]);
 
+  // fog gaps: a dashed line where segments meet (a band when x is time)
+  const fog = width > 0 ? fogMarks(view, replay.gaps).map(([a, b]) => [sx(a), sx(b)] as const) : [];
+
   if (panels.length === 0) return null;
 
   const hi = hoverT !== null && view.n > 0 ? indexAtTime(view, hoverT) : -1;
@@ -152,6 +156,17 @@ export default function ActivityCharts({ replay, sportType, hoverT, onHoverT }: 
                 )}
               </g>
             ))}
+            {fog.map(([x0, x1], i) =>
+              x1 - x0 >= 2 ? (
+                <rect key={`fog-${i}`} x={x0} width={x1 - x0} y={LABEL_H} height={height - LABEL_H} fill="var(--theme-text-muted)" fillOpacity={0.1} pointerEvents="none">
+                  <title>in the fog</title>
+                </rect>
+              ) : (
+                <line key={`fog-${i}`} x1={x0} x2={x0} y1={LABEL_H} y2={height} stroke="var(--theme-text-muted)" strokeOpacity={0.6} strokeWidth={1} strokeDasharray="2 3" pointerEvents="none">
+                  <title>in the fog</title>
+                </line>
+              )
+            )}
             {cx !== null && (
               <line x1={cx} x2={cx} y1={LABEL_H} y2={height} stroke="var(--theme-text-primary)" strokeOpacity={0.5} strokeWidth={1} pointerEvents="none" />
             )}

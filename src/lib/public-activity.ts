@@ -8,6 +8,7 @@
 // private columns (track_bbox, raw start time, fit_* paths, sources) never leave.
 
 import type { ActivityRow, FogEvent, RouteBounds } from "./db/schema";
+import type { ActivityMetrics } from "./metrics/types";
 import type { CalendarActivity } from "./strava";
 
 export type Visibility = "public" | "hide-map" | "private";
@@ -111,6 +112,23 @@ export function publicPhotos(row: Pick<ActivityRow, "mapHidden">, photos: Public
     caption: p.caption,
     pin: !row.mapHidden && p.pinLat !== null && p.pinLng !== null ? [p.pinLat, p.pinLng] : null,
   }));
+}
+
+// metrics are computed from the published track only (no fogged stretch in
+// them). hide hr removes everything heart-rate derived: split hr and effort.
+// private activities never get here (callers check isPublic first).
+export function publicMetrics(
+  row: Pick<ActivityRow, "hidden" | "hrHidden">,
+  metrics: ActivityMetrics | null | undefined
+): ActivityMetrics | null {
+  if (!metrics || row.hidden) return null;
+  if (!row.hrHidden) return metrics;
+  return {
+    ...metrics,
+    effort: null,
+    splitsKm: metrics.splitsKm.map((s) => ({ ...s, avgHr: null })),
+    splitsMi: metrics.splitsMi.map((s) => ({ ...s, avgHr: null })),
+  };
 }
 
 export function publicActivityDetail(row: ActivityRow, photos: PublicPhotoInput[]) {
