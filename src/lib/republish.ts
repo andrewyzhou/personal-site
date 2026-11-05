@@ -28,6 +28,7 @@ import {
   type ActivitySettings,
   type RawStats,
   activitySuggestions,
+  activityReplays,
 } from "./db";
 import {
   CARD_POLYLINE_MAX_POINTS,
@@ -57,6 +58,7 @@ import { cleanedStats, hrZoneSeconds, rawStatsOf } from "./cleaning/stats";
 import { DEFAULT_ACTIVITY_SETTINGS, loadActivitySettings } from "./cleaning/settings";
 import { detectSuggestions } from "./cleaning/detect";
 import { DETECTOR_VERSION, type Suggestion } from "./cleaning/types";
+import { buildReplay, type ReplayData } from "./replay/build";
 import {
   CANONICAL_FORMAT_VERSION,
   TRACK_SOURCE_PRECEDENCE,
@@ -77,7 +79,8 @@ import { r2Get } from "./r2";
 // bump when the publish math changes; every activity becomes stale
 // v2: privacy zones, distance policy, published start, photo pins
 // v3: cleaning edits, raw stats, hr zones, detector suggestions
-export const PROCESSING_VERSION = 3;
+// v4: replay track
+export const PROCESSING_VERSION = 4;
 
 export type { ZoneInput } from "./privacy/fog";
 
@@ -300,6 +303,7 @@ export interface PublishedTrack {
   // published (post-trim, post-fog) samples, in segments; pins snap to these
   visible: FogSample[][];
   rawStats: RawStats; // the untouched track's stats
+  replay: ReplayData | null; // the published track, timed, for the map replay
   cleaned: boolean;
 }
 
@@ -413,11 +417,15 @@ export function publishTrack(
 
   // fog per continuous run, so nothing is ever drawn across a cut
   const fog: { segments: FogSample[][]; events: FogEvent[]; visibleDistanceM: number } = { segments: [], events: [], visibleDistanceM: 0 };
+  const segmentRun: number[] = [];
+  let runNo = 0;
   let run: FogSample[] = [];
   const flushRun = () => {
     if (!run.length) return;
     const r = applyFog(run, ctx.zones);
     fog.segments.push(...r.segments);
+    for (let k = 0; k < r.segments.length; k++) segmentRun.push(runNo);
+    runNo++;
     fog.events.push(...r.events);
     fog.visibleDistanceM += r.visibleDistanceM;
     run = [];
@@ -461,11 +469,16 @@ export function publishTrack(
     ...resolveOverrides(edits),
   } as PublicColumns;
   const rawParsed = canonicalToParsed(rawTrack);
+  const byT = new Map(kept.map((r) => [r.t, r]));
   return {
     columns,
     visible: fog.segments,
     rawStats: rawStatsOf(rawTrack.session, rawParsed.records, rawParsed.cumDist),
     cleaned: cleaning.cleaned,
+    // route-only tracks have made-up time: no replay
+    replay: track.syntheticTime
+      ? null
+      : buildReplay(fog.segments, segmentRun, (t) => byT.get(t), ctx.sportType ?? track.sportType),
   };
 }
 
@@ -594,6 +607,7 @@ export interface RepublishDeps {
   ): Promise<EditInput[]>;
   // flag another activity for rebuild (merge targets of an absorbed activity)
   markStale?(id: number): Promise<void>;
+  writeReplay?(id: number, data: ReplayData | null): Promise<void>;
 }
 
 export type RepublishResult =
@@ -715,10 +729,14 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
   const fogCurrentRoute = async () => {
     if (opts.dryRun) return;
     const current = { polyline: row.polyline, cardPolyline: row.cardPolyline, bounds: row.bounds };
-    const f = fogStoredRoute(current, relevantZones(allZones, current.bounds));
+    const near = relevantZones(allZones, current.bounds);
+    const f = fogStoredRoute(current, near);
     if (f.fogged) {
       await deps.writeColumns(activityId, { polyline: f.polyline, cardPolyline: f.cardPolyline, bounds: f.bounds, fogShapes: null, updatedAt: new Date() });
     }
+    // the replay can't be re-fogged without the track: withdraw it while any
+    // zone could touch it (it comes back with the next successful republish)
+    if (near.length && deps.writeReplay) await deps.writeReplay(activityId, null);
   };
 
   // best source first; skip sources that hold no track, but stop (write
@@ -787,6 +805,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       canonicalTrackKey: stored ? key : null,
       updatedAt: new Date(),
     }, startedAt);
+    if (deps.writeReplay) await deps.writeReplay(activityId, published.replay);
     if (deps.markStale) for (const target of mergedInto) await deps.markStale(target);
     return { status: "published", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: stored ? key : null, pins };
   }
@@ -817,6 +836,8 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       publishedInputsHash: bestHash,
       updatedAt: new Date(),
     }, startedAt);
+    // no timed track: nothing to replay (an earlier replay never lingers)
+    if (deps.writeReplay) await deps.writeReplay(activityId, null);
   }
   return { status: "no-source", id: activityId, hash: bestHash };
 }
@@ -902,6 +923,12 @@ export function defaultDeps(): RepublishDeps {
       await db.update(activities).set(set).where(eq(activities.id, id));
     },
     loadActivitySettings,
+    async writeReplay(id, data) {
+      await db
+        .insert(activityReplays)
+        .values({ activityId: id, data, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: activityReplays.activityId, set: { data, updatedAt: new Date() } });
+    },
     async markStale(id) {
       await db.update(activities).set({ needsRepublish: true, staleMarkedAt: new Date() }).where(eq(activities.id, id));
     },
