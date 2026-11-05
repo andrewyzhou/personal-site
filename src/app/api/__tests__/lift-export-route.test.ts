@@ -74,14 +74,33 @@ describe("GET /api/lift/export", () => {
     expect((await GET(req("?format=csv", null))).status).toBe(401);
     expect((await GET(req("?format=csv", "nope"))).status).toBe(401);
     delete process.env.LIFT_APP_TOKEN;
-    delete process.env.LIFT_INGEST_TOKEN;
     expect((await GET(req("?format=csv", "app-token"))).status).toBe(401);
+    // an unset app token never matches an empty bearer
+    expect((await GET(req("?format=csv", ""))).status).toBe(401);
     expect(load).not.toHaveBeenCalled();
   });
 
-  it("accepts either lift token", async () => {
+  it("accepts only the app token, not the ingest token", async () => {
     expect((await GET(req("?format=csv", "app-token"))).status).toBe(200);
-    expect((await GET(req("?format=csv", "ingest-token"))).status).toBe(200);
+    expect((await GET(req("?format=csv", "ingest-token"))).status).toBe(401);
+    expect((await GET(req("?format=json", "ingest-token"))).status).toBe(401);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("streams the body", async () => {
+    const res = await GET(req("?format=json"));
+    expect(res.body).toBeInstanceOf(ReadableStream);
+    const text = await res.text();
+    // compact: no pretty-printing on a big export
+    expect(text).not.toContain("\n");
+    expect(JSON.parse(text).workouts).toHaveLength(1);
+  });
+
+  it("csv leaves out unfinished workouts", async () => {
+    load.mockResolvedValueOnce([WORKOUT, { ...WORKOUT, id: "app-live", title: "Live One", status: "active" }]);
+    const body = await (await GET(req("?format=csv"))).text();
+    expect(body).toContain("Push Day");
+    expect(body).not.toContain("Live One");
   });
 
   it("400s on an unknown format", async () => {
@@ -122,7 +141,8 @@ describe("GET /api/lift/export", () => {
     load.mockRejectedValueOnce(new ExportTooLargeError(250_000));
     const res = await GET(req("?format=json"));
     expect(res.status).toBe(413);
-    expect(await res.json()).toEqual({ ok: false, error: "export too large: 250,000 sets (limit 200,000)" });
+    expect(res.headers.get("content-disposition")).toBeNull();
+    expect(await res.json()).toEqual({ ok: false, error: "export too large: 250,000 sets (limit 100,000)" });
   });
 
   it("500s without leaking db errors", async () => {

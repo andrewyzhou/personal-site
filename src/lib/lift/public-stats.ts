@@ -520,13 +520,24 @@ const cachedOverview = unstable_cache(computeLiftsOverview, ["lift-overview-v1"]
   tags: [LIFT_PUBLIC_TAG],
 });
 
-/** the /lifts index; null when the db can't be read (the page says so instead of erroring) */
-export async function loadLiftsOverview(): Promise<LiftsOverview | null> {
+/** true while `next build` prerenders pages (no request, maybe no db) */
+export function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
+export interface LoadOverviewOptions {
+  /** rethrow instead of returning null, so an isr page keeps its last good render */
+  rethrow?: boolean;
+}
+
+/** the /lifts index; null when the db can't be read (unless `rethrow`) */
+export async function loadLiftsOverview(options: LoadOverviewOptions = {}): Promise<LiftsOverview | null> {
   try {
     if (liftFixtureOn()) return await (await import("./public-fixture")).fixtureOverview();
     return await cachedOverview();
   } catch (error) {
     log.error("lift:public", "lifts overview load failed", error);
+    if (options.rethrow) throw error;
     return null;
   }
 }

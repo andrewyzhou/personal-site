@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { bearerMatches } from "@/lib/lift/auth";
-import { ExportTooLargeError, loadExportWorkouts, toExportJson, toWorkoutCsv } from "@/lib/lift/export";
+import { ExportTooLargeError, chunkStream, exportJsonChunks, loadExportWorkouts, workoutCsvLines } from "@/lib/lift/export";
 import { liftTimezone, utcToLocal } from "@/lib/lift/time";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET /api/lift/export?format=csv|json (default csv). owner only: either lift token works.
+// GET /api/lift/export?format=csv|json (default csv). owner only: the app token.
+// not the ingest token: that one lives in a shortcut and only needs to write.
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!bearerMatches(auth, process.env.LIFT_APP_TOKEN) && !bearerMatches(auth, process.env.LIFT_INGEST_TOKEN)) {
+  if (!bearerMatches(request.headers.get("authorization"), process.env.LIFT_APP_TOKEN)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   const format = (new URL(request.url).searchParams.get("format") ?? "csv").toLowerCase();
@@ -18,6 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "format must be csv or json" }, { status: 400 });
   }
 
+  // loaded (and size-checked) before the first byte, so a 413 or 500 is still a real status
   let workouts;
   try {
     workouts = await loadExportWorkouts();
@@ -38,9 +39,9 @@ export async function GET(request: Request) {
     "cache-control": "no-store",
   };
   if (format === "json") {
-    return new Response(JSON.stringify(toExportJson(workouts, now, tz), null, 2), {
+    return new Response(chunkStream(exportJsonChunks(workouts, now, tz)), {
       headers: { ...headers, "content-type": "application/json; charset=utf-8" },
     });
   }
-  return new Response(toWorkoutCsv(workouts), { headers: { ...headers, "content-type": "text/csv; charset=utf-8" } });
+  return new Response(chunkStream(workoutCsvLines(workouts)), { headers: { ...headers, "content-type": "text/csv; charset=utf-8" } });
 }

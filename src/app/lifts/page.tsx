@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadLiftsOverview } from "@/lib/lift/public-stats";
+import { isBuildPhase, loadLiftsOverview } from "@/lib/lift/public-stats";
 import WeeklyMuscleVolume from "@/components/lift/WeeklyMuscleVolume";
 import PrFeed from "@/components/lift/PrFeed";
 import RecentLifts from "@/components/lift/RecentLifts";
@@ -25,7 +25,9 @@ function SectionHeading({ id, title, note }: { id: string; title: string; note?:
 }
 
 export default async function LiftsPage() {
-  const o = await loadLiftsOverview();
+  // at request time a failed load throws so isr keeps serving the last good page
+  // instead of caching the error state; at build there's no last page, so fall back
+  const o = await loadLiftsOverview({ rethrow: !isBuildPhase() });
   const perWeek = o ? Math.round((o.window.workingSets / Math.max(1, o.window.weeks)) * 10) / 10 : 0;
 
   return (
@@ -65,9 +67,11 @@ export default async function LiftsPage() {
           />
 
           <section style={{ margin: "3rem 0" }} aria-labelledby="lifts-volume">
-            <SectionHeading id="lifts-volume"                 title="weekly volume"
-                note={`working sets per muscle group, last ${o.window.weeks} weeks. secondary muscles count half a set.`}
-              />
+            <SectionHeading
+              id="lifts-volume"
+              title="weekly volume"
+              note={`working sets per muscle group, last ${o.window.weeks} weeks. secondary muscles count half a set.`}
+            />
             {o.window.workouts > 0 ? (
               <WeeklyMuscleVolume overview={o} />
             ) : (
