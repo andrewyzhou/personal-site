@@ -263,7 +263,8 @@ function Curve({ title, curve, format, noun }: { title: string; curve: { durS: n
   return (
     <Block title={title}>
       <p className="font-sans text-gray text-xs" style={{ ...NUM, marginBottom: 6 }}>
-        {format(g.yMin)} – {format(g.yMax)}
+        {/* the curve's own range, not the padded axis (whose floor can be 0) */}
+        {format(Math.min(...g.points.map((p) => p.value)))} – {format(Math.max(...g.points.map((p) => p.value)))}
       </p>
       <div style={{ position: "relative" }}>
         <svg

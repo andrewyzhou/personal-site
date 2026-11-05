@@ -111,6 +111,10 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
         <Link href="/" className="font-sans text-gray text-base link-highlight">
           ← home
         </Link>
+        <span className="font-sans text-gray text-base"> · </span>
+        <Link href="/activities/records" className="font-sans text-gray text-base link-highlight">
+          records
+        </Link>
       </section>
 
       <article className="py-8" style={{ maxWidth: "720px" }}>
