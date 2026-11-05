@@ -46,7 +46,7 @@ export async function r2Put(
   body: Uint8Array | ArrayBuffer,
   contentType: string
 ): Promise<{ url: string; pathname: string }> {
-  const res = await client().fetch(`${bucketEndpoint()}/${encodeKey(pathname)}`, {
+  const res = await signedFetch(`${bucketEndpoint()}/${encodeKey(pathname)}`, {
     method: "PUT",
     headers: { "Content-Type": contentType },
     body: body as BodyInit,
@@ -128,8 +128,17 @@ function endpointFor(bucket: string): string {
   return `https://${requireEnv("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com/${bucket}`;
 }
 
-export function r2BucketFetch(bucket: string, key: string, init?: RequestInit): Promise<Response> {
-  return client().fetch(`${endpointFor(bucket)}/${encodeKey(key)}`, init);
+// sign, then send the original bytes ourselves: re-sending the signed Request
+// streams its body, and some runtimes (node 22 on vercel) then drop
+// content-length, which r2 refuses with 411
+async function signedFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (init?.body == null) return client().fetch(url, init);
+  const signed = await client().sign(url, init);
+  return fetch(signed.url, { method: signed.method, headers: signed.headers, body: init.body });
+}
+
+export async function r2BucketFetch(bucket: string, key: string, init?: RequestInit): Promise<Response> {
+  return signedFetch(`${endpointFor(bucket)}/${encodeKey(key)}`, init);
 }
 
 // presigned browser PUT into any bucket. `headers` are signed into the url, so
