@@ -68,6 +68,8 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
   const [newName, setNewName] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // bumped after every save that leaves work pending: the rebuild starts on its own
+  const [autoRebuild, setAutoRebuild] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +94,7 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
     try {
       const r = await fn();
       if (typeof r.pending === "number") setPending(r.pending);
+      if ((r.pending ?? 0) > 0) setAutoRebuild((n) => n + 1);
       setMessage(done);
       await load();
       return true;
@@ -256,7 +259,7 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
         </div>
       )}
 
-      <RebuildPanel pending={pending} setPending={setPending} />
+      <RebuildPanel pending={pending} setPending={setPending} autoRun={autoRebuild} />
 
       {settings && <SettingsForm initial={settings} coarsenOptions={coarsenOptions} mutate={mutate} />}
     </div>
@@ -373,12 +376,15 @@ function History({ versions, busy, mutate }: { versions: ZoneVersion[]; busy: bo
   );
 }
 
-function RebuildPanel({ pending, setPending }: { pending: number | null; setPending(n: number): void }) {
+function RebuildPanel({ pending, setPending, autoRun }: { pending: number | null; setPending(n: number): void; autoRun: number }) {
   const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
   const [progress, setProgress] = useState("");
   const stopRef = useRef(false);
 
   async function run() {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     stopRef.current = false;
     const failed: number[] = [];
@@ -397,9 +403,19 @@ function RebuildPanel({ pending, setPending }: { pending: number | null; setPend
     } catch (error) {
       setProgress(`rebuild failed: ${(error as Error).message}`);
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
   }
+
+  // a save that left activities pending starts the rebuild without a click
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  });
+  useEffect(() => {
+    if (autoRun > 0) runRef.current();
+  }, [autoRun]);
 
   return (
     <div className="card-bg rounded-lg flex flex-col" style={{ padding: "12px", gap: "8px" }}>
@@ -417,7 +433,7 @@ function RebuildPanel({ pending, setPending }: { pending: number | null; setPend
           </button>
         )}
       </div>
-      <p className="font-sans text-gray text-sm">the scheduled import also rebuilds pending activities a batch at a time.</p>
+      <p className="font-sans text-gray text-sm">saving a zone or settings rebuilds affected activities automatically. keep this page open until it says up to date; the daily job catches anything left.</p>
       {progress && <p className="font-sans text-gray text-sm italic">{progress}</p>}
     </div>
   );
