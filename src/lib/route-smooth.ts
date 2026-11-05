@@ -86,3 +86,13 @@ export function projectSegments(segments: [number, number][][]): ProjectedRoute 
     h: maxY - minY || 1e-6,
   };
 }
+
+// start/end of a published route: first point of the first segment, last
+// point of the last one. these are the trimmed/fogged endpoints — the real
+// start or end may sit inside a privacy zone and is never in the data.
+export function routeEndpoints(segments: [number, number][][]): { start: [number, number]; end: [number, number] } | null {
+  const usable = segments.filter((s) => s.length > 0);
+  if (!usable.length) return null;
+  const last = usable[usable.length - 1];
+  return { start: usable[0][0], end: last[last.length - 1] };
+}
