@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { and, asc, eq } from "drizzle-orm";
 import { getDb, activities, activityPhotos, type ActivityRow } from "@/lib/db";
-import RouteMap from "@/components/RouteMap";
+import ActivityMapSection from "@/components/activity-map/ActivityMapSection";
 import ActivityPhotoCarousel from "@/components/ActivityPhotoCarousel";
 import EngagementSection from "@/components/EngagementSection";
 import LiftWorkoutCard from "@/components/lift/LiftWorkoutCard";
@@ -131,7 +131,16 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
 
         {(a.polyline && a.bounds) || fog ? (
           <div style={{ margin: "2rem 0" }}>
-            {a.polyline && a.bounds && <RouteMap polyline={a.polyline} bounds={a.bounds} fogShapes={a.fogShapes} />}
+            {a.polyline && a.bounds && (
+              <ActivityMapSection
+                activityId={row.id}
+                polyline={a.polyline}
+                bounds={a.bounds}
+                fogShapes={a.fogShapes}
+                photos={a.photos}
+                sportType={a.type}
+              />
+            )}
             {fog && (
               <p className="font-sans text-gray text-sm" style={{ marginTop: a.polyline ? "0.5rem" : 0 }}>
                 {fog}
