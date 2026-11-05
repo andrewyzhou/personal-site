@@ -8,6 +8,8 @@ import {
   toKg,
   type BodyweightPayload,
   type CustomExercisePayload,
+  type ProgramData,
+  type ProgramPayload,
   type SetPayload,
   type SyncMutation,
   type SyncPayloads,
@@ -23,6 +25,7 @@ import {
   exerciseMuscles,
   exercises,
   liftBodyweights,
+  liftPrograms,
   liftSets,
   liftSyncLog,
   liftTemplateExercises,
@@ -34,6 +37,7 @@ import {
   type NewExerciseMuscleRow,
   type NewExerciseRow,
   type NewLiftBodyweightRow,
+  type NewLiftProgramRow,
   type NewLiftSetRow,
   type NewLiftSyncLogRow,
   type NewLiftTemplateExerciseRow,
@@ -308,6 +312,18 @@ export function bodyweightRow(p: BodyweightPayload): NewLiftBodyweightRow {
   };
 }
 
+export function programRow(p: ProgramPayload): NewLiftProgramRow {
+  return {
+    id: p.id,
+    name: p.name.trim(),
+    // the validator already ran checkProgramData on this text
+    data: JSON.parse(p.data) as ProgramData,
+    active: flag(p.active),
+    createdAt: date(p.createdAt),
+    updatedAt: date(p.updatedAt),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // statements
 
@@ -384,6 +400,7 @@ export function planSync(
     tp: liftTemplates,
     te: liftTemplateExercises,
     bw: liftBodyweights,
+    pg: liftPrograms,
   };
 
   function upsertWorkout(p: WorkoutPayload): Outcome {
@@ -618,6 +635,8 @@ export function planSync(
           return { statements: [db.delete(t.te).where(eq(t.te.id, m.id))] };
         case "bodyweight":
           return { statements: [db.delete(t.bw).where(eq(t.bw.id, m.id))] };
+        case "program":
+          return { statements: [db.delete(t.pg).where(eq(t.pg.id, m.id))] };
       }
     }
     const p = m.payload as SyncPayloads[typeof m.entity];
@@ -658,6 +677,19 @@ export function planSync(
                 target: t.bw.id,
                 set: excludedExcept(t.bw, ["id", "createdAt"]),
                 setWhere: newerOrSame(t.bw.updatedAt),
+              }),
+          ],
+        };
+      case "program":
+        return {
+          statements: [
+            db
+              .insert(t.pg)
+              .values(programRow(p as ProgramPayload))
+              .onConflictDoUpdate({
+                target: t.pg.id,
+                set: excludedExcept(t.pg, ["id", "createdAt"]),
+                setWhere: newerOrSame(t.pg.updatedAt),
               }),
           ],
         };

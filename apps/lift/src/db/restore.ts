@@ -11,6 +11,7 @@ import {
   customExercises,
   kv,
   outbox,
+  programs,
   sets,
   templateExercises,
   templateFolders,
@@ -32,6 +33,7 @@ const TABLES = {
   workout_exercise: workoutExercises,
   set: sets,
   bodyweight: bodyweights,
+  program: programs,
 } as const satisfies Record<SyncEntity, unknown>;
 
 export function countLocalWorkouts(): number {

@@ -37,6 +37,8 @@ interface Props {
   prFlags?: Record<string, SetPrKind[]>;
   /** the set that just became a pr, to animate once */
   celebrate?: { setId: string; n: number } | null;
+  /** program progression line, e.g. "next: 190 lb × 5" */
+  hint?: string;
 }
 
 export function ExerciseCard(p: Props) {
@@ -75,6 +77,12 @@ export function ExerciseCard(p: Props) {
           <Text style={[styles.moreText, { color: menu ? c.accent : c.muted }]}>•••</Text>
         </Pressable>
       </View>
+
+      {p.hint ? (
+        <Text style={[styles.hint, { color: c.muted }]} numberOfLines={2}>
+          {p.hint}
+        </Text>
+      ) : null}
 
       {menu ? (
         <View style={[styles.menu, { borderColor: c.border }]}>
@@ -158,6 +166,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, marginBottom: 4, gap: 8 },
   exName: { flex: 1, fontSize: 16, fontWeight: "600" },
   more: { paddingHorizontal: 4 },
+  hint: { fontSize: 13, paddingHorizontal: 12, marginTop: -2, marginBottom: 4 },
   moreText: { fontSize: 14, fontWeight: "700", letterSpacing: 1 },
   menu: { marginHorizontal: 12, marginBottom: 6, paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, gap: 6 },
   menuRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },

@@ -12,6 +12,7 @@ import {
   customExercises,
   kv,
   outbox,
+  programs,
   sets,
   templateExercises,
   templateFolders,
@@ -59,6 +60,7 @@ describe("migrations", () => {
     templates,
     templateExercises,
     bodyweights,
+    programs,
     kv,
   ] as SQLiteTable[])(
     "matches the drizzle schema",
@@ -96,5 +98,16 @@ describe("migrations", () => {
     ).toThrow();
     db.exec(`DELETE FROM workouts WHERE id = 'w'`);
     expect((db.prepare("SELECT count(*) AS n FROM sets").get() as { n: number }).n).toBe(0);
+  });
+
+  it("v3 adds programs on top of a v2 db, keeping its rows", () => {
+    const db = new DatabaseSync(":memory:");
+    for (const m of pendingMigrations(0).slice(0, 2)) for (const s of m.statements) db.exec(s);
+    db.exec(`INSERT INTO templates (id, name, created_at, updated_at) VALUES ('t', 'push', 1, 1)`);
+    for (const m of pendingMigrations(2)) for (const s of m.statements) db.exec(s);
+    db.exec(`INSERT INTO programs (id, name, created_at, updated_at) VALUES ('p', 'ppl', 1, 1)`);
+    expect({ ...(db.prepare("SELECT data, active FROM programs").get() as object) }).toEqual({ data: "{}", active: 0 });
+    expect(() => db.exec(`UPDATE programs SET active = 2`)).toThrow();
+    expect((db.prepare("SELECT count(*) AS n FROM templates").get() as { n: number }).n).toBe(1);
   });
 });

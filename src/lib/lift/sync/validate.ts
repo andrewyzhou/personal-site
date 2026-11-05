@@ -1,5 +1,7 @@
 import {
+  MAX_PROGRAM_DATA_LENGTH,
   MUSCLE_REGIONS,
+  checkProgramData,
   SYNC_ENTITIES,
   SYNC_MAX_BATCH,
   SYNC_PROTOCOL_VERSION,
@@ -197,6 +199,19 @@ const plannedSet: Check = (v) =>
 
 const muscle = oneOf(MUSCLE_REGIONS);
 
+// json text of lift-core's ProgramData, checked strictly so the jsonb column only holds real programs
+const programData: Check = (v) => {
+  if (typeof v !== "string") return "must be a json string";
+  if (v.length > MAX_PROGRAM_DATA_LENGTH) return `length must be at most ${MAX_PROGRAM_DATA_LENGTH}`;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(v);
+  } catch {
+    return "is not valid json";
+  }
+  return checkProgramData(parsed);
+};
+
 export const PAYLOAD_SHAPES: Record<SyncEntity, Shape> = {
   workout: {
     id,
@@ -274,6 +289,7 @@ export const PAYLOAD_SHAPES: Record<SyncEntity, Shape> = {
     note: nullable(text()),
     ...timestamps,
   },
+  program: { id, name: text(200, 1), data: programData, active: flag, ...timestamps },
 };
 
 const OPS: readonly SyncOp[] = ["insert", "update", "delete"];

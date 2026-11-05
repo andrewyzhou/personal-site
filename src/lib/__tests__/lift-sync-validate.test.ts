@@ -203,3 +203,28 @@ describe("validateMutation", () => {
     expect(validateMutation(m("workout_exercise", "insert", { ...wex, restS: -5 }, "we1")).ok).toBe(false);
   });
 });
+
+describe("program payloads", () => {
+  const data = JSON.stringify({ version: 1, weeks: [{ days: [{ templateId: "t1" }] }], rules: {}, startedAt: null, skipped: 0, repeat: false });
+  const program = { id: "p1", name: "5x5", data, active: 0, ...ts };
+  const reason = (payload: Record<string, unknown>) => {
+    const r = validateMutation(m("program", "insert", payload, "p1"));
+    return r.ok ? null : r.reason;
+  };
+
+  it("accepts a program and its delete", () => {
+    expect(reason(program)).toBeNull();
+    expect(validateMutation(m("program", "delete", null, "p1")).ok).toBe(true);
+  });
+
+  it.each([
+    ["data that isn't json", { ...program, data: "{" }, "payload.data is not valid json"],
+    ["data of the wrong version", { ...program, data: data.replace('"version":1', '"version":9') }, "payload.data version must be 1"],
+    ["a bad rule", { ...program, data: data.replace('"rules":{}', '"rules":{"te1":{"kind":"linear"}}') }, "payload.data rules.te1 is not a valid rule"],
+    ["oversized data", { ...program, data: "x".repeat(100_001) }, "payload.data length must be at most 100000"],
+    ["a non-flag active", { ...program, active: true }, "payload.active must be 0 or 1"],
+    ["an empty name", { ...program, name: "" }, "payload.name length must be 1..200"],
+  ])("rejects %s", (_label, payload, expected) => {
+    expect(reason(payload)).toBe(expected);
+  });
+});

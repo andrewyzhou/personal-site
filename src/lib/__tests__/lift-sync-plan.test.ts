@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import type {
   BodyweightPayload,
   CustomExercisePayload,
+  ProgramPayload,
   SetPayload,
   SyncEntity,
   SyncOp,
@@ -17,6 +18,7 @@ import * as schema from "@/lib/db/schema";
 import {
   collectRefs,
   planSync,
+  programRow,
   setRow,
   startedLocalFor,
   workoutRow,
@@ -494,5 +496,48 @@ describe("planSync", () => {
 
   it("is empty for an empty push", () => {
     expect(plan([])).toMatchObject({ statements: [], applied: 0, appliedThrough: 0 });
+  });
+});
+
+describe("programs", () => {
+  const data =
+    '{"version":1,"weeks":[{"days":[{"templateId":"t1"},{"templateId":null}]}],"rules":{"te1":{"kind":"linear","sets":5,"reps":5}},"startedAt":null,"skipped":0,"repeat":false}';
+  const program = (over: Partial<ProgramPayload> = {}): ProgramPayload => ({ id: "p1", name: " 5x5 ", data, active: 1, ...ts, ...over });
+
+  it("maps the payload: trimmed name, parsed jsonb, boolean active", () => {
+    expect(programRow(program())).toEqual({
+      id: "p1",
+      name: "5x5",
+      data: JSON.parse(data),
+      active: true,
+      createdAt: new Date(ts.createdAt),
+      updatedAt: new Date(ts.updatedAt),
+    });
+  });
+
+  it("upserts last-write-wins without needing the templates it names", () => {
+    const p = plan([mut("program", "insert", program())]);
+    expect(p).toMatchObject({ applied: 1, rejected: [] });
+    const sqls = render(p.statements).map((s) => s.sql);
+    expect(sqls[0]).toMatch(
+      /^insert into "lift_programs" .* on conflict \("id"\) do update set .* where "lift_programs"."updated_at" <= excluded."updated_at"$/
+    );
+    expect(sqls[0]).toContain('"data" = excluded."data"');
+    expect(sqls[0]).toContain('"active" = excluded."active"');
+    expect(sqls[0]).not.toContain('"created_at" = ');
+    expect(sqls[1]).toMatch(/^insert into "lift_sync_log"/);
+    expect(sqls).toHaveLength(2);
+    expect(p.touchedWorkoutIds).toEqual([]);
+  });
+
+  it("deletes by id", () => {
+    const p = plan([mut("program", "delete", null, "p1")]);
+    const [del] = render(p.statements);
+    expect(del.sql).toBe('delete from "lift_programs" where "lift_programs"."id" = $1');
+    expect(del.params).toEqual(["p1"]);
+  });
+
+  it("collects no refs", () => {
+    expect(collectRefs([mut("program", "insert", program())])).toMatchObject({ templateIds: [], workoutIds: [], exerciseIds: [] });
   });
 });
