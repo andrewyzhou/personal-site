@@ -13,6 +13,8 @@ import { getAllPosts } from "@/lib/blog";
 import { getAllPhotosets } from "@/lib/photos";
 import { getItems, type ItemCategory } from "@/lib/items";
 import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
+import { getSite } from "@/content/site";
+import { formatDay } from "@/content/format";
 
 function loadCategory(category: ItemCategory) {
   return getItems(category).map((m) => ({
@@ -27,14 +29,9 @@ function loadCategory(category: ItemCategory) {
   }));
 }
 
-function formatDateLabel(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  const month = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
-  return `${month} ${d.getDate()}, ${d.getFullYear()}`;
-}
 
 export default function Home() {
+  const site = getSite();
   const workItems = loadCategory("work");
   const researchItems = loadCategory("research");
   const teachingItems = loadCategory("teaching");
@@ -42,10 +39,10 @@ export default function Home() {
 
   const libraryPreview: LibraryPreviewItem[] = getAllEntries().slice(0, 5).map((e) => {
     const dateLabel = e.dateCompleted
-      ? `completed ${formatDateLabel(e.dateCompleted)}`
+      ? `${site.pages.library.completed} ${formatDay(e.dateCompleted)}`
       : e.dateStarted
-      ? `started ${formatDateLabel(e.dateStarted)}`
-      : "in progress";
+      ? `${site.pages.library.started} ${formatDay(e.dateStarted)}`
+      : site.pages.library.inProgress;
     const year =
       (e.dateCompleted ?? e.dateStarted ?? "").slice(0, 4) || "";
     return {
@@ -63,7 +60,7 @@ export default function Home() {
     slug: p.slug,
     title: p.title,
     summary: p.summary,
-    dateLabel: formatDateLabel(p.date),
+    dateLabel: formatDay(p.date),
     year: (p.date ?? "").slice(0, 4) || "",
   }));
 
@@ -71,7 +68,7 @@ export default function Home() {
     slug: s.slug,
     title: s.title,
     caption: s.caption,
-    dateLabel: formatDateLabel(s.date),
+    dateLabel: formatDay(s.date),
     year: (s.date ?? "").slice(0, 4) || "",
     count: s.photoCount,
   }));
@@ -102,7 +99,7 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row justify-between gap-12">
           {/* left side - currently */}
           <div className="w-full sm:w-1/2">
-            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load this section.</p>}>
+            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">{site.home.errors.currently}</p>}>
               <Currently />
             </ErrorBoundary>
           </div>
@@ -119,20 +116,20 @@ export default function Home() {
       <section className="py-16">
         {/* heading - visible on mobile only, above everything */}
         <h3 className="font-sans font-bold text-off-white text-3xl activity-stack:hidden" style={{ marginBottom: '1rem' }}>
-          activity
+          {site.home.activity}
         </h3>
 
         <div className="flex flex-col activity-stack:flex-row justify-between gap-8 activity-stack:gap-12">
           {/* strava calendar - shows first on mobile, right on desktop */}
           <div className="w-full activity-stack:w-2/5 flex justify-center activity-stack:justify-end activity-stack:items-center order-first activity-stack:order-last">
-            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load the activity calendar.</p>}>
+            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">{site.home.errors.calendar}</p>}>
               <ActivityCalendar />
             </ErrorBoundary>
           </div>
 
           {/* github activity - shows second on mobile, left on desktop */}
           <div className="w-full activity-stack:w-3/5 order-last activity-stack:order-first">
-            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">couldn&apos;t load github activity.</p>}>
+            <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">{site.home.errors.github}</p>}>
               <GitHubActivity showHeading={true} mobileHeading={false} />
             </ErrorBoundary>
           </div>
@@ -145,7 +142,7 @@ export default function Home() {
 
       {/* footer */}
       <footer className="py-8 text-center">
-        <p className="font-sans text-gray text-sm">© andrew zhou 2025-2026</p>
+        <p className="font-sans text-gray text-sm">{site.site.footer}</p>
       </footer>
     </main>
   );

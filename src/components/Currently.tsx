@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { isSpotifyTrack, isStravaActivity, isLiteralBook, isStatsPayload } from "@/lib/validate";
+import { useSite } from "@/content/SiteProvider";
 
 interface SpotifyTrack {
   isPlaying: boolean;
@@ -34,6 +35,7 @@ interface LiteralBook {
 }
 
 export default function Currently() {
+  const { currently: copy } = useSite();
   const [spotify, setSpotify] = useState<SpotifyTrack | null>(null);
   const [strava, setStrava] = useState<StravaActivity | null>(null);
   const [book, setBook] = useState<LiteralBook | null>(null);
@@ -600,7 +602,7 @@ export default function Currently() {
   return (
     <div>
       <h3 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: '0.5rem' }}>
-        currently
+        {copy.heading}
       </h3>
       <p className="font-sans text-gray text-lg leading-[1.35]">
         {displayedText.length > 0 ? (
@@ -617,14 +619,14 @@ export default function Currently() {
       </p>
       <p className="font-sans text-off-white text-sm italic" style={{ marginTop: '0.5rem' }}>
         {loading ? (
-          <>data last fetched...</>
+          <>{`${copy.fetched}...`}</>
         ) : cachedFetchedAt !== null ? (
-          <>data last fetched {displayedFetchTime}<Cursor visible={cursorLine === "fetch_time"} /></>
+          <>{`${copy.fetched} `}{displayedFetchTime}<Cursor visible={cursorLine === "fetch_time"} /></>
         ) : null}
         {!loading && prevApiCalls !== null && prevApiCalls > 0 && (
           <>
             <br />
-            total api calls: {displayedApiCalls}<Cursor visible={cursorLine === "api_calls"} />
+            {`${copy.apiCalls} `}{displayedApiCalls}<Cursor visible={cursorLine === "api_calls"} />
           </>
         )}
       </p>

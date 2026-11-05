@@ -4,20 +4,17 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { BlogPost } from "@/lib/blog";
+import { useSite } from "@/content/SiteProvider";
+import { formatDay } from "@/content/format";
 
 interface Props {
   posts: BlogPost[];
   allTags: string[];
 }
 
-function formatDate(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  const month = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
-  return `${month} ${d.getDate()}, ${d.getFullYear()}`;
-}
 
 export default function BlogIndex({ posts, allTags }: Props) {
+  const copy = useSite().pages.blog;
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
 
@@ -72,7 +69,7 @@ export default function BlogIndex({ posts, allTags }: Props) {
                 : "text-gray link-highlight"
             }`}
           >
-            all
+            {copy.allTags}
           </button>
           {allTags.map((tag) => (
             <button
@@ -91,7 +88,7 @@ export default function BlogIndex({ posts, allTags }: Props) {
       )}
 
       {filtered.length === 0 && (
-        <p className="font-sans text-gray text-lg italic">no posts match these tags.</p>
+        <p className="font-sans text-gray text-lg italic">{copy.noMatch}</p>
       )}
 
       <div className="flex flex-col gap-2">
@@ -133,7 +130,7 @@ function PostRow({ post, onTagClick, activeTags }: RowProps) {
             >
               {post.title}
             </Link>
-            <span className="font-sans text-gray text-sm shrink-0">{formatDate(post.date)}</span>
+            <span className="font-sans text-gray text-sm shrink-0">{formatDay(post.date)}</span>
           </div>
           {post.summary && (
             <p className="font-sans text-secondary text-base leading-[1.4]" style={{ marginTop: "0.5rem" }}>

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { getSite, pageTitle } from "@/content/site";
+import { formatDay } from "@/content/format";
+
+const site = getSite();
 import { getAllEntries, getEntryBySlug, getAdjacentEntries } from "@/lib/library";
 import SourceIcon from "@/components/library/SourceIcon";
 import Rating from "@/components/library/Rating";
@@ -18,19 +22,13 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const entry = getEntryBySlug(slug);
-  if (!entry) return { title: "not found · andrew zhou" };
+  if (!entry) return { title: pageTitle(site, site.site.notFoundTitle) };
   return {
-    title: `${entry.title} · library · andrew zhou`,
+    title: pageTitle(site, entry.title, site.pages.library.title),
     description: entry.summary,
   };
 }
 
-function formatDate(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  const month = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
-  return `${month} ${d.getDate()}, ${d.getFullYear()}`;
-}
 
 export default async function LibraryEntryPage({ params }: PageProps) {
   const { slug } = await params;
@@ -40,15 +38,15 @@ export default async function LibraryEntryPage({ params }: PageProps) {
   const { prev, next } = getAdjacentEntries(slug);
 
   const dates: string[] = [];
-  if (entry.dateStarted) dates.push(`started ${formatDate(entry.dateStarted)}`);
-  if (entry.dateCompleted) dates.push(`completed ${formatDate(entry.dateCompleted)}`);
-  if (dates.length === 0 && entry.status === "in-progress") dates.push("in progress");
+  if (entry.dateStarted) dates.push(`${site.pages.library.started} ${formatDay(entry.dateStarted)}`);
+  if (entry.dateCompleted) dates.push(`${site.pages.library.completed} ${formatDay(entry.dateCompleted)}`);
+  if (dates.length === 0 && entry.status === "in-progress") dates.push(site.pages.library.inProgress);
 
   return (
     <main className="site-container">
       <section className="py-8">
         <Link href="/library" className="font-sans text-gray text-base link-highlight">
-          ← library
+          {`← ${site.nav.library}`}
         </Link>
       </section>
 
@@ -80,7 +78,7 @@ export default async function LibraryEntryPage({ params }: PageProps) {
               rel="noopener noreferrer"
               className="font-sans text-gray text-base link-highlight"
             >
-              original source ↗
+              {`${site.pages.library.originalSource} ↗`}
             </a>
           )}
         </div>
@@ -131,7 +129,7 @@ export default async function LibraryEntryPage({ params }: PageProps) {
                 {prev && (
                   <Link href={`/library/${prev.slug}`} className="block group">
                     <p className="font-sans text-gray text-sm" style={{ marginBottom: "0.25rem" }}>
-                      ← previous
+                      {`← ${site.nav.previous}`}
                     </p>
                     <p className="font-sans text-off-white text-lg link-highlight inline-block">
                       {prev.title}
@@ -143,7 +141,7 @@ export default async function LibraryEntryPage({ params }: PageProps) {
                 {next && (
                   <Link href={`/library/${next.slug}`} className="block group">
                     <p className="font-sans text-gray text-sm" style={{ marginBottom: "0.25rem" }}>
-                      next →
+                      {`${site.nav.next} →`}
                     </p>
                     <p className="font-sans text-off-white text-lg link-highlight inline-block">
                       {next.title}
@@ -159,7 +157,7 @@ export default async function LibraryEntryPage({ params }: PageProps) {
       <div className="section-divider" />
 
       <footer className="py-8 text-center">
-        <p className="font-sans text-gray text-sm">© andrew zhou 2025-2026</p>
+        <p className="font-sans text-gray text-sm">{site.site.footer}</p>
       </footer>
     </main>
   );

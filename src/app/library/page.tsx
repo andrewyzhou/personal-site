@@ -2,10 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getAllEntries, getAllTags } from "@/lib/library";
 import LibraryIndex from "@/components/library/LibraryIndex";
+import { getSite, pageTitle } from "@/content/site";
+
+const site = getSite();
 
 export const metadata: Metadata = {
-  title: "library · andrew zhou",
-  description: "books, videos, podcasts, and courses i've been learning from, with my notes.",
+  title: pageTitle(site, site.pages.library.title),
+  description: site.pages.library.metaDescription,
 };
 
 export default function LibraryPage() {
@@ -19,16 +22,16 @@ export default function LibraryPage() {
           href="/"
           className="font-sans text-gray text-base link-highlight"
         >
-          ← home
+          {`← ${site.nav.home}`}
         </Link>
       </section>
 
       <section className="py-8">
         <h1 className="font-sans font-bold text-off-white text-6xl" style={{ letterSpacing: "-0.02em", marginBottom: "1rem" }}>
-          library
+          {site.pages.library.title}
         </h1>
         <p className="font-sans text-gray text-lg leading-[1.35] max-w-2xl">
-          a running list of books, videos, podcasts, and courses i&apos;ve been learning from — with summaries, commentary, and what stuck. mostly non-technical, occasionally technical, always honest.
+          {site.pages.library.intro}
         </p>
       </section>
 
@@ -41,7 +44,7 @@ export default function LibraryPage() {
       <div className="section-divider" />
 
       <footer className="py-8 text-center">
-        <p className="font-sans text-gray text-sm">© andrew zhou 2025-2026</p>
+        <p className="font-sans text-gray text-sm">{site.site.footer}</p>
       </footer>
     </main>
   );

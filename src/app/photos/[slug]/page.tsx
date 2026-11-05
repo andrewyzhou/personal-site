@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { getSite, pageTitle } from "@/content/site";
+
+const site = getSite();
 import { getAllPhotosets, getPhotosetBySlug, getAdjacentPhotosets } from "@/lib/photos";
 import PhotosetViewer from "@/components/photos/PhotosetViewer";
 import EssayViewer from "@/components/photos/EssayViewer";
@@ -17,9 +20,9 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const set = getPhotosetBySlug(slug);
-  if (!set) return { title: "not found · andrew zhou" };
+  if (!set) return { title: pageTitle(site, site.site.notFoundTitle) };
   return {
-    title: `${set.title} · photos · andrew zhou`,
+    title: pageTitle(site, set.title, site.pages.photos.title),
     description: set.caption,
   };
 }
@@ -38,7 +41,7 @@ export default async function PhotosetDetailPage({ params }: PageProps) {
     <main className="site-container">
       <section className="py-8">
         <Link href="/photos" className="font-sans text-gray text-base link-highlight">
-          ← photos
+          {`← ${site.nav.photos}`}
         </Link>
       </section>
 
@@ -80,7 +83,7 @@ export default async function PhotosetDetailPage({ params }: PageProps) {
       <div className="section-divider" />
 
       <footer className="py-8 text-center">
-        <p className="font-sans text-gray text-sm">© andrew zhou 2025-2026</p>
+        <p className="font-sans text-gray text-sm">{site.site.footer}</p>
       </footer>
     </main>
   );

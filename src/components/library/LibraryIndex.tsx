@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import type { LibraryEntry } from "@/lib/library";
+import { useSite } from "@/content/SiteProvider";
+import { formatDay } from "@/content/format";
 import SourceIcon from "./SourceIcon";
 import Rating from "./Rating";
 
@@ -11,14 +13,9 @@ interface Props {
   allTags: string[];
 }
 
-function formatDate(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  const month = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
-  return `${month} ${d.getDate()}, ${d.getFullYear()}`;
-}
 
 export default function LibraryIndex({ entries, allTags }: Props) {
+  const copy = useSite().pages.library;
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [hydrated, setHydrated] = useState(false);
 
@@ -76,7 +73,7 @@ export default function LibraryIndex({ entries, allTags }: Props) {
                 : "text-gray link-highlight"
             }`}
           >
-            all
+            {copy.allTags}
           </button>
           {allTags.map((tag) => (
             <button
@@ -95,14 +92,14 @@ export default function LibraryIndex({ entries, allTags }: Props) {
       )}
 
       {filtered.length === 0 && (
-        <p className="font-sans text-gray text-lg italic">no entries match these tags.</p>
+        <p className="font-sans text-gray text-lg italic">{copy.noMatch}</p>
       )}
 
       {inProgress.length > 0 && (
-        <Section title="in progress" entries={inProgress} onTagClick={toggleTag} activeTags={activeTags} />
+        <Section title={copy.inProgress} entries={inProgress} onTagClick={toggleTag} activeTags={activeTags} />
       )}
       {completed.length > 0 && (
-        <Section title="completed" entries={completed} onTagClick={toggleTag} activeTags={activeTags} />
+        <Section title={copy.completed} entries={completed} onTagClick={toggleTag} activeTags={activeTags} />
       )}
     </div>
   );
@@ -137,11 +134,12 @@ interface RowProps {
 }
 
 function EntryRow({ entry, onTagClick, activeTags }: RowProps) {
+  const copy = useSite().pages.library;
   const dateStr =
     entry.status === "completed"
-      ? `completed ${formatDate(entry.dateCompleted)}`
+      ? `${copy.completed} ${formatDay(entry.dateCompleted)}`
       : entry.dateStarted
-      ? `started ${formatDate(entry.dateStarted)}`
+      ? `${copy.started} ${formatDay(entry.dateStarted)}`
       : "";
 
   return (

@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { getSite, pageTitle } from "@/content/site";
+import { formatDay } from "@/content/format";
+
+const site = getSite();
 import { getAllPosts, getPostBySlug, getAdjacentPosts } from "@/lib/blog";
 import BlogContent from "@/components/blog/BlogContent";
 import { Figure } from "@/components/blog/mdx";
@@ -17,19 +21,13 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = getPostBySlug(slug);
-  if (!post) return { title: "not found · andrew zhou" };
+  if (!post) return { title: pageTitle(site, site.site.notFoundTitle) };
   return {
-    title: `${post.title} · blog · andrew zhou`,
+    title: pageTitle(site, post.title, site.pages.blog.title),
     description: post.summary,
   };
 }
 
-function formatDate(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  const month = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
-  return `${month} ${d.getDate()}, ${d.getFullYear()}`;
-}
 
 export default async function BlogPostPage({ params }: PageProps) {
   const { slug } = await params;
@@ -42,7 +40,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     <main className="site-container">
       <section className="py-8">
         <Link href="/blog" className="font-sans text-gray text-base link-highlight">
-          ← blog
+          {`← ${site.nav.blog}`}
         </Link>
       </section>
 
@@ -56,7 +54,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         </h1>
 
         <p className="font-sans text-gray text-lg" style={{ marginBottom: "1.5rem" }}>
-          {formatDate(post.date)}
+          {formatDay(post.date)}
         </p>
 
         {post.tags.length > 0 && (
@@ -109,7 +107,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                 {prev && (
                   <Link href={`/blog/${prev.slug}`} className="block group">
                     <p className="font-sans text-gray text-sm" style={{ marginBottom: "0.25rem" }}>
-                      ← previous
+                      {`← ${site.nav.previous}`}
                     </p>
                     <p className="font-sans text-off-white text-lg link-highlight inline-block">
                       {prev.title}
@@ -121,7 +119,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                 {next && (
                   <Link href={`/blog/${next.slug}`} className="block group">
                     <p className="font-sans text-gray text-sm" style={{ marginBottom: "0.25rem" }}>
-                      next →
+                      {`${site.nav.next} →`}
                     </p>
                     <p className="font-sans text-off-white text-lg link-highlight inline-block">
                       {next.title}
@@ -137,7 +135,7 @@ export default async function BlogPostPage({ params }: PageProps) {
       <div className="section-divider" />
 
       <footer className="py-8 text-center">
-        <p className="font-sans text-gray text-sm">© andrew zhou 2025-2026</p>
+        <p className="font-sans text-gray text-sm">{site.site.footer}</p>
       </footer>
     </main>
   );
