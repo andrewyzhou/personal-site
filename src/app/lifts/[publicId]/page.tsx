@@ -3,7 +3,9 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import LiftWorkoutCard, { liftStats } from "@/components/lift/LiftWorkoutCard";
+import StatGrid from "@/components/lift/StatGrid";
 import { loadLiftOnlyTitle, loadLiftOnlyWorkout } from "@/lib/lift/public";
+import { loadLiftsOverview, weekContextLine } from "@/lib/lift/public-stats";
 import { formatClockDuration, formatLocalDateLine, sportIcon, sportLabel } from "@/lib/activity-format";
 
 export const revalidate = 300;
@@ -20,8 +22,12 @@ export async function generateMetadata({ params }: { params: Promise<{ publicId:
 
 export default async function LiftPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = await params;
+  // the week line comes from the cached index; started now so it overlaps the workout load
+  const overviewPromise = loadLiftsOverview();
   const w = await loadLiftOnlyWorkout(publicId);
   if (!w) notFound();
+  const overview = await overviewPromise;
+  const week = overview ? weekContextLine(overview, w.date) : null;
 
   const { dateLine, timeLine } = formatLocalDateLine(w.date, w.startTime ?? "00:00");
   const stats = liftStats(w);
@@ -30,8 +36,8 @@ export default async function LiftPage({ params }: { params: Promise<{ publicId:
   return (
     <main className="site-container">
       <section className="py-8">
-        <Link href="/" className="font-sans text-gray text-base link-highlight">
-          ← home
+        <Link href="/lifts" className="font-sans text-gray text-base link-highlight">
+          ← lifts
         </Link>
       </section>
 
@@ -55,14 +61,25 @@ export default async function LiftPage({ params }: { params: Promise<{ publicId:
 
         <hr style={{ border: "none", borderTop: "1px solid var(--theme-divider)", margin: "1.5rem 0" }} />
 
-        <div className="grid grid-cols-3 gap-3" style={{ margin: "2rem 0" }}>
-          {stats.map((s) => (
-            <div key={s.label}>
-              <p className="font-sans text-off-white text-lg font-medium">{s.value}</p>
-              <p className="font-sans text-gray text-xs">{s.label}</p>
-            </div>
-          ))}
-        </div>
+        <StatGrid stats={stats} />
+
+        {(week || w.prs.length > 0) && (
+          <div className="font-sans text-sm" style={{ margin: "-0.75rem 0 2rem" }}>
+            {w.prs.length > 0 && (
+              <p className="text-secondary">
+                new records in {[...new Set(w.prs.map((p) => p.exerciseName))].join(", ")}
+              </p>
+            )}
+            {week && (
+              <p className="text-gray">
+                {week} ·{" "}
+                <Link href="/lifts" className="link-highlight">
+                  all lifts
+                </Link>
+              </p>
+            )}
+          </div>
+        )}
 
         <LiftWorkoutCard workout={w} title={false} />
       </article>
