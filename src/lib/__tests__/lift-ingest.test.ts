@@ -19,7 +19,7 @@ vi.mock("@/lib/db", async (orig) => ({
 }));
 vi.mock("@/lib/lift/plan", async (orig) => ({
   ...(await orig<typeof import("@/lib/lift/plan")>()),
-  planStrongIngest: (...a: unknown[]) => plan(...a),
+  planShareIngest: (...a: unknown[]) => plan(...a),
 }));
 vi.mock("@/lib/lift/link", () => ({
   linkWorkout: (...a: unknown[]) => linkWorkout(...a),
@@ -32,13 +32,13 @@ import {
   editCandidatesWhere,
   editGuardQuery,
   editedInApp,
-  ingestStrongText,
+  ingestShareText,
   EMPTY_TEXT,
   type EditGuard,
 } from "@/lib/lift/ingest";
 import { publicLiftId } from "@/lib/lift/public-id";
 
-const realPlan = (await vi.importActual<typeof import("@/lib/lift/plan")>("@/lib/lift/plan")).planStrongIngest;
+const realPlan = (await vi.importActual<typeof import("@/lib/lift/plan")>("@/lib/lift/plan")).planShareIngest;
 
 const db = drizzle(neon("postgresql://user:pass@127.0.0.1:1/none"), { schema });
 
@@ -60,21 +60,21 @@ function fullPlan(): IngestPlan {
       source: "shortcut",
       rawSha256: "ab".repeat(32),
       rawText: "raw",
-      strongSlug: "Slug1",
-      workoutId: "strong-Slug1",
+      shareSlug: "Slug1",
+      workoutId: "share-Slug1",
       status: "parsed",
       warnings: [],
     },
     workout: {
       workout: {
-        id: "strong-Slug1",
+        id: "share-Slug1",
         title: "Push Day",
         startedLocal: "2026-11-04T18:12",
         startedAt: new Date("2026-11-05T02:12:00Z"),
         utcOffsetMin: -480,
-        source: "strong-text",
+        source: "share-text",
         latestIngestId: "ing_" + "ab".repeat(12),
-        strongSlug: "Slug1",
+        shareSlug: "Slug1",
         workingSets: 2,
         volumeKg: 839.15,
         muscleLoad: { chest: 1 },
@@ -83,9 +83,9 @@ function fullPlan(): IngestPlan {
       aliases: [{ exerciseId: "bench-press-barbell", alias: "Bench Press (Barbell)", normalized: "bench press barbell" }],
       muscles: [{ exerciseId: "bench-press-barbell", region: "chest", role: "primary" }],
       workoutExercises: [
-        { id: "strong-Slug1:0", workoutId: "strong-Slug1", exerciseId: "bench-press-barbell", position: 0, nameRaw: "Bench Press (Barbell)" },
+        { id: "share-Slug1:0", workoutId: "share-Slug1", exerciseId: "bench-press-barbell", position: 0, nameRaw: "Bench Press (Barbell)" },
       ],
-      sets: [{ id: "strong-Slug1:0:0", workoutExerciseId: "strong-Slug1:0", position: 0, kind: "normal" }],
+      sets: [{ id: "share-Slug1:0:0", workoutExerciseId: "share-Slug1:0", position: 0, kind: "normal" }],
     },
     summary: SUMMARY,
     parsed: {} as IngestPlan["parsed"],
@@ -134,7 +134,7 @@ beforeEach(() => {
   process.env.LIFT_PUBLIC_ID_SECRET = "test-secret";
 });
 
-const LIVE = { id: "strong-Slug1", title: "Push Day", deletedAt: null };
+const LIVE = { id: "share-Slug1", title: "Push Day", deletedAt: null };
 
 describe("buildIngestBatch", () => {
   it("writes ingest, catalog rows, workout upsert, then replaces exercises and sets", () => {
@@ -171,25 +171,25 @@ describe("buildIngestBatch", () => {
   });
 });
 
-describe("ingestStrongText", () => {
+describe("ingestShareText", () => {
   it("stores a new workout in one batch, then links it", async () => {
     plan.mockReturnValue(fullPlan());
     linkWorkout.mockResolvedValue([
       { activityId: 1, role: "primary", method: "auto", deltaMin: -2, sportType: "WeightTraining", localTime: "18:10" },
     ]);
-    const res = await ingestStrongText("raw", { source: "shortcut" });
+    const res = await ingestShareText("raw", { source: "shortcut" });
     expect(plan).toHaveBeenCalledWith("raw", { source: "shortcut" });
     expect(batch).toHaveBeenCalledOnce();
     expect(batch.mock.calls[0][0]).toHaveLength(8);
-    expect(linkWorkout).toHaveBeenCalledWith(expect.objectContaining({ id: "strong-Slug1", startedLocal: "2026-11-04T18:12" }));
-    expect(res).toMatchObject({ status: "created", duplicate: false, workoutId: "strong-Slug1", ingestId: "ing_" + "ab".repeat(12) });
+    expect(linkWorkout).toHaveBeenCalledWith(expect.objectContaining({ id: "share-Slug1", startedLocal: "2026-11-04T18:12" }));
+    expect(res).toMatchObject({ status: "created", duplicate: false, workoutId: "share-Slug1", ingestId: "ing_" + "ab".repeat(12) });
     expect(res.text).toMatch(/^logged push day · .* · watch: linked \(weight training 18:10\)$/);
   });
 
   it("still succeeds when linking blows up", async () => {
     plan.mockReturnValue(fullPlan());
     linkWorkout.mockRejectedValue(new Error("db hiccup"));
-    const res = await ingestStrongText("raw", { source: "shortcut" });
+    const res = await ingestShareText("raw", { source: "shortcut" });
     expect(res.status).toBe("created");
     expect(res.links).toEqual([]);
     expect(res.text).toMatch(/watch: not linked yet$/);
@@ -197,45 +197,45 @@ describe("ingestStrongText", () => {
 
   it("a byte-identical re-send of a live workout only re-inserts the raw ingest row", async () => {
     plan.mockReturnValue(fullPlan());
-    existingRows = [{ id: "ing_old", workoutId: "strong-Slug1", status: "parsed" }];
+    existingRows = [{ id: "ing_old", workoutId: "share-Slug1", status: "parsed" }];
     workoutRows = [LIVE];
     getWorkoutLinks.mockResolvedValue([
       { activityId: 3, role: "primary", method: "auto", deltaMin: 0, sportType: "WeightTraining", localTime: "18:10" },
     ]);
-    const res = await ingestStrongText("raw", { source: "telegram" });
+    const res = await ingestShareText("raw", { source: "telegram" });
     expect(batch).toHaveBeenCalledOnce();
     const writes = (batch.mock.calls[0][0] as Sqlable[]).map((q) => q.toSQL().sql);
     expect(writes).toHaveLength(1);
     expect(writes[0]).toMatch(/^insert into "lift_ingests" .* on conflict do nothing$/);
     // existing links are read, not re-synced: that would bump updated_at
     expect(linkWorkout).not.toHaveBeenCalled();
-    expect(res).toMatchObject({ status: "duplicate", duplicate: true, ingestId: "ing_old", workoutId: "strong-Slug1" });
+    expect(res).toMatchObject({ status: "duplicate", duplicate: true, ingestId: "ing_old", workoutId: "share-Slug1" });
     expect(res.text).toMatch(/^already logged push day/);
     expect(res.details.split("\n").at(-1)).toBe("https://www.andrewzhou.org/activities/3");
   });
 
   it("a byte-identical re-send still tries to link an unlinked workout", async () => {
     plan.mockReturnValue(fullPlan());
-    existingRows = [{ id: "ing_old", workoutId: "strong-Slug1", status: "parsed" }];
+    existingRows = [{ id: "ing_old", workoutId: "share-Slug1", status: "parsed" }];
     workoutRows = [LIVE];
-    await ingestStrongText("raw", { source: "telegram" });
-    expect(linkWorkout).toHaveBeenCalledWith(expect.objectContaining({ id: "strong-Slug1" }));
+    await ingestShareText("raw", { source: "telegram" });
+    expect(linkWorkout).toHaveBeenCalledWith(expect.objectContaining({ id: "share-Slug1" }));
   });
 
   it("a byte-identical re-send of a soft-deleted workout rewrites it (sharing again un-deletes)", async () => {
     plan.mockReturnValue(fullPlan());
-    existingRows = [{ id: "ing_old", workoutId: "strong-Slug1", status: "parsed" }];
+    existingRows = [{ id: "ing_old", workoutId: "share-Slug1", status: "parsed" }];
     workoutRows = [{ ...LIVE, deletedAt: new Date() }];
-    const res = await ingestStrongText("raw", { source: "telegram" });
+    const res = await ingestShareText("raw", { source: "telegram" });
     expect(batch.mock.calls[0][0]).toHaveLength(8);
     expect(linkWorkout).toHaveBeenCalled();
-    expect(res).toMatchObject({ status: "duplicate", workoutId: "strong-Slug1" });
+    expect(res).toMatchObject({ status: "duplicate", workoutId: "share-Slug1" });
   });
 
   it("a byte-identical re-send whose workout is gone writes it again", async () => {
     plan.mockReturnValue(fullPlan());
-    existingRows = [{ id: "ing_old", workoutId: "strong-Slug1", status: "parsed" }];
-    await ingestStrongText("raw", { source: "telegram" });
+    existingRows = [{ id: "ing_old", workoutId: "share-Slug1", status: "parsed" }];
+    await ingestShareText("raw", { source: "telegram" });
     expect(batch.mock.calls[0][0]).toHaveLength(8);
   });
 
@@ -245,20 +245,20 @@ describe("ingestStrongText", () => {
     getWorkoutLinks.mockResolvedValueOnce([
       { activityId: 4, role: "duplicate", method: "manual", deltaMin: 0, sportType: "WeightTraining", localTime: "18:10" },
     ]);
-    const linked = await ingestStrongText("raw", { source: "shortcut" });
+    const linked = await ingestShareText("raw", { source: "shortcut" });
     expect(linked.links).toHaveLength(1);
     expect(linked.details.split("\n").at(-1)).toBe("https://www.andrewzhou.org/activities/4");
 
     getWorkoutLinks.mockRejectedValueOnce(new Error("still down"));
-    const unknown = await ingestStrongText("raw", { source: "shortcut" });
+    const unknown = await ingestShareText("raw", { source: "shortcut" });
     expect(unknown.status).toBe("created");
     expect(unknown.details).not.toMatch(/https:/);
   });
 
   it("links a lift-only workout by its public id, never the internal one", async () => {
     plan.mockReturnValue(fullPlan());
-    const res = await ingestStrongText("raw", { source: "shortcut" });
-    expect(res.details.split("\n").at(-1)).toBe(`https://www.andrewzhou.org/lifts/${publicLiftId("strong-Slug1")}`);
+    const res = await ingestShareText("raw", { source: "shortcut" });
+    expect(res.details.split("\n").at(-1)).toBe(`https://www.andrewzhou.org/lifts/${publicLiftId("share-Slug1")}`);
     expect(res.details).not.toContain("Slug1");
     expect(res.text).not.toContain("Slug1");
   });
@@ -266,18 +266,18 @@ describe("ingestStrongText", () => {
   it("logs a previously empty sha once the parser can read it", async () => {
     plan.mockReturnValue(fullPlan());
     existingRows = [{ id: "ing_old", workoutId: null, status: "empty" }];
-    const res = await ingestStrongText("raw", { source: "api" });
+    const res = await ingestShareText("raw", { source: "api" });
     expect(batch).toHaveBeenCalledOnce();
     expect(batch.mock.calls[0][0]).toHaveLength(8);
     expect(linkWorkout).toHaveBeenCalled();
-    expect(res).toMatchObject({ status: "created", duplicate: false, ingestId: "ing_old", workoutId: "strong-Slug1" });
+    expect(res).toMatchObject({ status: "created", duplicate: false, ingestId: "ing_old", workoutId: "share-Slug1" });
     expect(res.text).toMatch(/^logged push day/);
   });
 
   it("keeps the raw text of an oversized share and says why it was refused", async () => {
     const reason = "too big to log: 1 exercises / 501 sets (max 100 / 500)";
     plan.mockReturnValue({ ...emptyPlan(), rejected: reason });
-    const res = await ingestStrongText("huge", { source: "api" });
+    const res = await ingestShareText("huge", { source: "api" });
     expect(batch).toHaveBeenCalledOnce();
     expect(batch.mock.calls[0][0]).toHaveLength(1);
     expect(linkWorkout).not.toHaveBeenCalled();
@@ -286,7 +286,7 @@ describe("ingestStrongText", () => {
 
   it("keeps the raw text of an empty parse and reports it", async () => {
     plan.mockReturnValue(emptyPlan());
-    const res = await ingestStrongText("hello", { source: "api" });
+    const res = await ingestShareText("hello", { source: "api" });
     expect(batch).toHaveBeenCalledOnce();
     expect(batch.mock.calls[0][0]).toHaveLength(1);
     expect(linkWorkout).not.toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe("ingestStrongText", () => {
   it("reports a re-sent empty share as an empty duplicate (the insert is a no-op)", async () => {
     plan.mockReturnValue(emptyPlan());
     existingRows = [{ id: "ing_old", workoutId: null, status: "empty" }];
-    const res = await ingestStrongText("hello", { source: "api" });
+    const res = await ingestShareText("hello", { source: "api" });
     expect(batch).toHaveBeenCalledOnce();
     expect(batch.mock.calls[0][0]).toHaveLength(1);
     expect(res).toMatchObject({ status: "empty", duplicate: true, ingestId: "ing_old", text: EMPTY_TEXT });
@@ -345,25 +345,25 @@ describe("editedInApp", () => {
   });
 
   it("reads the workout, its latest ingest, links and child rows in one query", () => {
-    const q = editGuardQuery(db, "strong-x").toSQL();
+    const q = editGuardQuery(db, "share-x").toSQL();
     expect(q.sql).toContain('from "lift_workouts"');
     expect(q.sql).toContain('(select i."created_at" from "lift_ingests" i where i."id" = "lift_workouts"."latest_ingest_id")');
     expect(q.sql).toContain('select max(a."created_at") from "lift_workout_activities" a');
     expect(q.sql).toContain('select max(e."updated_at") from "lift_workout_exercises" e');
     expect(q.sql).toContain('select max(s."updated_at") from "lift_sets" s');
-    expect(q.params).toEqual(["strong-x", 1]);
+    expect(q.params).toEqual(["share-x", 1]);
   });
 });
 
 describe("editCandidatesWhere", () => {
-  it("matches its own id, its link, or a live strong workout at the same minute", () => {
-    const q = db.select().from(schema.liftWorkouts).where(editCandidatesWhere("strong-y", "y", "2026-11-02T19:18")).toSQL();
+  it("matches its own id, its link, or a live imported workout at the same minute", () => {
+    const q = db.select().from(schema.liftWorkouts).where(editCandidatesWhere("share-y", "y", "2026-11-02T19:18")).toSQL();
     expect(q.sql).toMatch(
-      /where \("lift_workouts"."id" = \$1 or "lift_workouts"."strong_slug" = \$2 or \("lift_workouts"."started_local" = \$3 and "lift_workouts"."source" like \$4 and "lift_workouts"."deleted_at" is null\)\)$/
+      /where \("lift_workouts"."id" = \$1 or "lift_workouts"."share_slug" = \$2 or \("lift_workouts"."started_local" = \$3 and "lift_workouts"."source" in \(\$4, \$5\) and "lift_workouts"."deleted_at" is null\)\)$/
     );
-    expect(q.params).toEqual(["strong-y", "y", "2026-11-02T19:18", "strong%"]);
-    const bare = db.select().from(schema.liftWorkouts).where(editCandidatesWhere("strong-z", null, null)).toSQL();
-    expect(bare.params).toEqual(["strong-z"]);
+    expect(q.params).toEqual(["share-y", "y", "2026-11-02T19:18", "share-text", "workout-csv"]);
+    const bare = db.select().from(schema.liftWorkouts).where(editCandidatesWhere("share-z", null, null)).toSQL();
+    expect(bare.params).toEqual(["share-z"]);
   });
 });
 
@@ -371,14 +371,14 @@ describe("editCandidatesWhere", () => {
 const FULL_BODY_B =
   "Full Body B\nMonday, November 2, 2026 at 7:18 PM\n\nSquat (Barbell)\nW1: 45 lb × 6 [Warm-up]\nW2: 135 lb × 4 [Warm-up]\n" +
   "Set 1: 185 lb × 5\nSet 2: 185 lb × 5\n\nDeadlift (Barbell)\nSet 1: 185 lb × 5\nSet 2: 185 lb × 4\n\n" +
-  "Bicep Curl (Dumbbell)\nSet 1: 35 lb × 6\nSet 2: 35 lb × 7\n\nhttps://link.strong.app/caterxeu\n";
-// edited in strong afterwards (deadlift set 2 got its fifth rep) and shared again: new link
+  "Bicep Curl (Dumbbell)\nSet 1: 35 lb × 6\nSet 2: 35 lb × 7\n\nhttps://example.com/w/caterxeu\n";
+// edited in the app afterwards (deadlift set 2 got its fifth rep) and shared again: new link
 const FULL_BODY_B_EDITED = FULL_BODY_B.replace("Set 2: 185 lb × 4", "Set 2: 185 lb × 5").replace("caterxeu", "q7Edit2b");
 const CORE_SAME_MINUTE =
   "Core Finisher\nMonday, November 2, 2026 at 7:18 PM\n\nCable Crunch\nSet 1: 50 lb × 15\n\nHanging Leg Raise\nSet 1: 12 reps\n\n" +
-  "https://link.strong.app/core9xyz\n";
+  "https://example.com/w/core9xyz\n";
 
-describe("ingestStrongText re-share sequences (real planner)", () => {
+describe("ingestShareText re-share sequences (real planner)", () => {
   type Row = Record<string, unknown>;
 
   beforeEach(() => {
@@ -397,7 +397,7 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
     const w = p.workout.workout;
     workoutRows = [
       ...(workoutRows as Row[]).filter((r) => r.id !== w.id),
-      { id: w.id, title: w.title, startedLocal: w.startedLocal, strongSlug: w.strongSlug, source: w.source, deletedAt: null },
+      { id: w.id, title: w.title, startedLocal: w.startedLocal, shareSlug: w.shareSlug, source: w.source, deletedAt: null },
     ];
     workoutExerciseRows = [
       ...(workoutExerciseRows as Row[]).filter((r) => r.workoutId !== w.id),
@@ -423,7 +423,7 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
 
   async function share(text: string) {
     batch.mockClear();
-    const res = await ingestStrongText(text, { source: "telegram" });
+    const res = await ingestShareText(text, { source: "telegram" });
     const writes = (batch.mock.calls[0][0] as Sqlable[]).map((q) => q.toSQL());
     commit();
     return { res, writes, plan: plan.mock.results.at(-1)!.value as IngestPlan };
@@ -431,35 +431,35 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
 
   it("an edited re-share with a new link updates the same workout; a byte-identical one is a duplicate", async () => {
     const a = await share(FULL_BODY_B);
-    expect(a.res).toMatchObject({ status: "created", workoutId: "strong-caterxeu" });
+    expect(a.res).toMatchObject({ status: "created", workoutId: "share-caterxeu" });
     expect(a.res.details.split("\n")[0]).toMatch(/^logged full body b · mon nov 2 · 3 exercises · 6 sets/);
 
     const b = await share(FULL_BODY_B_EDITED);
-    expect(b.res).toMatchObject({ status: "updated", duplicate: false, workoutId: "strong-caterxeu" });
+    expect(b.res).toMatchObject({ status: "updated", duplicate: false, workoutId: "share-caterxeu" });
     expect(b.res.text).toMatch(/^updated full body b · mon nov 2 · 3 exercises · 6 sets · 4,155 lb · /);
     expect(b.res.details.split("\n")).toContain("deadlift (barbell): 2×5 @ 185 lb · top e1rm 216 lb");
     // a fresh ingest row keeps the edited raw and points at the old workout
-    expect(b.plan.ingest).toMatchObject({ rawText: FULL_BODY_B_EDITED, strongSlug: "q7Edit2b", workoutId: "strong-caterxeu" });
+    expect(b.plan.ingest).toMatchObject({ rawText: FULL_BODY_B_EDITED, shareSlug: "q7Edit2b", workoutId: "share-caterxeu" });
     expect(b.res.ingestId).toBe(b.plan.ingest.id);
     expect(b.res.ingestId).not.toBe(a.res.ingestId);
     expect(b.writes[0].params).toContain(FULL_BODY_B_EDITED);
     // the workout is upserted in place (links live on its id) and its exercises replaced
     const upsert = b.writes.find((w) => w.sql.startsWith('insert into "lift_workouts"'))!;
-    expect(upsert.params).toContain("strong-caterxeu");
+    expect(upsert.params).toContain("share-caterxeu");
     expect(upsert.params).toContain("q7Edit2b");
-    expect(upsert.params).not.toContain("strong-q7Edit2b");
+    expect(upsert.params).not.toContain("share-q7Edit2b");
     const replace = b.writes.find((w) => w.sql.startsWith('delete from "lift_workout_exercises"'))!;
-    expect(replace.params).toEqual(["strong-caterxeu"]);
-    expect(b.plan.workout!.sets.every((s) => String(s.id).startsWith("strong-caterxeu:"))).toBe(true);
+    expect(replace.params).toEqual(["share-caterxeu"]);
+    expect(b.plan.workout!.sets.every((s) => String(s.id).startsWith("share-caterxeu:"))).toBe(true);
     expect(workoutRows).toHaveLength(1);
 
     const again = await share(FULL_BODY_B_EDITED);
-    expect(again.res).toMatchObject({ status: "duplicate", duplicate: true, workoutId: "strong-caterxeu", ingestId: b.res.ingestId });
+    expect(again.res).toMatchObject({ status: "duplicate", duplicate: true, workoutId: "share-caterxeu", ingestId: b.res.ingestId });
     expect(again.res.text).toMatch(/^already logged full body b/);
 
     // the original bytes are seen too: they point at the same workout, and don't rewrite it
     const old = await share(FULL_BODY_B);
-    expect(old.res).toMatchObject({ status: "duplicate", workoutId: "strong-caterxeu" });
+    expect(old.res).toMatchObject({ status: "duplicate", workoutId: "share-caterxeu" });
     expect(old.writes).toHaveLength(1);
     expect(old.writes[0].sql).toMatch(/^insert into "lift_ingests"/);
     expect(workoutRows).toHaveLength(1);
@@ -478,7 +478,7 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
       childAt: new Date(t + 30 * 60_000),
     }));
     const b = await share(FULL_BODY_B_EDITED);
-    expect(b.res).toMatchObject({ status: "duplicate", duplicate: true, workoutId: "strong-caterxeu" });
+    expect(b.res).toMatchObject({ status: "duplicate", duplicate: true, workoutId: "share-caterxeu" });
     expect(b.res.text).toBe("kept your app edits for full body b; re-share ignored");
     expect(b.res.details.split("\n")[0]).toBe(b.res.text);
     expect(b.res.warnings).toContainEqual(expect.objectContaining({ message: b.res.text }));
@@ -486,7 +486,7 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
     expect(b.writes).toHaveLength(1);
     expect(b.writes[0].sql).toMatch(/^insert into "lift_ingests"/);
     expect(b.writes[0].params).toContain(FULL_BODY_B_EDITED);
-    expect(b.plan.ingest).toMatchObject({ workoutId: "strong-caterxeu" });
+    expect(b.plan.ingest).toMatchObject({ workoutId: "share-caterxeu" });
     expect(b.plan.ingest.warnings).toContainEqual(expect.objectContaining({ message: b.res.text }));
     expect(b.res.details).not.toContain("caterxeu");
   });
@@ -494,29 +494,29 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
   it("a different workout at the same minute stays its own", async () => {
     await share(FULL_BODY_B);
     const core = await share(CORE_SAME_MINUTE);
-    expect(core.res).toMatchObject({ status: "created", workoutId: "strong-core9xyz" });
+    expect(core.res).toMatchObject({ status: "created", workoutId: "share-core9xyz" });
     expect(core.res.text).toMatch(/^logged core finisher/);
     expect(workoutRows).toHaveLength(2);
     // and the edited full body b still finds its own workout next to it
     const b = await share(FULL_BODY_B_EDITED);
-    expect(b.res).toMatchObject({ status: "updated", workoutId: "strong-caterxeu" });
+    expect(b.res).toMatchObject({ status: "updated", workoutId: "share-caterxeu" });
   });
 
   it("a renamed edit still lands on the workout when most exercises carry over", async () => {
     await share(FULL_BODY_B);
     const renamed = await share(FULL_BODY_B_EDITED.replace("Full Body B", "Full Body B (light)"));
-    expect(renamed.res).toMatchObject({ status: "updated", workoutId: "strong-caterxeu" });
+    expect(renamed.res).toMatchObject({ status: "updated", workoutId: "share-caterxeu" });
     expect(renamed.res.text).toMatch(/^updated full body b \(light\)/);
   });
 
   it("doesn't guess between two candidates: logs new and says why", async () => {
     workoutRows = [
-      { id: "strong-csv-a", title: "Full Body B", startedLocal: "2026-11-02T19:18", strongSlug: null, source: "strong-csv", deletedAt: null },
-      { id: "strong-csv-b", title: "Full Body B", startedLocal: "2026-11-02T19:18", strongSlug: null, source: "strong-csv", deletedAt: null },
+      { id: "workout-csv-a", title: "Full Body B", startedLocal: "2026-11-02T19:18", shareSlug: null, source: "workout-csv", deletedAt: null },
+      { id: "workout-csv-b", title: "Full Body B", startedLocal: "2026-11-02T19:18", shareSlug: null, source: "workout-csv", deletedAt: null },
     ];
     const res = await share(FULL_BODY_B);
-    expect(res.res).toMatchObject({ status: "created", workoutId: "strong-caterxeu" });
-    const warning = { line: 0, message: "2 workouts already start at that minute, so this was logged as a new one", text: "strong-csv-a, strong-csv-b" };
+    expect(res.res).toMatchObject({ status: "created", workoutId: "share-caterxeu" });
+    const warning = { line: 0, message: "2 workouts already start at that minute, so this was logged as a new one", text: "workout-csv-a, workout-csv-b" };
     expect(res.res.warnings).toContainEqual(warning);
     expect(res.plan.ingest.warnings).toContainEqual(warning);
     expect(res.res.details.split("\n").at(-1)).toBe(warning.message);
@@ -524,9 +524,9 @@ describe("ingestStrongText re-share sequences (real planner)", () => {
 
   it("revives a deleted workout as logged, not updated", async () => {
     workoutRows = [
-      { id: "strong-caterxeu", title: "Full Body B", startedLocal: "2026-11-02T19:18", strongSlug: "caterxeu", source: "strong-text", deletedAt: new Date() },
+      { id: "share-caterxeu", title: "Full Body B", startedLocal: "2026-11-02T19:18", shareSlug: "caterxeu", source: "share-text", deletedAt: new Date() },
     ];
     const res = await share(FULL_BODY_B);
-    expect(res.res).toMatchObject({ status: "created", workoutId: "strong-caterxeu" });
+    expect(res.res).toMatchObject({ status: "created", workoutId: "share-caterxeu" });
   });
 });

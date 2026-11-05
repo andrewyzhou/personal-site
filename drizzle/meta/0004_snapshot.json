@@ -1387,8 +1387,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "strong_slug": {
-          "name": "strong_slug",
+        "share_slug": {
+          "name": "share_slug",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1421,11 +1421,11 @@
         }
       },
       "indexes": {
-        "lift_ingests_strong_slug_idx": {
-          "name": "lift_ingests_strong_slug_idx",
+        "lift_ingests_share_slug_idx": {
+          "name": "lift_ingests_share_slug_idx",
           "columns": [
             {
-              "expression": "strong_slug",
+              "expression": "share_slug",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2043,8 +2043,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "strong_slug": {
-          "name": "strong_slug",
+        "share_slug": {
+          "name": "share_slug",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2092,18 +2092,18 @@
         }
       },
       "indexes": {
-        "lift_workouts_strong_slug_idx": {
-          "name": "lift_workouts_strong_slug_idx",
+        "lift_workouts_share_slug_idx": {
+          "name": "lift_workouts_share_slug_idx",
           "columns": [
             {
-              "expression": "strong_slug",
+              "expression": "share_slug",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "where": "\"lift_workouts\".\"strong_slug\" is not null",
+          "where": "\"lift_workouts\".\"share_slug\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

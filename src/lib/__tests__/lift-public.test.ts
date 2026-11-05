@@ -55,7 +55,7 @@ const SECRET = "PRIVATE-NOTE-SENTINEL";
 
 function workout(over: Partial<LiftWorkoutInput> = {}): LiftWorkoutInput {
   return {
-    id: "strong-abc",
+    id: "share-abc",
     title: "Full Body B",
     startedLocal: "2026-11-02T19:18",
     durationS: null,
@@ -67,13 +67,13 @@ function workout(over: Partial<LiftWorkoutInput> = {}): LiftWorkoutInput {
 }
 
 function ex(i: number, exerciseId: string, over: Partial<LiftExerciseInput> = {}): LiftExerciseInput {
-  return { id: `strong-abc:${i}`, exerciseId, position: i, nameRaw: exerciseId, customName: null, ...over };
+  return { id: `share-abc:${i}`, exerciseId, position: i, nameRaw: exerciseId, customName: null, ...over };
 }
 
 let pos = 0;
 function set(exIndex: number, over: Partial<LiftSetInput> = {}): LiftSetInput {
   return {
-    workoutExerciseId: `strong-abc:${exIndex}`,
+    workoutExerciseId: `share-abc:${exIndex}`,
     position: pos++,
     kind: "normal",
     weight: 185,
@@ -176,7 +176,7 @@ describe("serializeLiftWorkout", () => {
   });
 
   it("never carries the internal workout id", () => {
-    const w = serializeLiftWorkout(workout({ id: "strong-caterxeu" }), exercises.map((e) => ({ ...e, id: e.id.replace("abc", "caterxeu") })), [])!;
+    const w = serializeLiftWorkout(workout({ id: "share-caterxeu" }), exercises.map((e) => ({ ...e, id: e.id.replace("abc", "caterxeu") })), [])!;
     expect(JSON.stringify(w)).not.toContain("caterxeu");
     expect(w).not.toHaveProperty("id");
   });
@@ -209,8 +209,8 @@ describe("serializeLiftWorkout", () => {
   });
 
   it("treats a throwing pr detector as no prs", () => {
-    const history = [{ workoutId: "strong-abc", startedAt: 1, exerciseId: "squat-barbell", kind: "normal" as const, weight: 185, unit: "lb" as const, reps: 5, completed: true }];
-    expect(safeWorkoutPrs(history, "strong-abc")).toEqual([]);
+    const history = [{ workoutId: "share-abc", startedAt: 1, exerciseId: "squat-barbell", kind: "normal" as const, weight: 185, unit: "lb" as const, reps: 5, completed: true }];
+    expect(safeWorkoutPrs(history, "share-abc")).toEqual([]);
     expect(serializeLiftWorkout(workout(), exercises, sets(), { history })!.prs).toEqual([]);
   });
 
@@ -223,10 +223,10 @@ describe("serializeLiftWorkout", () => {
       { exerciseId: "not-in-this-workout", kind: "e1rm", value: 50, previous: 40, set: null },
     ];
     detect.mockReturnValue(hits);
-    const history = [{ workoutId: "strong-abc", startedAt: 1, exerciseId: "squat-barbell", kind: "normal" as const, weight: 185, unit: "lb" as const, reps: 5, completed: true }];
+    const history = [{ workoutId: "share-abc", startedAt: 1, exerciseId: "squat-barbell", kind: "normal" as const, weight: 185, unit: "lb" as const, reps: 5, completed: true }];
     const twice = [...exercises, ex(2, "squat-barbell")];
     const w = serializeLiftWorkout(workout(), twice, [...sets(), set(2)], { history })!;
-    expect(detect).toHaveBeenCalledWith(history, "strong-abc");
+    expect(detect).toHaveBeenCalledWith(history, "share-abc");
     expect(w.exercises[0].prs.map((p) => p.label)).toEqual([
       "e1rm 226 lb",
       "heaviest 205 lb × 3",
@@ -253,7 +253,7 @@ describe("serializeLiftWorkout", () => {
       { exerciseId: "squat-barbell", kind: "volume", value: 306, previous: 300, set: null },
     ];
     detect.mockReturnValue(hits);
-    const history = [{ workoutId: "strong-abc", startedAt: 1, exerciseId: "pull-up", kind: "normal" as const, weight: 30, unit: "lb" as const, reps: 7, completed: true }];
+    const history = [{ workoutId: "share-abc", startedAt: 1, exerciseId: "pull-up", kind: "normal" as const, weight: 30, unit: "lb" as const, reps: 7, completed: true }];
     const w = serializeLiftWorkout(workout(), pull, pullSets, { history })!;
     const [p, sq] = w.exercises;
     expect(p.topSet).toBe("+30 lb × 7");
@@ -270,7 +270,7 @@ describe("serializeLiftWorkout", () => {
     // an assisted set has a negative load and no records; a plain set has none at all
     const dipSets = [set(0, { weight: -40, reps: 8, bodyweight: true }), set(0, { weight: null, reps: 12, bodyweight: true })];
     detect.mockReturnValue([{ exerciseId: "dip", kind: "volume", value: 100, previous: 50, set: null }]);
-    const history = [{ workoutId: "strong-abc", startedAt: 1, exerciseId: "dip", kind: "normal" as const, weight: null, unit: null, reps: 12, completed: true }];
+    const history = [{ workoutId: "share-abc", startedAt: 1, exerciseId: "dip", kind: "normal" as const, weight: null, unit: null, reps: 12, completed: true }];
     const w = serializeLiftWorkout(workout(), dips, dipSets, { history })!;
     expect(w.exercises[0].prs.map((x) => x.kind)).toEqual(["volume"]);
     expect(w.exercises[0].bestE1rm).toBeNull();
@@ -287,7 +287,7 @@ describe("privacy filters", () => {
   });
 
   it("only url-safe ids reach a query", () => {
-    expect(isValidLiftId("strong-caterxeu")).toBe(true);
+    expect(isValidLiftId("share-caterxeu")).toBe(true);
     expect(isValidLiftId("8f14e45f-ceea-467f-a3b4-6c8e5f0a1b2c")).toBe(true);
     expect(isValidLiftId("")).toBe(false);
     expect(isValidLiftId("a b")).toBe(false);
@@ -318,14 +318,14 @@ describe("loadActivityLiftWorkouts", () => {
   it("shows each linked workout once (any role) and drops deleted/discarded ones", async () => {
     const w = workout();
     queue.push(
-      [w, w, workout({ id: "strong-del", deletedAt: new Date() }), workout({ id: "strong-dis", status: "discarded" })],
-      [{ ...ex(0, "squat-barbell"), workoutId: "strong-abc" }],
-      [{ ...set(0), workoutId: "strong-abc" }],
+      [w, w, workout({ id: "share-del", deletedAt: new Date() }), workout({ id: "share-dis", status: "discarded" })],
+      [{ ...ex(0, "squat-barbell"), workoutId: "share-abc" }],
+      [{ ...set(0), workoutId: "share-abc" }],
       [],
     );
     const out = await loadActivityLiftWorkouts({ id: 1, hidden: false });
     expect(out.map((x) => x.title)).toEqual(["Full Body B"]);
-    expect(JSON.stringify(out)).not.toContain("strong-abc");
+    expect(JSON.stringify(out)).not.toContain("share-abc");
     // the recording header already shows its own coarsened time
     expect(out[0].startTime).toBeNull();
   });
@@ -347,27 +347,27 @@ describe("public ids", () => {
   });
 
   it("is a stable 16-char base64url hmac, keyed by the secret", () => {
-    const a = publicLiftId("strong-caterxeu")!;
+    const a = publicLiftId("share-caterxeu")!;
     expect(a).toMatch(/^[A-Za-z0-9_-]{16}$/);
     expect(isPublicLiftId(a)).toBe(true);
-    expect(publicLiftId("strong-caterxeu")).toBe(a);
-    expect(publicLiftId("strong-other")).not.toBe(a);
+    expect(publicLiftId("share-caterxeu")).toBe(a);
+    expect(publicLiftId("share-other")).not.toBe(a);
     expect(a).not.toContain("caterxeu");
     process.env.LIFT_PUBLIC_ID_SECRET = "rotated";
-    expect(publicLiftId("strong-caterxeu")).not.toBe(a);
+    expect(publicLiftId("share-caterxeu")).not.toBe(a);
   });
 
   it("falls back to AUTH_SECRET, and is off with neither", () => {
     delete process.env.LIFT_PUBLIC_ID_SECRET;
-    expect(publicLiftId("strong-x")).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    expect(publicLiftId("share-x")).toMatch(/^[A-Za-z0-9_-]{16}$/);
     delete process.env.AUTH_SECRET;
-    expect(publicLiftId("strong-x")).toBeNull();
+    expect(publicLiftId("share-x")).toBeNull();
   });
 });
 
 const ROWS: LiftOnlyRow[] = [
-  { id: "strong-caterxeu", title: "Push", startedLocal: "2026-11-02T19:18", durationS: 3600, workingSets: 6, exerciseCount: 3 },
-  { id: "strong-0123456789abcdef", title: "Pull", startedLocal: "2026-11-01T07:00", durationS: null, workingSets: 1, exerciseCount: 1 },
+  { id: "share-caterxeu", title: "Push", startedLocal: "2026-11-02T19:18", durationS: 3600, workingSets: 6, exerciseCount: 3 },
+  { id: "share-0123456789abcdef", title: "Pull", startedLocal: "2026-11-01T07:00", durationS: null, workingSets: 1, exerciseCount: 1 },
   // a 16-char id that looks like a public one must still not resolve as itself
   { id: "abcdefghijklmnop", title: "Legs", startedLocal: "2026-10-30T07:00", durationS: null, workingSets: 4, exerciseCount: 2 },
 ];
@@ -392,12 +392,12 @@ describe("calendar entries", () => {
       elapsedTime: 3600,
       averageHeartrate: null,
       description: null,
-      href: `/lifts/${publicLiftId("strong-caterxeu")}`,
+      href: `/lifts/${publicLiftId("share-caterxeu")}`,
       liftSummary: "3 exercises · 6 sets",
     });
     expect(e.id).toBeLessThan(0);
     // derived from the public id, so it says nothing the href doesn't
-    expect(e.id).toBe(liftCalendarId(publicLiftId("strong-caterxeu")!));
+    expect(e.id).toBe(liftCalendarId(publicLiftId("share-caterxeu")!));
     expect(publicLiftCalendarEntry(ROWS[1], 0)!.duration).toBe(0);
     expect(publicLiftCalendarEntry(ROWS[1], 0)!.liftSummary).toBe("1 exercise · 1 set");
   });
@@ -408,7 +408,7 @@ describe("calendar entries", () => {
     const json = JSON.stringify(entries);
     for (const r of ROWS) {
       expect(json).not.toContain(r.id);
-      expect(json).not.toContain(r.id.replace(/^strong-/, ""));
+      expect(json).not.toContain(r.id.replace(/^share-/, ""));
     }
   });
 
@@ -428,13 +428,13 @@ describe("calendar entries", () => {
       expect((await resolvePublicLiftId(publicLiftId(r.id)!, index))?.id).toBe(r.id);
       expect(await resolvePublicLiftId(r.id, index)).toBeNull();
     }
-    expect(await resolvePublicLiftId(publicLiftId("strong-not-lift-only")!, index)).toBeNull();
+    expect(await resolvePublicLiftId(publicLiftId("share-not-lift-only")!, index)).toBeNull();
     expect(await resolvePublicLiftId("a/b", index)).toBeNull();
   });
 
   it("synthetic ids are stable, negative and distinct", () => {
     expect(liftCalendarId("abc")).toBe(liftCalendarId("abc"));
-    const ids = new Set(Array.from({ length: 500 }, (_, i) => liftCalendarId(publicLiftId(`strong-${i}`)!)));
+    const ids = new Set(Array.from({ length: 500 }, (_, i) => liftCalendarId(publicLiftId(`share-${i}`)!)));
     expect(ids.size).toBe(500);
     for (const id of ids) expect(id).toBeLessThan(0);
   });

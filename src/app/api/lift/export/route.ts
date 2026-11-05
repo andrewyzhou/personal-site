@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bearerMatches } from "@/lib/lift/auth";
-import { ExportTooLargeError, chunkStream, exportJsonChunks, loadExportWorkouts, strongCsvLines } from "@/lib/lift/export";
+import { ExportTooLargeError, chunkStream, exportJsonChunks, loadExportWorkouts, workoutCsvLines } from "@/lib/lift/export";
 import { liftTimezone, utcToLocal } from "@/lib/lift/time";
 import { log } from "@/lib/log";
 
@@ -43,5 +43,5 @@ export async function GET(request: Request) {
       headers: { ...headers, "content-type": "application/json; charset=utf-8" },
     });
   }
-  return new Response(chunkStream(strongCsvLines(workouts)), { headers: { ...headers, "content-type": "text/csv; charset=utf-8" } });
+  return new Response(chunkStream(workoutCsvLines(workouts)), { headers: { ...headers, "content-type": "text/csv; charset=utf-8" } });
 }

@@ -9,12 +9,12 @@ const db = drizzle(neon("postgresql://user:pass@127.0.0.1:1/none"), { schema });
 
 describe("candidateRecordingsQuery", () => {
   it("only treats recordings claimed by live workouts as taken", () => {
-    const { sql, params } = candidateRecordingsQuery(db, { id: "strong-x", startedLocal: "2026-11-04T18:12" }).toSQL();
+    const { sql, params } = candidateRecordingsQuery(db, { id: "share-x", startedLocal: "2026-11-04T18:12" }).toSQL();
     const sub = sql.slice(sql.indexOf("not exists"));
     expect(sub).toMatch(/inner join "lift_workouts" on "lift_workouts"."id" = "lift_workout_activities"."workout_id"/);
     expect(sub).toContain('"lift_workouts"."deleted_at" is null');
     expect(sub).toContain('"lift_workout_activities"."workout_id" <> $');
-    expect(params).toEqual(expect.arrayContaining(["2026-11-03", "2026-11-05", "strong-x"]));
+    expect(params).toEqual(expect.arrayContaining(["2026-11-03", "2026-11-05", "share-x"]));
     // read-only against activities
     expect(sql).toMatch(/^select /);
   });

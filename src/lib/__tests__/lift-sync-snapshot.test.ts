@@ -14,7 +14,7 @@ const U = new Date("2026-11-05T03:00:00Z");
 
 function workoutRow(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
   return {
-    id: "strong-Slug1",
+    id: "share-Slug1",
     title: "Push Day",
     startedLocal: "2026-11-04T18:12",
     startedAt: new Date("2026-11-05T02:12:00Z"),
@@ -22,11 +22,11 @@ function workoutRow(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
     endedAt: null,
     durationS: null,
     notes: null,
-    source: "strong-text",
+    source: "share-text",
     status: "finished",
     templateId: null,
     latestIngestId: "ing_x",
-    strongSlug: "Slug1",
+    shareSlug: "Slug1",
     workingSets: 3,
     volumeKg: 1000,
     muscleLoad: {},
@@ -39,8 +39,8 @@ function workoutRow(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
 
 function setRowOf(over: Partial<LiftSetRow> = {}): LiftSetRow {
   return {
-    id: "strong-Slug1:0:0",
-    workoutExerciseId: "strong-Slug1:0",
+    id: "share-Slug1:0:0",
+    workoutExerciseId: "share-Slug1:0",
     position: 0,
     kind: "normal",
     weight: 185,
@@ -66,10 +66,10 @@ function roundTrips(entity: string, payload: { id: string }) {
 }
 
 describe("snapshot mapping", () => {
-  it("maps a strong share to a finished workout with ms timestamps", () => {
+  it("maps a workout share to a finished workout with ms timestamps", () => {
     const p = workoutPayload(workoutRow());
     expect(p).toEqual({
-      id: "strong-Slug1",
+      id: "share-Slug1",
       title: "Push Day",
       startedAt: Date.parse("2026-11-05T02:12:00Z"),
       endedAt: null,
@@ -83,7 +83,7 @@ describe("snapshot mapping", () => {
     expect(roundTrips("workout", p).ok).toBe(true);
   });
 
-  it("derives startedAt from the wall clock when a strong row has none", () => {
+  it("derives startedAt from the wall clock when an imported row has none", () => {
     const p = workoutPayload(workoutRow({ startedAt: null, utcOffsetMin: null }), "America/Los_Angeles");
     expect(p.startedAt).toBe(Date.parse("2026-11-05T02:12:00Z"));
     expect(p.utcOffsetMin).toBe(-480);
@@ -93,10 +93,10 @@ describe("snapshot mapping", () => {
     expect(workoutPayload(workoutRow({ durationS: 3600 })).endedAt).toBe(Date.parse("2026-11-05T03:12:00Z"));
   });
 
-  it("keeps app workout status, but strong rows are always finished", () => {
+  it("keeps app workout status, but imported rows are always finished", () => {
     expect(workoutPayload(workoutRow({ source: "app", status: "active" })).status).toBe("active");
     expect(workoutPayload(workoutRow({ source: "app", status: "discarded" })).status).toBe("discarded");
-    expect(workoutPayload(workoutRow({ source: "strong-text", status: "discarded" })).status).toBe("finished");
+    expect(workoutPayload(workoutRow({ source: "share-text", status: "discarded" })).status).toBe("finished");
     expect(workoutPayload(workoutRow({ source: "app", status: "weird" })).status).toBe("finished");
   });
 
@@ -114,7 +114,7 @@ describe("snapshot mapping", () => {
       equipment: "barbell",
       category: "strength",
       tracking: "weight_reps",
-      source: "strong",
+      source: "import",
       isCustom: true,
       archived: false,
       freeDbId: null,
@@ -129,7 +129,7 @@ describe("snapshot mapping", () => {
     ]);
     expect(p).toMatchObject({ primary: '["front_delts"]', secondary: '["triceps"]', archived: 0 });
     expect(roundTrips("custom_exercise", p).ok).toBe(true);
-    // strong's guessed equipment strings outside the enum fall back
+    // guessed equipment strings outside the enum fall back
     expect(customExercisePayload({ ...row, equipment: "mystery" }, []).equipment).toBe("other");
   });
 
@@ -161,8 +161,8 @@ describe("snapshot mapping", () => {
         workouts: [workoutRow()],
         workoutExercises: [
           {
-            id: "strong-Slug1:0",
-            workoutId: "strong-Slug1",
+            id: "share-Slug1:0",
+            workoutId: "share-Slug1",
             exerciseId: "bench-press-barbell",
             position: 0,
             nameRaw: "Bench Press (Barbell)",

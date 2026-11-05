@@ -2,30 +2,30 @@ import { unzipSync } from "fflate";
 import {
   customExerciseId,
   linkWorkoutToActivities,
-  parseStrongCsv,
+  parseWorkoutCsv,
   resolveExerciseName,
   STRENGTH_SPORT_TYPES,
   type DistanceUnit,
   type LinkRole,
   type ParsedWorkout,
   type ParseWarning,
-  type StrongCsvResult,
+  type WorkoutCsvResult,
   type WeightUnit,
 } from "lift-core";
-import { partitionCsvWorkouts, planCsvWorkouts, type ExistingWorkoutKey, type PresentReason } from "./sync/strong-csv";
+import { partitionCsvWorkouts, planCsvWorkouts, type ExistingWorkoutKey, type PresentReason } from "./sync/workout-csv";
 import { addDays } from "./time";
 
-// pure half of the strong csv backfill report (scripts/lift-import-strong-csv.ts).
+// pure half of the workout csv backfill report (scripts/lift-import-workout-csv.ts).
 // the script does the reads; everything it prints is decided here, so the dry
 // run and --apply agree on what's new and the whole thing is testable without a db.
 
 // ---------------------------------------------------------------------------
 // input files
 
-// years of strong history is a few mb; anything near this is a zip bomb or the wrong file
+// years of workout history is a few mb; anything near this is a zip bomb or the wrong file
 export const MAX_ZIP_CSV_BYTES = 50 * 1024 * 1024;
 
-/** the first *.csv in a zip (strong's export is a single strong.csv), or null */
+/** the first *.csv in a zip (the export is a single csv), or null */
 export function csvFromZip(bytes: Uint8Array): { name: string; text: string } | null {
   let taken = false;
   const files = unzipSync(bytes, {
@@ -143,14 +143,14 @@ export interface UnitInfo {
 }
 
 export interface ParsedExport {
-  parsed: StrongCsvResult;
+  parsed: WorkoutCsvResult;
   rows: number;
   unit: UnitInfo;
   distanceUnit: DistanceUnit;
   renamedHeaders: string[];
 }
 
-function weightedUnits(r: StrongCsvResult): WeightUnit[] {
+function weightedUnits(r: WorkoutCsvResult): WeightUnit[] {
   return r.workouts.flatMap((w) => w.exercises.flatMap((e) => e.sets.flatMap((s) => (s.weight != null && s.unit ? [s.unit] : []))));
 }
 
@@ -166,7 +166,7 @@ export function parseExport(csv: string, flagUnit?: WeightUnit | null): ParsedEx
   // the parser's default distance unit only takes mi/km; others are patched after
   const parserDistance = distanceUnit === "km" ? "km" : "mi";
   const parse = (unit: WeightUnit) => {
-    const r = parseStrongCsv(fix.text, { weightUnit: unit, distanceUnit: parserDistance });
+    const r = parseWorkoutCsv(fix.text, { weightUnit: unit, distanceUnit: parserDistance });
     if (fix.distanceUnit && fix.distanceUnit !== parserDistance) {
       for (const w of r.workouts)
         for (const e of w.exercises) for (const s of e.sets) if (s.distance != null) s.distanceUnit = fix.distanceUnit;
@@ -200,7 +200,7 @@ export function parseExport(csv: string, flagUnit?: WeightUnit | null): ParsedEx
   } else {
     unit = "lb";
     source = "default";
-    if (lbUnits.length) note = "the export doesn't say; assumed lb. pass --unit kg if strong is set to kg";
+    if (lbUnits.length) note = "the export doesn't say; assumed lb. pass --unit kg if the app is set to kg";
   }
   // when the column decided, both parses are the same
   const parsed = columnDecides || unit === "lb" ? asLb : asKg;
@@ -448,7 +448,7 @@ export function formatCsvReport(r: CsvReport): string {
     default: "default",
   };
 
-  p(`strong csv: ${r.file}`);
+  p(`workout csv: ${r.file}`);
   p(`  rows:        ${r.rows}`);
   p(`  workouts:    ${r.workoutsParsed} (${span(r.dateRange)})`);
   p(`  weights:     ${r.unit.unit} (${unitWhy[r.unit.source]})${r.unit.note ? ` - ${r.unit.note}` : ""}`);

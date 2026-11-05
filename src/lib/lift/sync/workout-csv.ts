@@ -2,12 +2,12 @@ import { nameKey, sha256Hex, type ParsedWorkout } from "lift-core";
 import type { LiftWarning, NewLiftIngestRow } from "@/lib/db/lift-schema";
 import { EDIT_OVERLAP, MAX_EXERCISES, MAX_SETS, planParsedWorkout, type IngestSummary, type WorkoutPlan } from "../plan";
 
-// pure half of the one-time strong csv import (scripts/lift-import-strong-csv.ts).
+// pure half of the one-time workout csv import (scripts/lift-import-workout-csv.ts).
 // a csv workout is "already present" when a stored workout starts the same
 // minute and has the same normalized title or mostly the same exercises, the
 // same rule a re-shared (edited) workout lands by.
 
-export const CSV_SOURCE = "strong-csv";
+export const CSV_SOURCE = "workout-csv";
 
 export interface ExistingWorkoutKey {
   title: string;
@@ -26,7 +26,7 @@ export function dedupeKey(title: string, startedLocal: string): string {
 }
 
 export function csvWorkoutId(title: string, startedLocal: string): string {
-  return `strong-csv-${sha256Hex(`${nameKey(displayTitle(title))}|${startedLocal.slice(0, 16)}`).slice(0, 16)}`;
+  return `workout-csv-${sha256Hex(`${nameKey(displayTitle(title))}|${startedLocal.slice(0, 16)}`).slice(0, 16)}`;
 }
 
 export function csvIngestRow(csv: string, sha: string, warnings: LiftWarning[]): NewLiftIngestRow & { id: string } {
@@ -35,7 +35,7 @@ export function csvIngestRow(csv: string, sha: string, warnings: LiftWarning[]):
     source: CSV_SOURCE,
     rawSha256: sha,
     rawText: csv,
-    strongSlug: null,
+    shareSlug: null,
     workoutId: null,
     status: "parsed",
     // a messy export can warn on every row; the raw csv is kept for replays anyway
@@ -129,7 +129,7 @@ export function planCsvWorkouts(
       workoutId: csvWorkoutId(parsed.title, parsed.startedLocal!),
       ingestId: opts.ingestId,
       workoutSource: CSV_SOURCE,
-      strongSlug: null,
+      shareSlug: null,
       timezone: opts.timezone,
       redirects: opts.redirects,
       durationS: parsed.durationS ?? null,

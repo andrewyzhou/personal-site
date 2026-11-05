@@ -41,7 +41,7 @@ export function catalogExerciseRows(ex: Exercise): ExerciseRows {
   };
 }
 
-// strong prints equipment as a trailing parenthetical: "Curl (Cable)"
+// share text prints equipment as a trailing parenthetical: "Curl (Cable)"
 const EQUIPMENT_HINTS: Record<string, string> = {
   barbell: "barbell",
   dumbbell: "dumbbell",
@@ -65,7 +65,7 @@ export function guessEquipment(name: string): string {
   return (m && EQUIPMENT_HINTS[m[1].trim().toLowerCase()]) || "other";
 }
 
-/** infer what a custom exercise tracks from the sets strong printed for it */
+/** infer what a custom exercise tracks from the sets the share printed for it */
 export function guessTracking(sets: readonly ParsedSet[]): string {
   if (sets.some((s) => s.distance != null)) return sets.some((s) => s.weight != null) ? "weight_distance" : "distance_duration";
   if (sets.some((s) => s.weight != null && !s.bodyweight)) return "weight_reps";
@@ -86,7 +86,7 @@ export function customExerciseRows(name: string, sets: readonly ParsedSet[]): Ex
       equipment: guessEquipment(name),
       category: "strength",
       tracking: guessTracking(sets),
-      source: "strong",
+      source: "import",
       isCustom: true,
       freeDbId: null,
     },

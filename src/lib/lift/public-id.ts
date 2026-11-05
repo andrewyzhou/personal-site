@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 
-// internal workout ids leak things ("strong-<slug>" is the share link, the sha
+// internal workout ids leak things ("share-<slug>" is the share link, the sha
 // form can be brute-forced back to the start minute), so public urls carry an
 // hmac of the id instead. no secret means no lift-only pages at all.
 

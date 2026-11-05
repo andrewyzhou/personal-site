@@ -72,7 +72,7 @@ export function lastByPosition<T extends Positioned>(items: readonly T[]): T | u
   return best;
 }
 
-/** 1-based display number counting only non-warmup sets, like strong; warmups show "W" */
+/** 1-based display number counting only non-warmup sets; warmups show "W" */
 export function setLabels(sets: readonly { kind: SetKind }[]): string[] {
   let n = 0;
   return sets.map((s) => (s.kind === "warmup" ? KIND_LABEL.warmup : String(++n)));

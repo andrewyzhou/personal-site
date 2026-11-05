@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { looksLikeStrongText, parseStrongDate, parseStrongText } from "../parse-strong";
+import { looksLikeShareText, parseShareDate, parseShareText } from "../parse-share-text";
 import type { ParsedSet } from "../types";
 
 function fixture(name: string): string {
-  return readFileSync(path.join(__dirname, "fixtures", "strong", name), "utf8");
+  return readFileSync(path.join(__dirname, "fixtures", "share-text", name), "utf8");
 }
 
 function pick(s: ParsedSet) {
@@ -36,13 +36,13 @@ const EMPTY = {
   note: null,
 };
 
-describe("parseStrongText: us push day", () => {
-  const w = parseStrongText(fixture("us-push-day.txt"));
+describe("parseShareText: us push day", () => {
+  const w = parseShareText(fixture("us-push-day.txt"));
 
   it("reads the header and link", () => {
     expect(w.title).toBe("Push Day");
     expect(w.startedLocal).toBe("2026-11-04T18:12");
-    expect(w.link).toBe("https://strong.app.link/AbCdEf123");
+    expect(w.link).toBe("https://example.com/w/AbCdEf123");
     expect(w.linkSlug).toBe("AbCdEf123");
     expect(w.notes).toEqual([]);
     expect(w.warnings).toEqual([]);
@@ -107,17 +107,17 @@ describe("parseStrongText: us push day", () => {
   });
 
   it("is identical with crlf line endings", () => {
-    const crlf = parseStrongText(fixture("us-push-day.txt").replace(/\r?\n/g, "\r\n"));
+    const crlf = parseShareText(fixture("us-push-day.txt").replace(/\r?\n/g, "\r\n"));
     expect(crlf).toEqual(w);
   });
 
   it("is detected", () => {
-    expect(looksLikeStrongText(fixture("us-push-day.txt"))).toBe(true);
+    expect(looksLikeShareText(fixture("us-push-day.txt"))).toBe(true);
   });
 });
 
-describe("parseStrongText: en-gb kg", () => {
-  const w = parseStrongText(fixture("en-gb-kg.txt"));
+describe("parseShareText: en-gb kg", () => {
+  const w = parseShareText(fixture("en-gb-kg.txt"));
 
   it("reads a 24h en-gb date", () => {
     expect(w.title).toBe("Legs");
@@ -151,14 +151,14 @@ describe("parseStrongText: en-gb kg", () => {
   });
 });
 
-describe("parseStrongText: short date, emoji, query-string link", () => {
+describe("parseShareText: short date, emoji, query-string link", () => {
   const text = fixture("short-date-emoji.txt");
 
   it("parses the fixture", () => {
-    const w = parseStrongText(text);
+    const w = parseShareText(text);
     expect(w.title).toBe("Upper 💪");
     expect(w.startedLocal).toBe("2026-11-04T18:12");
-    expect(w.link).toBe("https://strong.app/workout/XyZ789?utm_source=share&ref=ios");
+    expect(w.link).toBe("https://example.com/w/workout/XyZ789?utm_source=share&ref=ios");
     expect(w.linkSlug).toBe("XyZ789");
     expect(w.exercises.map((e) => e.name)).toEqual(["Incline Bench Press (Dumbbell)", "Lat Pulldown (Cable)"]);
     expect(w.exercises[0].sets).toHaveLength(2);
@@ -170,7 +170,7 @@ describe("parseStrongText: short date, emoji, query-string link", () => {
       .replace("6:12 PM", "6:12 PM")
       .replace("Set 1: 65 lb", "Set 1: 65 lb")
       .replace(/\r?\n/g, "\r\n");
-    const w = parseStrongText(nb);
+    const w = parseShareText(nb);
     expect(w.startedLocal).toBe("2026-11-04T18:12");
     expect(w.exercises[0].sets[0].weight).toBe(65);
     expect(w.exercises[0].sets[0].raw).toBe("Set 1: 65 lb × 10");
@@ -178,8 +178,8 @@ describe("parseStrongText: short date, emoji, query-string link", () => {
   });
 });
 
-describe("parseStrongText: warm-up and tag variants", () => {
-  const w = parseStrongText(fixture("warmup-variants-no-link.txt"));
+describe("parseShareText: warm-up and tag variants", () => {
+  const w = parseShareText(fixture("warmup-variants-no-link.txt"));
   const sets = w.exercises[0].sets;
 
   it("has no link", () => {
@@ -222,12 +222,12 @@ describe("parseStrongText: warm-up and tag variants", () => {
   });
 
   it("is detected without a link", () => {
-    expect(looksLikeStrongText(fixture("warmup-variants-no-link.txt"))).toBe(true);
+    expect(looksLikeShareText(fixture("warmup-variants-no-link.txt"))).toBe(true);
   });
 });
 
-describe("parseStrongText: notes", () => {
-  const w = parseStrongText(fixture("notes.txt"));
+describe("parseShareText: notes", () => {
+  const w = parseShareText(fixture("notes.txt"));
 
   it("collects workout notes between the date and the first exercise", () => {
     expect(w.notes).toEqual(["Felt good, slept 8h.", "Gym was busy."]);
@@ -247,7 +247,7 @@ describe("parseStrongText: notes", () => {
   });
 
   it("separates workout notes from the first exercise even without a blank line", () => {
-    const x = parseStrongText(
+    const x = parseShareText(
       "Quick\nMonday, November 3, 2026 at 6:00 AM\nshort one today\n\nCurl\nSet 1: 20 lb × 10\n",
     );
     expect(x.notes).toEqual(["short one today"]);
@@ -255,8 +255,8 @@ describe("parseStrongText: notes", () => {
   });
 });
 
-describe("parseStrongText: durations and distances", () => {
-  const w = parseStrongText(fixture("cardio-durations.txt"));
+describe("parseShareText: durations and distances", () => {
+  const w = parseShareText(fixture("cardio-durations.txt"));
   const byName = Object.fromEntries(w.exercises.map((e) => [e.name, e.sets]));
 
   it("reads every duration style", () => {
@@ -289,8 +289,8 @@ describe("parseStrongText: durations and distances", () => {
   });
 });
 
-describe("parseStrongText: garbage", () => {
-  const w = parseStrongText(fixture("garbage-lines.txt"));
+describe("parseShareText: garbage", () => {
+  const w = parseShareText(fixture("garbage-lines.txt"));
 
   it("trims the title and skips leading blanks", () => {
     expect(w.title).toBe("Messy Session");
@@ -318,15 +318,15 @@ describe("parseStrongText: garbage", () => {
   });
 });
 
-describe("parseStrongText: dates", () => {
+describe("parseShareText: dates", () => {
   it("parses a date without weekday or 'at' and a 24h time", () => {
-    const w = parseStrongText(fixture("no-weekday-24h.txt"));
+    const w = parseShareText(fixture("no-weekday-24h.txt"));
     expect(w.startedLocal).toBe("2026-11-04T18:12");
     expect(w.warnings).toEqual([]);
   });
 
   it("returns null and warns on an unparseable date", () => {
-    const w = parseStrongText(fixture("bad-date.txt"));
+    const w = parseShareText(fixture("bad-date.txt"));
     expect(w.startedLocal).toBeNull();
     expect(w.title).toBe("Mystery Date");
     expect(w.warnings).toHaveLength(1);
@@ -347,7 +347,7 @@ describe("parseStrongText: dates", () => {
     ["Saturday, January 1, 2028 at 11:59 p.m.", "2028-01-01T23:59"],
     ["2026-11-04 18:12", "2026-11-04T18:12"],
   ])("%s", (line, expected) => {
-    expect(parseStrongDate(line)).toBe(expected);
+    expect(parseShareDate(line)).toBe(expected);
   });
 
   it.each([
@@ -359,20 +359,20 @@ describe("parseStrongText: dates", () => {
     "Set 1: 185 lb × 5",
     "13:00 PM November 4 2026",
   ])("rejects %s", (line) => {
-    expect(parseStrongDate(line)).toBeNull();
+    expect(parseShareDate(line)).toBeNull();
   });
 
   it("warns when the date line is missing entirely", () => {
-    const w = parseStrongText("Push\nBench Press\nSet 1: 100 lb × 5\n");
+    const w = parseShareText("Push\nBench Press\nSet 1: 100 lb × 5\n");
     expect(w.startedLocal).toBeNull();
     expect(w.exercises[0].name).toBe("Bench Press");
     expect(w.warnings.some((x) => x.line === 2)).toBe(true);
   });
 });
 
-describe("parseStrongText: inline variations", () => {
+describe("parseShareText: inline variations", () => {
   const head = "T\nTuesday, November 4, 2026 at 6:12 PM\n\nEx\n";
-  const one = (line: string) => parseStrongText(head + line + "\n").exercises[0]?.sets[0];
+  const one = (line: string) => parseShareText(head + line + "\n").exercises[0]?.sets[0];
 
   it.each([
     ["Set 1: 100 lbs × 5", { weight: 100, unit: "lb", reps: 5 }],
@@ -401,12 +401,12 @@ describe("parseStrongText: inline variations", () => {
   });
 
   it("splits exercises that are not separated by a blank line", () => {
-    const w = parseStrongText(head + "Set 1: 10 lb × 5\nCurl (Cable)\nSet 1: 20 lb × 5\n");
+    const w = parseShareText(head + "Set 1: 10 lb × 5\nCurl (Cable)\nSet 1: 20 lb × 5\n");
     expect(w.exercises.map((e) => e.name)).toEqual(["Ex", "Curl (Cable)"]);
   });
 
   it("keeps prose between set lines as a note, not a new exercise", () => {
-    const w = parseStrongText(
+    const w = parseShareText(
       "Legs\nWednesday, November 4, 2026 at 6:12 PM\n\nSquat\nSet 1: 225 lb × 5\nfelt 2x harder than last week\nSet 2: 225 lb × 5\n"
     );
     expect(w.exercises).toHaveLength(1);
@@ -415,48 +415,74 @@ describe("parseStrongText: inline variations", () => {
   });
 
   it("splits mid-block on a catalog name without an equipment suffix", () => {
-    const w = parseStrongText(head + "Set 1: 10 lb × 5\nPull Up\nSet 1: 12 reps\n");
+    const w = parseShareText(head + "Set 1: 10 lb × 5\nPull Up\nSet 1: 12 reps\n");
     expect(w.exercises.map((e) => e.name)).toEqual(["Ex", "Pull Up"]);
   });
 
   it("keeps a stray blank line inside an exercise on the same exercise", () => {
-    const w = parseStrongText(head + "Set 1: 10 lb × 5\n\nSet 2: 10 lb × 5\n");
+    const w = parseShareText(head + "Set 1: 10 lb × 5\n\nSet 2: 10 lb × 5\n");
     expect(w.exercises).toHaveLength(1);
     expect(w.exercises[0].sets.map((s) => s.position)).toEqual([0, 1]);
   });
 
   it("fills in a missing unit from the rest of the workout", () => {
-    const w = parseStrongText(head + "Set 1: 80 kg × 5\nSet 2: 85 × 5\n");
+    const w = parseShareText(head + "Set 1: 80 kg × 5\nSet 2: 85 × 5\n");
     expect(w.exercises[0].sets[1]).toMatchObject({ weight: 85, unit: "kg", reps: 5 });
     expect(w.warnings).toHaveLength(1);
     expect(w.warnings[0].line).toBe(6);
   });
 
-  it("finds the link on a shared line and with strong.app.link host", () => {
-    const w = parseStrongText(head + "Set 1: 10 lb × 5\n\nCheck out my workout: https://strong.app.link/Zz9?x=1\n");
-    expect(w.link).toBe("https://strong.app.link/Zz9?x=1");
+  it("finds a trailing link on a shared line, on any host", () => {
+    const w = parseShareText(head + "Set 1: 10 lb × 5\n\nCheck out my workout: https://example.com/w/Zz9?x=1\n");
+    expect(w.link).toBe("https://example.com/w/Zz9?x=1");
     expect(w.linkSlug).toBe("Zz9");
+  });
+
+  it("takes the slug from the last path segment and strips trailing punctuation", () => {
+    const w = parseShareText(head + "Set 1: 10 lb × 5\n\n(https://share.example.org/a/b/Last42).\n");
+    expect(w.link).toBe("https://share.example.org/a/b/Last42");
+    expect(w.linkSlug).toBe("Last42");
+  });
+
+  it("leaves urls that aren't at the end of the text in the notes", () => {
+    const text = "T\nTuesday, November 4, 2026 at 6:12 PM\n\nBench Press (Barbell)\nform video https://example.com/v/abc\nSet 1: 135 lb × 5\n";
+    const w = parseShareText(text);
+    expect(w.link).toBeNull();
+    expect(w.linkSlug).toBeNull();
+    expect(JSON.stringify(w.exercises)).toContain("https://example.com/v/abc");
+  });
+
+  it("detection counts a trailing link on any host, not one mid-text", () => {
+    const date = "Tuesday, November 4, 2026 at 6:12 PM";
+    expect(looksLikeShareText(`T\n${date}\nnothing logged\nhttps://example.net/w/q1`)).toBe(true);
+    expect(looksLikeShareText(`T\n${date}\nsee https://example.net/w/q1\nnothing logged`)).toBe(false);
+  });
+
+  it("a bare host with no path is a link without a slug", () => {
+    const w = parseShareText(head + "Set 1: 10 lb × 5\n\nhttps://example.com\n");
+    expect(w.link).toBe("https://example.com");
+    expect(w.linkSlug).toBeNull();
   });
 
   it("never throws on odd input", () => {
     for (const t of ["", "\n\n\n", "   ", "Set 1:", "[[[", "×××", "W:", " ", head]) {
-      expect(() => parseStrongText(t)).not.toThrow();
+      expect(() => parseShareText(t)).not.toThrow();
     }
-    expect(parseStrongText("").exercises).toEqual([]);
-    expect(parseStrongText("").warnings.length).toBeGreaterThan(0);
+    expect(parseShareText("").exercises).toEqual([]);
+    expect(parseShareText("").warnings.length).toBeGreaterThan(0);
   });
 });
 
-describe("non-strong text", () => {
+describe("non-share text", () => {
   it("parses to zero exercises with a warning", () => {
-    const w = parseStrongText(fixture("not-strong.txt"));
+    const w = parseShareText(fixture("not-share-text.txt"));
     expect(w.exercises).toEqual([]);
     expect(w.warnings.length).toBeGreaterThan(0);
     expect(w.startedLocal).toBeNull();
   });
 
   it.each([
-    fixture("not-strong.txt"),
+    fixture("not-share-text.txt"),
     "lol",
     "",
     "W: 5",
@@ -464,8 +490,8 @@ describe("non-strong text", () => {
     "Meeting notes\nSet 1: agenda\nSet 2: questions",
     "Tuesday, November 4, 2026 at 6:12 PM — dinner?",
     "just did 185 lb × 5 on bench!",
-  ])("looksLikeStrongText false: %s", (t) => {
-    expect(looksLikeStrongText(t)).toBe(false);
+  ])("looksLikeShareText false: %s", (t) => {
+    expect(looksLikeShareText(t)).toBe(false);
   });
 
   it.each([
@@ -478,11 +504,11 @@ describe("non-strong text", () => {
     "garbage-lines.txt",
     "no-weekday-24h.txt",
     "bad-date.txt",
-  ])("looksLikeStrongText true: %s", (name) => {
-    expect(looksLikeStrongText(fixture(name))).toBe(true);
+  ])("looksLikeShareText true: %s", (name) => {
+    expect(looksLikeShareText(fixture(name))).toBe(true);
   });
 
   it("detects a share with only a date and one set", () => {
-    expect(looksLikeStrongText("Arms\nNov 4, 2026 at 6:12 PM\n\nCurl\nSet 1: 20 lb × 10")).toBe(true);
+    expect(looksLikeShareText("Arms\nNov 4, 2026 at 6:12 PM\n\nCurl\nSet 1: 20 lb × 10")).toBe(true);
   });
 });

@@ -27,7 +27,14 @@ function normalizeLines(text: string): string[] {
 // ---------------------------------------------------------------------------
 // share link
 
-const LINK_RE = /https?:\/\/(?:[\w-]+\.)*strong\.app(?:\.link)?(?:\/[^\s]*)?/i;
+// the share link is a url ending the text's last non-empty line, on any host;
+// urls anywhere else are left alone (they're notes)
+const LINK_RE = /https?:\/\/[^\s/?#]+(?:[/?#]\S*)?$/i;
+
+function lastNonEmpty<T>(lines: T[], text: (l: T) => string): T | null {
+  for (let i = lines.length - 1; i >= 0; i--) if (text(lines[i])) return lines[i];
+  return null;
+}
 
 function slugOf(link: string): string | null {
   const path = link.replace(/^https?:\/\/[^/]+/i, "").split(/[?#]/)[0];
@@ -67,7 +74,7 @@ function pad(n: number): string {
 }
 
 /** "Tuesday, November 4, 2026 at 6:12 PM" and friends -> "2026-11-04T18:12" */
-export function parseStrongDate(line: string): string | null {
+export function parseShareDate(line: string): string | null {
   const s = line.toLowerCase().trim();
 
   const iso = /^(\d{4})-(\d{2})-(\d{2})[t ,]+(\d{1,2}):(\d{2})/.exec(s);
@@ -309,7 +316,7 @@ function looksLikeExerciseName(line: string): boolean {
 
 /**
  * mid-block, prose like "felt 2x harder" also passes the name shape, so only a
- * catalog hit or strong's "(Equipment)" suffix starts a new exercise there
+ * catalog hit or an "(Equipment)" suffix starts a new exercise there
  */
 function startsNewExercise(line: string): boolean {
   if (!looksLikeExerciseName(line)) return false;
@@ -331,8 +338,8 @@ interface Line {
 // ---------------------------------------------------------------------------
 // main parser
 
-/** parse strong's "share workout" text. never throws: problems become warnings. */
-export function parseStrongText(text: string): ParsedWorkout {
+/** parse a "share workout" text. never throws: problems become warnings. */
+export function parseShareText(text: string): ParsedWorkout {
   const warnings: ParseWarning[] = [];
   const warn = (line: number, message: string, t: string) => warnings.push({ line, message, text: t });
 
@@ -355,14 +362,12 @@ export function parseStrongText(text: string): ParsedWorkout {
   }
 
   // pull the share link out first so it never reads as a title or note
-  for (const l of lines) {
-    const m = LINK_RE.exec(l.text);
-    if (!m) continue;
-    if (workout.link === null) {
-      workout.link = m[0].replace(/[).,;]+$/, "");
-      workout.linkSlug = slugOf(workout.link);
-    }
-    l.text = l.text.replace(LINK_RE, "").trim();
+  const tail = lastNonEmpty(lines, (l) => l.text);
+  const m = tail ? LINK_RE.exec(tail.text) : null;
+  if (tail && m) {
+    workout.link = m[0].replace(/[).,;]+$/, "");
+    workout.linkSlug = slugOf(workout.link);
+    tail.text = tail.text.slice(0, m.index).trim();
   }
 
   let i = 0;
@@ -374,7 +379,7 @@ export function parseStrongText(text: string): ParsedWorkout {
 
   // header: title then date, either of which may be missing
   const first = lines[i];
-  const firstDate = parseStrongDate(first.text);
+  const firstDate = parseShareDate(first.text);
   if (firstDate) {
     workout.startedLocal = firstDate;
     warn(first.no, "no title line before the date", first.text);
@@ -384,7 +389,7 @@ export function parseStrongText(text: string): ParsedWorkout {
     i++;
     while (i < lines.length && !lines[i].text) i++;
     if (i < lines.length) {
-      const d = parseStrongDate(lines[i].text);
+      const d = parseShareDate(lines[i].text);
       if (d) {
         workout.startedLocal = d;
         i++;
@@ -417,7 +422,7 @@ export function parseStrongText(text: string): ParsedWorkout {
   fillMissingUnits(workout, warn, setLines);
 
   if (workout.exercises.length === 0) {
-    warn(first.no, "no exercises found; this doesn't look like a strong share", first.text);
+    warn(first.no, "no exercises found; this doesn't look like a workout share", first.text);
   }
   return workout;
 }
@@ -514,13 +519,15 @@ function fillMissingUnits(workout: ParsedWorkout, warn: Warn, setLines: Map<Pars
   }
 }
 
-/** cheap check used by chat bots to decide whether a message is a strong share */
-export function looksLikeStrongText(text: string): boolean {
+/** cheap check used by chat bots to decide whether a message is a workout share */
+export function looksLikeShareText(text: string): boolean {
   if (typeof text !== "string" || !text.trim()) return false;
   const lines = normalizeLines(text).filter(Boolean);
   const head = lines.slice(0, 4);
-  const hasDate = head.some((l) => parseStrongDate(l) !== null || looksDateish(l));
-  const hasLink = lines.some((l) => LINK_RE.test(l) && /strong\.app(\.link)?\/\S+/i.test(l));
+  const hasDate = head.some((l) => parseShareDate(l) !== null || looksDateish(l));
+  const tail = lastNonEmpty(lines, (l) => l);
+  const link = tail ? LINK_RE.exec(tail) : null;
+  const hasLink = link !== null && slugOf(link[0]) !== null;
 
   let goodSets = 0;
   for (const l of lines) {

@@ -3,11 +3,11 @@
 export type WeightUnit = "lb" | "kg";
 export type DistanceUnit = "m" | "km" | "mi" | "ft" | "yd";
 
-// warmup = strong's "W" sets; drop/failure come from strong's set tags
+// warmup = the share's "W" sets; drop/failure come from its set tags
 export type SetKind = "warmup" | "normal" | "drop" | "failure";
 
 // ---------------------------------------------------------------------------
-// strong share-text parser output
+// share-text parser output
 
 export interface ParsedSet {
   /** 0-based position within the exercise, warm-ups included, in text order */
@@ -35,7 +35,7 @@ export interface ParsedSet {
 }
 
 export interface ParsedExercise {
-  /** exercise name exactly as strong printed it, e.g. "Bench Press (Barbell)" */
+  /** exercise name exactly as the share printed it, e.g. "Bench Press (Barbell)" */
   name: string;
   sets: ParsedSet[];
   notes: string[];
@@ -51,7 +51,7 @@ export interface ParseWarning {
 export interface ParsedWorkout {
   title: string;
   /**
-   * local wall-clock start, "YYYY-MM-DDTHH:MM" (no zone: strong's share text
+   * local wall-clock start, "YYYY-MM-DDTHH:MM" (no zone: share text
    * has none, and it has no end time either). null when the date line is missing
    * or unparseable.
    */
@@ -59,12 +59,12 @@ export interface ParsedWorkout {
   exercises: ParsedExercise[];
   /** workout-level notes (lines between the date and the first exercise) */
   notes: string[];
-  /** full share link if present, e.g. "https://strong.app.link/AbC123" */
+  /** full share link if present, e.g. "https://example.com/w/AbC123" */
   link: string | null;
   /** last path segment of the link, used as an idempotency key */
   linkSlug: string | null;
   warnings: ParseWarning[];
-  /** workout length in seconds when the source has it (strong's csv export); share text has none */
+  /** workout length in seconds when the source has it (the csv export); share text has none */
   durationS?: number | null;
 }
 
@@ -135,7 +135,7 @@ export type TrackingType =
 export interface Exercise {
   /** stable slug, e.g. "overhead-press-barbell". never changes once shipped. */
   id: string;
-  /** canonical display name in strong's style, e.g. "Overhead Press (Barbell)" */
+  /** canonical display name in share-text style, e.g. "Overhead Press (Barbell)" */
   name: string;
   equipment: Equipment;
   category: ExerciseCategory;

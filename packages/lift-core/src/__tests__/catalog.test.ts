@@ -11,7 +11,7 @@ import {
 import { MUSCLE_REGIONS } from "../muscles";
 import type { Exercise } from "../types";
 
-const STRONG_NAMES = [
+const SHARE_NAMES = [
   "Bench Press (Barbell)",
   "Incline Bench Press (Dumbbell)",
   "Squat (Barbell)",
@@ -191,8 +191,8 @@ describe("upstream mapping", () => {
 });
 
 describe("resolveExerciseName", () => {
-  it("resolves every strong-style name", () => {
-    const missing = STRONG_NAMES.filter((n) => resolveExerciseName(n)?.name !== n);
+  it("resolves every share-text name", () => {
+    const missing = SHARE_NAMES.filter((n) => resolveExerciseName(n)?.name !== n);
     expect(missing).toEqual([]);
   });
 
@@ -215,7 +215,7 @@ describe("resolveExerciseName", () => {
     expect(resolveExerciseName("RDL")?.id).toBe("romanian-deadlift-barbell");
   });
 
-  it("tolerates strong's dash suffixes in both directions", () => {
+  it("tolerates share-text dash suffixes in both directions", () => {
     expect(resolveExerciseName("Triceps Pushdown (Cable)")?.id).toBe("triceps-pushdown-cable-straight-bar");
     expect(resolveExerciseName("Lat Pulldown (Cable - Wide Grip)")?.id).toBe("lat-pulldown-cable");
   });

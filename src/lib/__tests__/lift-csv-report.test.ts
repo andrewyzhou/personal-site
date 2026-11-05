@@ -17,11 +17,11 @@ import {
   simulateLinks,
   type ActivityRow,
 } from "@/lib/lift/csv-report";
-import { partitionCsvWorkouts } from "@/lib/lift/sync/strong-csv";
+import { partitionCsvWorkouts } from "@/lib/lift/sync/workout-csv";
 
-const dir = join(__dirname, "fixtures", "strong-export");
-const MAIN = readFileSync(join(dir, "strong.csv"), "utf8");
-const SEMI = readFileSync(join(dir, "strong-semicolon.csv"), "utf8");
+const dir = join(__dirname, "fixtures", "workout-export");
+const MAIN = readFileSync(join(dir, "workouts.csv"), "utf8");
+const SEMI = readFileSync(join(dir, "workouts-semicolon.csv"), "utf8");
 const TZ = "America/Los_Angeles";
 
 const allSets = (ws: readonly ParsedWorkout[]) => ws.flatMap((w) => w.exercises.flatMap((e) => e.sets));
@@ -37,7 +37,7 @@ function rec(id: number, startedLocal: string, deltaMin: number, elapsedMin: num
 
 function report(input: Partial<Parameters<typeof buildCsvReport>[0]> = {}) {
   return buildCsvReport({
-    file: "strong.csv",
+    file: "workouts.csv",
     sha256: sha256Hex(MAIN),
     parsedExport: parseExport(MAIN),
     existing: [],
@@ -61,7 +61,7 @@ describe("parsing the export fixture", () => {
     const sets = allSets(workouts);
     const kinds = new Set(sets.map((s) => s.kind));
     expect([...kinds].sort()).toEqual(["drop", "failure", "normal", "warmup"]);
-    // bodyweight pull-ups, timed planks and treadmill distance survive the zeros strong writes
+    // bodyweight pull-ups, timed planks and treadmill distance survive the zeros the export writes
     expect(sets.some((s) => s.bodyweight && s.reps === 8 && s.weight === null)).toBe(true);
     expect(sets.some((s) => s.durationS === 75 && s.weight === null && s.reps === null)).toBe(true);
     expect(sets.some((s) => s.distance !== null && s.distanceUnit === "mi" && s.durationS !== null)).toBe(true);
@@ -127,12 +127,12 @@ describe("parsing the export fixture", () => {
 describe("input files", () => {
   it("picks the first real csv out of a zip", () => {
     const zip = zipSync({
-      "__MACOSX/._strong.csv": strToU8("junk"),
+      "__MACOSX/._workouts.csv": strToU8("junk"),
       "readme.txt": strToU8("hi"),
-      "export/strong.csv": strToU8(SEMI),
+      "export/workouts.csv": strToU8(SEMI),
       "other.csv": strToU8("x"),
     });
-    expect(csvFromZip(zip)).toEqual({ name: "export/strong.csv", text: SEMI });
+    expect(csvFromZip(zip)).toEqual({ name: "export/workouts.csv", text: SEMI });
     expect(csvFromZip(zipSync({ "a.txt": strToU8("no") }))).toBeNull();
   });
 
@@ -149,15 +149,15 @@ describe("input files", () => {
   }
 
   it("inflates only the first csv", () => {
-    const zip = zipSync({ "strong.csv": strToU8(SEMI), "later.csv": strToU8("x".repeat(500)) });
+    const zip = zipSync({ "workouts.csv": strToU8(SEMI), "later.csv": strToU8("x".repeat(500)) });
     // an unknown method throws if fflate ever tries to inflate the second entry
     const poisoned = patchCentral(zip, "later.csv", (v, at) => v.setUint16(at + 10, 99, true));
-    expect(csvFromZip(poisoned)).toEqual({ name: "strong.csv", text: SEMI });
+    expect(csvFromZip(poisoned)).toEqual({ name: "workouts.csv", text: SEMI });
   });
 
   it("refuses a csv entry that claims more than the size cap", () => {
-    const zip = zipSync({ "strong.csv": strToU8(SEMI) });
-    const huge = patchCentral(zip, "strong.csv", (v, at) => v.setUint32(at + 24, MAX_ZIP_CSV_BYTES + 1, true));
+    const zip = zipSync({ "workouts.csv": strToU8(SEMI) });
+    const huge = patchCentral(zip, "workouts.csv", (v, at) => v.setUint32(at + 24, MAX_ZIP_CSV_BYTES + 1, true));
     expect(() => csvFromZip(huge)).toThrow(/too large to import/);
   });
 
@@ -176,12 +176,12 @@ describe("dry run report", () => {
     const names = (w: ParsedWorkout) => w.exercises.map((e) => e.name);
     const { report: r, fresh } = report({
       existing: [
-        { id: "strong-a", title: w0.title.toUpperCase(), startedLocal: w0.startedLocal! },
+        { id: "share-a", title: w0.title.toUpperCase(), startedLocal: w0.startedLocal! },
         // renamed on the phone, same lifts
-        { id: "strong-b", title: "Renamed", startedLocal: w5.startedLocal!, exerciseNames: names(w5).slice(0, 3) },
+        { id: "share-b", title: "Renamed", startedLocal: w5.startedLocal!, exerciseNames: names(w5).slice(0, 3) },
         // same minute but a different session (only 2 of 5 lifts)
-        { id: "strong-c", title: "Other", startedLocal: w6.startedLocal!, exerciseNames: names(w6).slice(0, 2) },
-        { id: "strong-d", title: w0.title, startedLocal: "2020-01-01T00:00" },
+        { id: "share-c", title: "Other", startedLocal: w6.startedLocal!, exerciseNames: names(w6).slice(0, 2) },
+        { id: "share-d", title: w0.title, startedLocal: "2020-01-01T00:00" },
       ],
     });
     expect(r.present).toMatchObject({ total: 2, byTitle: 1, byExercises: 1, repeatedInCsv: 0 });
@@ -189,7 +189,7 @@ describe("dry run report", () => {
     expect(fresh).toHaveLength(38);
     expect(fresh.map((w) => w.startedLocal)).toContain(w6.startedLocal);
     expect(r.fresh.workouts).toBe(38);
-    expect(r.nextCommand).toBe("npm run lift:import-csv -- strong.csv --unit lb --apply");
+    expect(r.nextCommand).toBe("npm run lift:import-csv -- workouts.csv --unit lb --apply");
   });
 
   it("lists custom exercises: new, known, and merged", () => {
@@ -252,7 +252,7 @@ describe("dry run report", () => {
   });
 
   it("prints a summary with the next command", () => {
-    const { report: r } = report({ file: "C:\\Users\\me\\Downloads\\strong export.csv", activities: [rec(1, workouts[0].startedLocal!, 2, 60)] });
+    const { report: r } = report({ file: "C:\\Users\\me\\Downloads\\workout export.csv", activities: [rec(1, workouts[0].startedLocal!, 2, 60)] });
     const text = formatCsvReport(r);
     expect(text).toContain("rows:        719");
     expect(text).toContain("weights:     lb (default)");
@@ -261,7 +261,7 @@ describe("dry run report", () => {
     expect(text).toContain("would link:  1 workouts (1 by start time, 0 inside a long recording)");
     expect(text).toContain("lift-only:   39 workouts");
     expect(text).toContain('line 294: unreadable weight "12o"');
-    expect(text).toContain('npm run lift:import-csv -- "C:\\Users\\me\\Downloads\\strong export.csv" --unit lb --apply');
+    expect(text).toContain('npm run lift:import-csv -- "C:\\Users\\me\\Downloads\\workout export.csv" --unit lb --apply');
     // the json form round-trips
     expect(JSON.parse(JSON.stringify(r))).toEqual(r);
   });
@@ -274,6 +274,6 @@ describe("dry run report", () => {
   });
 
   it("quotes only when it has to", () => {
-    expect(applyCommand("./strong.csv", "kg")).toBe("npm run lift:import-csv -- ./strong.csv --unit kg --apply");
+    expect(applyCommand("./workouts.csv", "kg")).toBe("npm run lift:import-csv -- ./workouts.csv --unit kg --apply");
   });
 });

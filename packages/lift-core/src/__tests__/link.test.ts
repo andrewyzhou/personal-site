@@ -25,7 +25,7 @@ describe("linkWorkoutToActivities", () => {
     ]);
   });
 
-  it("2026-11-02 (real): strong at 19:18 inside activity 496 (14:01, 365 min) links as overrun", () => {
+  it("2026-11-02 (real): share at 19:18 inside activity 496 (14:01, 365 min) links as overrun", () => {
     const candidates = [c(496, "2026-11-02T14:01", 21909), c(497, "2026-11-02T19:10", 1800, "Ride")];
     expect(linkWorkoutToActivities("2026-11-02T19:18", candidates)).toEqual([
       { activityId: 496, role: "overrun", deltaMin: -317 },

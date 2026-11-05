@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { ingest, looksLike, answer } = vi.hoisted(() => ({ ingest: vi.fn(), looksLike: vi.fn(), answer: vi.fn() }));
-vi.mock("@/lib/lift/ingest", () => ({ ingestStrongText: (...a: unknown[]) => ingest(...a) }));
+vi.mock("@/lib/lift/ingest", () => ({ ingestShareText: (...a: unknown[]) => ingest(...a) }));
 vi.mock("@/lib/lift/query", () => ({ answerLiftQuestion: (...a: unknown[]) => answer(...a) }));
-vi.mock("lift-core", () => ({ looksLikeStrongText: (t: string) => looksLike(t) }));
+vi.mock("lift-core", () => ({ looksLikeShareText: (t: string) => looksLike(t) }));
 
 import { POST } from "@/app/api/lift/telegram/route";
 
@@ -38,8 +38,8 @@ describe("POST /api/lift/telegram", () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     looksLike.mockImplementation((t: string) => t.includes("Set 1"));
-    answer.mockResolvedValue("share a workout from strong to this chat to log it, or ask:");
-    ingest.mockResolvedValue({ status: "created", workoutId: "strong-x", text: "logged push day · wed nov 4", details: DETAILS });
+    answer.mockResolvedValue("share a workout to this chat to log it, or ask:");
+    ingest.mockResolvedValue({ status: "created", workoutId: "share-x", text: "logged push day · wed nov 4", details: DETAILS });
   });
 
   afterEach(() => vi.unstubAllGlobals());
@@ -78,7 +78,7 @@ describe("POST /api/lift/telegram", () => {
     expect((init as RequestInit).method).toBe("POST");
     expect(sentBodies()[0]).toEqual({
       chat_id: 42,
-      text: "share a workout from strong to this chat to log it, or ask:",
+      text: "share a workout to this chat to log it, or ask:",
       reply_to_message_id: 7,
       allow_sending_without_reply: true,
     });
@@ -110,18 +110,18 @@ describe("POST /api/lift/telegram", () => {
     expect(answer).not.toHaveBeenCalled();
   });
 
-  it("ingests a strong share and replies with the multi-line breakdown", async () => {
+  it("ingests a workout share and replies with the multi-line breakdown", async () => {
     const text = "Push Day\nSet 1: 185 lb × 5";
     const res = await POST(update(msg(text)));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, handled: "created", workoutId: "strong-x" });
+    expect(await res.json()).toMatchObject({ ok: true, handled: "created", workoutId: "share-x" });
     expect(ingest).toHaveBeenCalledWith(text, { source: "telegram" });
     expect(sentBodies()[0]).toMatchObject({ chat_id: 42, text: DETAILS, reply_to_message_id: 7 });
   });
 
   it("says updated for an edited re-share", async () => {
     const details = DETAILS.replace(/^logged/, "updated");
-    ingest.mockResolvedValueOnce({ status: "updated", workoutId: "strong-x", text: "updated push day", details });
+    ingest.mockResolvedValueOnce({ status: "updated", workoutId: "share-x", text: "updated push day", details });
     const res = await POST(update(msg("Push Day\nSet 1: 185 lb × 6")));
     expect(await res.json()).toMatchObject({ handled: "updated" });
     expect(sentBodies()[0].text).toBe(details);
@@ -129,14 +129,14 @@ describe("POST /api/lift/telegram", () => {
   });
 
   it("falls back to the one-liner without details", async () => {
-    ingest.mockResolvedValueOnce({ status: "duplicate", workoutId: "strong-x", text: "already logged push day" });
+    ingest.mockResolvedValueOnce({ status: "duplicate", workoutId: "share-x", text: "already logged push day" });
     await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
     expect(sentBodies()[0].text).toBe("already logged push day");
   });
 
   it("caps a long reply without splitting an emoji", async () => {
     const details = "a" + "\u{1F4AA}".repeat(3000);
-    ingest.mockResolvedValueOnce({ status: "created", workoutId: "strong-x", text: "x", details });
+    ingest.mockResolvedValueOnce({ status: "created", workoutId: "share-x", text: "x", details });
     await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
     const sent: string = sentBodies()[0].text;
     expect(sent.length).toBeLessThanOrEqual(4000);

@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseStrongCsv, parseStrongCsvDate, parseStrongDuration } from "../parse-strong-csv";
+import { parseWorkoutCsv, parseWorkoutCsvDate, parseCsvDuration } from "../parse-workout-csv";
 import { summarizeWorkout } from "../math";
 import type { ParsedSet } from "../types";
 
 // checkouts may rewrite line endings, so normalise to lf and let tests add crlf themselves
 function fixture(name: string): string {
-  return readFileSync(path.join(__dirname, "fixtures", "strong-csv", name), "utf8").replace(/\r\n/g, "\n");
+  return readFileSync(path.join(__dirname, "fixtures", "workout-csv", name), "utf8").replace(/\r\n/g, "\n");
 }
 
 function pick(s: ParsedSet) {
@@ -28,8 +28,8 @@ function pick(s: ParsedSet) {
 
 const HEADER = "Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE";
 
-describe("parseStrongCsv: modern quoted export", () => {
-  const { workouts, warnings } = parseStrongCsv(fixture("modern.csv"));
+describe("parseWorkoutCsv: modern quoted export", () => {
+  const { workouts, warnings } = parseWorkoutCsv(fixture("modern.csv"));
 
   it("groups by date + workout name, oldest first", () => {
     expect(warnings).toEqual([]);
@@ -96,7 +96,7 @@ describe("parseStrongCsv: modern quoted export", () => {
   });
 
   it("uses the unit options", () => {
-    const kg = parseStrongCsv(fixture("modern.csv"), { weightUnit: "kg", distanceUnit: "km" });
+    const kg = parseWorkoutCsv(fixture("modern.csv"), { weightUnit: "kg", distanceUnit: "km" });
     expect(kg.workouts[0].exercises[0].sets[1].unit).toBe("kg");
     expect(kg.workouts[1].exercises[1].sets[0].distanceUnit).toBe("km");
   });
@@ -105,7 +105,7 @@ describe("parseStrongCsv: modern quoted export", () => {
     const base = fixture("modern.csv");
     const expected = JSON.parse(JSON.stringify(workouts.map((w) => ({ ...w, exercises: w.exercises.map((e) => ({ ...e, sets: e.sets.map(pick) })) }))));
     for (const variant of ["﻿" + base, base.replace(/\n/g, "\r\n"), "﻿" + base.replace(/\n/g, "\r\r\n"), base.replace(/\n/g, "\r")]) {
-      const res = parseStrongCsv(variant);
+      const res = parseWorkoutCsv(variant);
       expect(res.warnings).toEqual([]);
       const got = res.workouts.map((w) => ({ ...w, exercises: w.exercises.map((e) => ({ ...e, sets: e.sets.map(pick) })) }));
       expect(got).toEqual(expected);
@@ -113,8 +113,8 @@ describe("parseStrongCsv: modern quoted export", () => {
   });
 });
 
-describe("parseStrongCsv: legacy semicolon export", () => {
-  const { workouts, warnings } = parseStrongCsv(fixture("legacy-semicolon.csv"));
+describe("parseWorkoutCsv: legacy semicolon export", () => {
+  const { workouts, warnings } = parseWorkoutCsv(fixture("legacy-semicolon.csv"));
 
   it("parses unit columns, decimal commas and workout duration", () => {
     expect(warnings).toEqual([]);
@@ -131,12 +131,12 @@ describe("parseStrongCsv: legacy semicolon export", () => {
     expect(pick(w.exercises[1].sets[0])).toMatchObject({ distance: 2000, distanceUnit: "m", durationS: 480, weight: null, reps: null });
     // the row's own unit column wins over the option
     expect(pick(w.exercises[2].sets[0])).toMatchObject({ weight: 100, unit: "lb", reps: 15 });
-    expect(parseStrongCsv(fixture("legacy-semicolon.csv"), { weightUnit: "lb" }).workouts[0].exercises[0].sets[0].unit).toBe("kg");
+    expect(parseWorkoutCsv(fixture("legacy-semicolon.csv"), { weightUnit: "lb" }).workouts[0].exercises[0].sets[0].unit).toBe("kg");
   });
 });
 
-describe("parseStrongCsv: messy input", () => {
-  const { workouts, warnings } = parseStrongCsv(fixture("messy.csv"));
+describe("parseWorkoutCsv: messy input", () => {
+  const { workouts, warnings } = parseWorkoutCsv(fixture("messy.csv"));
 
   it("keeps good rows and turns bad ones into warnings", () => {
     expect(workouts.map((w) => w.title)).toEqual(["Morning", "Mystery"]);
@@ -168,7 +168,7 @@ describe("parseStrongCsv: messy input", () => {
   });
 });
 
-describe("parseStrongCsv: quoting and structure", () => {
+describe("parseWorkoutCsv: quoting and structure", () => {
   it("handles embedded delimiters, quotes and newlines and reports start lines", () => {
     const csv = [
       HEADER,
@@ -176,7 +176,7 @@ describe("parseStrongCsv: quoting and structure", () => {
       `line two, still note","",""`,
       `"2024-05-01 10:00:00","A, ""quoted"" name","","Curl (Cable)","2","20","nope","0","0","","",""`,
     ].join("\n");
-    const res = parseStrongCsv(csv);
+    const res = parseWorkoutCsv(csv);
     expect(res.workouts[0].title).toBe('A, "quoted" name');
     expect(res.workouts[0].durationS).toBeNull();
     expect(res.workouts[0].exercises[0].sets[0].note).toBe("line one\nline two, still note");
@@ -190,7 +190,7 @@ describe("parseStrongCsv: quoting and structure", () => {
       "2024-05-02 10:00:00,B,,Squat (Barbell),1,200,5,0,0,,,",
       "2024-05-01 10:00:00,A,,Curl (Cable),2,20,10,0,0,,,",
     ].join("\n");
-    const { workouts } = parseStrongCsv(csv);
+    const { workouts } = parseWorkoutCsv(csv);
     expect(workouts.map((w) => w.title)).toEqual(["A", "B"]);
     expect(workouts[0].exercises).toHaveLength(1);
     expect(workouts[0].exercises[0].sets.map((s) => [s.position, s.reps])).toEqual([
@@ -206,7 +206,7 @@ describe("parseStrongCsv: quoting and structure", () => {
       "2024-05-01 10:00:00,A,,Curl (Cable),1,20,12,0,0,,,",
       "2024-05-01 10:00:00,B,,Curl (Cable),1,20,12,0,0,,,",
     ].join("\n");
-    const { workouts } = parseStrongCsv(csv);
+    const { workouts } = parseWorkoutCsv(csv);
     expect(workouts.map((w) => [w.startedLocal, w.title])).toEqual([
       ["2024-05-01T10:00", "A"],
       ["2024-05-01T10:00", "B"],
@@ -216,7 +216,7 @@ describe("parseStrongCsv: quoting and structure", () => {
 
   it("accepts columns in any order, short rows and unquoted fields", () => {
     const csv = ["Exercise Name,Reps,Date,Set Order,Weight", "Dip,8,2024-01-01 08:00:00,1", "Dip,6,2024-01-01 08:00:00,2,-20"].join("\n");
-    const { workouts, warnings } = parseStrongCsv(csv);
+    const { workouts, warnings } = parseWorkoutCsv(csv);
     expect(warnings).toEqual([]);
     const [a, b] = workouts[0].exercises[0].sets;
     expect(workouts[0].title).toBe("");
@@ -227,14 +227,14 @@ describe("parseStrongCsv: quoting and structure", () => {
 
   it("skips rest timer rows and blank lines silently", () => {
     const csv = [HEADER, "", "2024-01-01 08:00:00,A,,Bench Press (Barbell),Rest Timer,0,0,0,120,,,", "2024-01-01 08:00:00,A,,Bench Press (Barbell),1,100,5,0,0,,,", "", ""].join("\n");
-    const { workouts, warnings } = parseStrongCsv(csv);
+    const { workouts, warnings } = parseWorkoutCsv(csv);
     expect(warnings).toEqual([]);
     expect(workouts[0].exercises[0].sets).toHaveLength(1);
   });
 
   it("reads numeric-with-letter set orders", () => {
     const rows = ["W", "W2", "2W", "D", "3D", "F", "F4", "7"].map((o, i) => `2024-01-01 08:00:00,A,,Squat (Barbell),${o},100,${i + 1},0,0,,,`);
-    const sets = parseStrongCsv([HEADER, ...rows].join("\n")).workouts[0].exercises[0].sets;
+    const sets = parseWorkoutCsv([HEADER, ...rows].join("\n")).workouts[0].exercises[0].sets;
     expect(sets.map((s) => [s.kind, s.label])).toEqual([
       ["warmup", null],
       ["warmup", 2],
@@ -249,22 +249,22 @@ describe("parseStrongCsv: quoting and structure", () => {
 
   it("warns on an unterminated quote but keeps what it read", () => {
     const csv = `${HEADER}\n2024-01-01 08:00:00,A,,Squat (Barbell),1,100,5,0,0,"oops`;
-    const res = parseStrongCsv(csv);
+    const res = parseWorkoutCsv(csv);
     expect(res.warnings.map((w) => w.message)).toEqual(["unterminated quoted field"]);
     expect(res.workouts[0].exercises[0].sets[0].note).toBe("oops");
   });
 
   it("rejects text that isn't an export", () => {
-    expect(parseStrongCsv("")).toEqual({ workouts: [], warnings: [] });
-    expect(parseStrongCsv("\n\n")).toEqual({ workouts: [], warnings: [] });
-    const res = parseStrongCsv("name,age\nbob,3");
+    expect(parseWorkoutCsv("")).toEqual({ workouts: [], warnings: [] });
+    expect(parseWorkoutCsv("\n\n")).toEqual({ workouts: [], warnings: [] });
+    const res = parseWorkoutCsv("name,age\nbob,3");
     expect(res.workouts).toEqual([]);
-    expect(res.warnings[0]).toMatchObject({ line: 1, message: expect.stringContaining("not a strong csv export") });
+    expect(res.warnings[0]).toMatchObject({ line: 1, message: expect.stringContaining("not a workout csv export") });
   });
 
   it("detects tab separated exports", () => {
     const csv = [HEADER.replace(/,/g, "\t"), ["2024-01-01 08:00:00", "A", "", "Squat (Barbell)", "1", "100", "5"].join("\t")].join("\n");
-    expect(parseStrongCsv(csv).workouts[0].exercises[0].sets[0].weight).toBe(100);
+    expect(parseWorkoutCsv(csv).workouts[0].exercises[0].sets[0].weight).toBe(100);
   });
 
   it("handles a large export quickly", () => {
@@ -273,14 +273,14 @@ describe("parseStrongCsv: quoting and structure", () => {
       const date = new Date(Date.UTC(2020, 0, 1 + d)).toISOString().slice(0, 10);
       for (let s = 1; s <= 20; s++) rows.push(`"${date} 07:00:00","Day","1h","Squat (Barbell)","${s}","225","5","0","0","","",""`);
     }
-    const { workouts } = parseStrongCsv(rows.join("\r\n"));
+    const { workouts } = parseWorkoutCsv(rows.join("\r\n"));
     expect(workouts).toHaveLength(400);
     expect(workouts[0].startedLocal).toBe("2020-01-01T07:00");
     expect(workouts[399].exercises[0].sets).toHaveLength(20);
   });
 });
 
-describe("parseStrongCsvDate", () => {
+describe("parseWorkoutCsvDate", () => {
   it.each([
     ["2024-03-14 18:30:00", "2024-03-14T18:30"],
     ["2024-03-14 18:30", "2024-03-14T18:30"],
@@ -296,11 +296,11 @@ describe("parseStrongCsvDate", () => {
     ["", null],
     ["soon", null],
   ])("%j -> %j", (input, out) => {
-    expect(parseStrongCsvDate(input)).toBe(out);
+    expect(parseWorkoutCsvDate(input)).toBe(out);
   });
 });
 
-describe("parseStrongDuration", () => {
+describe("parseCsvDuration", () => {
   it.each([
     ["1h 5m", 3900],
     ["45m", 2700],
@@ -315,6 +315,6 @@ describe("parseStrongDuration", () => {
     ["soon", null],
     ["1h x", null],
   ])("%j -> %j", (input, out) => {
-    expect(parseStrongDuration(input)).toBe(out);
+    expect(parseCsvDuration(input)).toBe(out);
   });
 });

@@ -3,7 +3,7 @@ import {
   e1rm,
   getExercise,
   isWorkingSet,
-  parseStrongText,
+  parseShareText,
   resolveExerciseName,
   summarizeWorkout,
   toKg,
@@ -29,7 +29,14 @@ import { liftTimezone, localToUtc, utcToLocal } from "./time";
 // pure ingest planning: raw share text in, every row the ingest writes out.
 // no db access here, so the whole mapping is unit-testable.
 
-export type IngestSource = "shortcut" | "telegram" | "api" | "strong-csv";
+export type IngestSource = "shortcut" | "telegram" | "api" | "workout-csv";
+
+/** lift_workouts.source values for workouts that came in as text (share or csv), not from the phone */
+export const IMPORTED_SOURCES = ["share-text", "workout-csv"] as const;
+
+export function isImportedSource(source: string): boolean {
+  return (IMPORTED_SOURCES as readonly string[]).includes(source);
+}
 
 export interface PlanOptions {
   source: IngestSource;
@@ -50,7 +57,7 @@ export interface ParsedWorkoutPlanOptions {
   ingestId: string;
   /** lift_workouts.source */
   workoutSource: string;
-  strongSlug: string | null;
+  shareSlug: string | null;
   now?: Date;
   timezone?: string;
   redirects?: ReadonlyMap<string, string>;
@@ -186,15 +193,15 @@ function tooLarge(parsed: ParsedWorkout): string | null {
 }
 
 function derivedWorkoutId(parsed: ParsedWorkout, slug: string | null, sha256: string): string {
-  if (slug) return `strong-${slug}`;
+  if (slug) return `share-${slug}`;
   // same title + start from any channel (or with stray whitespace) is the same workout
-  if (parsed.startedLocal) return `strong-${sha256Hex(`${nameKey(parsed.title)}|${parsed.startedLocal}`).slice(0, 16)}`;
-  return `strong-${sha256.slice(0, 16)}`;
+  if (parsed.startedLocal) return `share-${sha256Hex(`${nameKey(parsed.title)}|${parsed.startedLocal}`).slice(0, 16)}`;
+  return `share-${sha256.slice(0, 16)}`;
 }
 
-export function planStrongIngest(rawText: string, opts: PlanOptions): IngestPlan {
+export function planShareIngest(rawText: string, opts: PlanOptions): IngestPlan {
   const sha256 = sha256Hex(rawText);
-  const parsed = parseStrongText(rawText);
+  const parsed = parseShareText(rawText);
   const warnings: LiftWarning[] = parsed.warnings.map((w) => ({ line: w.line, message: w.message, text: w.text }));
   if (opts.extraWarnings) warnings.push(...opts.extraWarnings);
   const slug = parsed.linkSlug && SLUG_RE.test(parsed.linkSlug) ? parsed.linkSlug : null;
@@ -209,7 +216,7 @@ export function planStrongIngest(rawText: string, opts: PlanOptions): IngestPlan
     source: opts.source,
     rawSha256: sha256,
     rawText,
-    strongSlug: slug,
+    shareSlug: slug,
     workoutId: hasWorkout ? workoutId : null,
     status: hasWorkout ? "parsed" : "empty",
     warnings,
@@ -219,8 +226,8 @@ export function planStrongIngest(rawText: string, opts: PlanOptions): IngestPlan
   const { workout, summary } = planParsedWorkout(parsed, {
     workoutId,
     ingestId,
-    workoutSource: "strong-text",
-    strongSlug: slug,
+    workoutSource: "share-text",
+    shareSlug: slug,
     now: opts.now,
     timezone: opts.timezone,
     redirects: opts.redirects,
@@ -304,7 +311,7 @@ export function planParsedWorkout(
     notes: joinNotes(parsed.notes),
     source: opts.workoutSource,
     latestIngestId: ingestId,
-    strongSlug: opts.strongSlug,
+    shareSlug: opts.shareSlug,
     workingSets: totals.workingSets,
     volumeKg: round(totals.volumeKg, 2),
     muscleLoad: normalizedLoad,
@@ -351,7 +358,7 @@ export interface EditCandidate {
   id: string;
   title: string;
   startedLocal: string;
-  strongSlug: string | null;
+  shareSlug: string | null;
   source: string;
   deletedAt: Date | null;
   /** nameRaw of its exercises */
@@ -393,9 +400,9 @@ function existing(c: EditCandidate): EditTarget {
 }
 
 /**
- * which stored workout a share lands on. strong can issue a new link (and the
+ * which stored workout a share lands on. the app can issue a new link (and the
  * title can change) when a workout is edited and re-shared, so a share whose
- * own id is unknown still updates the one strong workout that started the same
+ * own id is unknown still updates the one imported workout that started the same
  * minute with the same title or mostly the same exercises.
  */
 export function pickEditTarget(share: EditLookup, candidates: readonly EditCandidate[]): EditTarget {
@@ -403,7 +410,7 @@ export function pickEditTarget(share: EditLookup, candidates: readonly EditCandi
   if (own) return existing(own);
   // the same link already landed on another id (an earlier edit moved it there).
   // the slug is unique on workouts, so a new row with it would fail anyway
-  const sameSlug = share.slug ? candidates.find((c) => c.strongSlug === share.slug) : undefined;
+  const sameSlug = share.slug ? candidates.find((c) => c.shareSlug === share.slug) : undefined;
   if (sameSlug) return existing(sameSlug);
   if (!share.startedLocal) return { kind: "new" };
 
@@ -411,7 +418,7 @@ export function pickEditTarget(share: EditLookup, candidates: readonly EditCandi
   const matches = candidates.filter(
     (c) =>
       c.startedLocal === share.startedLocal &&
-      c.source.startsWith("strong") &&
+      isImportedSource(c.source) &&
       !c.deletedAt &&
       (nameKey(c.title) === title || exerciseOverlap(c.exerciseNames, share.exerciseNames) >= EDIT_OVERLAP)
   );

@@ -16,7 +16,7 @@
     "images": "bash scripts/convert-images.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "lift:import-csv": "tsx --env-file=.env.local scripts/lift-import-strong-csv.ts",
+    "lift:import-csv": "tsx --env-file=.env.local scripts/lift-import-workout-csv.ts",
     "build:design": "node scripts/design-build.mjs",
     "test:design": "playwright test -c tests/design/playwright.config.ts",
     "tokens": "tsx scripts/gen-tokens.ts"

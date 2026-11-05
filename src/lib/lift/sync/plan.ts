@@ -189,7 +189,7 @@ export function workoutRow(p: WorkoutPayload, tz?: string): NewLiftWorkoutRow & 
     source: "app",
     status: p.status,
     templateId: p.templateId,
-    // discarded workouts hide like a soft-deleted strong share; un-discarding clears it.
+    // discarded workouts hide like a soft-deleted workout share; un-discarding clears it.
     // imported workouts follow the same rule: the phone's status drives deletedAt
     // (discarded -> set, finished -> cleared), while source stays server-owned
     deletedAt: p.status === "discarded" ? date(p.updatedAt) : null,
@@ -419,7 +419,7 @@ export function planSync(
               "createdAt",
               "source",
               "latestIngestId",
-              "strongSlug",
+              "shareSlug",
               "workingSets",
               "volumeKg",
               "muscleLoad",
@@ -455,7 +455,7 @@ export function planSync(
             target: t.we.id,
             set: {
               ...excludedExcept(t.we, ["id", "createdAt", "nameRaw"]),
-              // keep strong's printed name while the exercise is unchanged
+              // keep the share's printed name while the exercise is unchanged
               nameRaw: sql.raw(
                 `case when "lift_workout_exercises"."exercise_id" = excluded."exercise_id" ` +
                   `then "lift_workout_exercises"."name_raw" else excluded."name_raw" end`
@@ -527,7 +527,7 @@ export function planSync(
     }
     if (p.mergedInto) {
       mergeTargets.add(p.mergedInto);
-      // history logged against the old id (strong shares included) follows the merge
+      // history logged against the old id (workout shares included) follows the merge
       const merged = sql`exists (select 1 from "exercises" e where e."id" = ${p.id} and e."merged_into" = ${p.mergedInto})`;
       statements.push(
         db

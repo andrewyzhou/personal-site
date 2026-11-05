@@ -16,7 +16,7 @@ import type { ProgramData } from "lift-core";
 import { activities } from "./schema";
 
 // lifting tracker. text primary keys everywhere: ids are derived from content
-// (strong link slug, sha of the raw share) so an ingest is a single db.batch
+// (share link slug, sha of the raw share) so an ingest is a single db.batch
 // with no id round-trips, and the phone app can later push its own uuids.
 
 const createdAt = () =>
@@ -46,7 +46,7 @@ export const exercises = pgTable("exercises", {
   equipment: text("equipment").notNull().default("other"),
   category: text("category").notNull().default("strength"),
   tracking: text("tracking").notNull().default("weight_reps"),
-  source: text("source").notNull(), // 'catalog' | 'strong' | 'app'
+  source: text("source").notNull(), // 'catalog' | 'import' | 'app'
   isCustom: boolean("is_custom").notNull().default(false),
   archived: boolean("archived").notNull().default(false),
   freeDbId: text("free_db_id"),
@@ -137,19 +137,19 @@ export const liftIngests = pgTable(
     // future pointer into the content-addressed raw_objects store; null until that lands
     rawObjectId: text("raw_object_id"),
     // not unique: an edited re-share of the same workout is a new ingest row
-    strongSlug: text("strong_slug"),
+    shareSlug: text("share_slug"),
     workoutId: text("workout_id"),
     status: text("status").notNull(), // 'parsed' | 'empty'
     warnings: jsonb("warnings").$type<LiftWarning[]>().notNull().default([]),
     createdAt: createdAt(),
   },
-  (t) => [index("lift_ingests_strong_slug_idx").on(t.strongSlug)]
+  (t) => [index("lift_ingests_share_slug_idx").on(t.shareSlug)]
 );
 
 export const liftWorkouts = pgTable(
   "lift_workouts",
   {
-    // "strong-<slug>" when the share has a link, else "strong-<first 16 hex of sha>"
+    // "share-<slug>" when the share has a link, else "share-<first 16 hex of sha>"
     id: text("id").primaryKey(),
     title: text("title").notNull(),
     startedLocal: text("started_local").notNull(), // 'YYYY-MM-DDTHH:MM' wall clock
@@ -159,12 +159,12 @@ export const liftWorkouts = pgTable(
     endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
     durationS: integer("duration_s"), // only known from linked recordings
     notes: text("notes"),
-    source: text("source").notNull(), // 'strong-text' | 'strong-csv' | 'app'
+    source: text("source").notNull(), // 'share-text' | 'workout-csv' | 'app'
     status: text("status").notNull().default("finished"), // 'active' | 'finished' | 'discarded'
     // soft pointer: templates can be deleted without touching history
     templateId: text("template_id"),
     latestIngestId: text("latest_ingest_id"),
-    strongSlug: text("strong_slug"),
+    shareSlug: text("share_slug"),
     workingSets: integer("working_sets").notNull().default(0),
     volumeKg: doublePrecision("volume_kg").notNull().default(0),
     // region -> 0..1, most-loaded region = 1
@@ -174,7 +174,7 @@ export const liftWorkouts = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    uniqueIndex("lift_workouts_strong_slug_idx").on(t.strongSlug).where(isNotNull(t.strongSlug)),
+    uniqueIndex("lift_workouts_share_slug_idx").on(t.shareSlug).where(isNotNull(t.shareSlug)),
     index("lift_workouts_started_local_idx").on(t.startedLocal.desc()),
   ]
 );
@@ -190,7 +190,7 @@ export const liftWorkoutExercises = pgTable(
       .notNull()
       .references(() => exercises.id),
     position: integer("position").notNull(),
-    nameRaw: text("name_raw").notNull(), // exactly as strong printed it
+    nameRaw: text("name_raw").notNull(), // exactly as the share printed it
     notes: text("notes"),
     supersetGroup: integer("superset_group"),
     restS: integer("rest_s"),

@@ -50,7 +50,7 @@ import {
 import { liftTimezone, localToUtc } from "../time";
 import { EQUIPMENT, SET_KINDS, TRACKING_TYPES, WORKOUT_STATUSES } from "./validate";
 
-// server rows -> the phone's payload shapes, for a reinstall restore. strong
+// server rows -> the phone's payload shapes, for a reinstall restore. workout
 // shares come back as finished workouts so the phone sees one history.
 
 const ms = (d: Date) => d.getTime();
@@ -64,7 +64,7 @@ export function workoutPayload(row: LiftWorkoutRow, tz = liftTimezone()): Workou
   let startedAt = row.startedAt ? ms(row.startedAt) : null;
   let utcOffsetMin = row.utcOffsetMin;
   if (startedAt == null) {
-    // older strong rows without a zone: read the wall clock in LIFT_TIMEZONE
+    // older imported rows without a zone: read the wall clock in LIFT_TIMEZONE
     const utc = localToUtc(row.startedLocal, tz);
     startedAt = utc ? ms(utc.date) : ms(row.createdAt);
     utcOffsetMin ??= utc?.utcOffsetMin ?? null;
@@ -280,7 +280,7 @@ export async function loadSnapshotPage(q: SnapshotQuery, now = new Date()): Prom
   const db = getDb();
   const w = liftWorkouts;
   const n = q.limit + 1;
-  // soft-deleted strong shares stay hidden; app rows (discarded included) go back as-is
+  // soft-deleted workout shares stay hidden; app rows (discarded included) go back as-is
   const visible = or(eq(w.source, "app"), isNull(w.deletedAt));
   const after = (col: PgColumn) => (q.after != null ? gt(col, q.after) : undefined);
   const page = <K extends SnapshotEntity>(entity: K, payloads: SyncSnapshot[K]) => snapshotPage(entity, payloads, q.limit, now);

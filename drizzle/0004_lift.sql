@@ -33,7 +33,7 @@ CREATE TABLE "lift_ingests" (
 	"raw_sha256" text NOT NULL,
 	"raw_text" text NOT NULL,
 	"raw_object_id" text,
-	"strong_slug" text,
+	"share_slug" text,
 	"workout_id" text,
 	"status" text NOT NULL,
 	"warnings" jsonb DEFAULT '[]'::jsonb NOT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE "lift_workouts" (
 	"notes" text,
 	"source" text NOT NULL,
 	"latest_ingest_id" text,
-	"strong_slug" text,
+	"share_slug" text,
 	"working_sets" integer DEFAULT 0 NOT NULL,
 	"volume_kg" double precision DEFAULT 0 NOT NULL,
 	"muscle_load" jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -129,11 +129,11 @@ ALTER TABLE "lift_workout_activities" ADD CONSTRAINT "lift_workout_activities_ac
 ALTER TABLE "lift_workout_exercises" ADD CONSTRAINT "lift_workout_exercises_workout_id_lift_workouts_id_fk" FOREIGN KEY ("workout_id") REFERENCES "public"."lift_workouts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lift_workout_exercises" ADD CONSTRAINT "lift_workout_exercises_exercise_id_exercises_id_fk" FOREIGN KEY ("exercise_id") REFERENCES "public"."exercises"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "exercise_aliases_normalized_idx" ON "exercise_aliases" USING btree ("normalized");--> statement-breakpoint
-CREATE INDEX "lift_ingests_strong_slug_idx" ON "lift_ingests" USING btree ("strong_slug");--> statement-breakpoint
+CREATE INDEX "lift_ingests_share_slug_idx" ON "lift_ingests" USING btree ("share_slug");--> statement-breakpoint
 CREATE INDEX "lift_sets_workout_exercise_idx" ON "lift_sets" USING btree ("workout_exercise_id","position");--> statement-breakpoint
 CREATE INDEX "lift_template_exercises_template_idx" ON "lift_template_exercises" USING btree ("template_id","position");--> statement-breakpoint
 CREATE INDEX "lift_workout_activities_activity_idx" ON "lift_workout_activities" USING btree ("activity_id");--> statement-breakpoint
 CREATE INDEX "lift_workout_exercises_workout_idx" ON "lift_workout_exercises" USING btree ("workout_id","position");--> statement-breakpoint
 CREATE INDEX "lift_workout_exercises_exercise_idx" ON "lift_workout_exercises" USING btree ("exercise_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "lift_workouts_strong_slug_idx" ON "lift_workouts" USING btree ("strong_slug") WHERE "lift_workouts"."strong_slug" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX "lift_workouts_share_slug_idx" ON "lift_workouts" USING btree ("share_slug") WHERE "lift_workouts"."share_slug" is not null;--> statement-breakpoint
 CREATE INDEX "lift_workouts_started_local_idx" ON "lift_workouts" USING btree ("started_local" DESC NULLS LAST);
