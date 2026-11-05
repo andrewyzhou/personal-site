@@ -183,8 +183,10 @@ describe("r2 raw backend", () => {
     process.env.R2_ACCESS_KEY_ID = "k";
     process.env.R2_SECRET_ACCESS_KEY = "s";
     const seen: Request[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (req: Request) => {
-      seen.push(req);
+    const bodies: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo, init?: RequestInit) => {
+      seen.push(new Request(input, init));
+      bodies.push(init?.body);
       return new Response(null, { status: seen.length === 1 ? 200 : 412 });
     }));
     const backend = r2RawBackend("raw-bucket");
@@ -196,6 +198,8 @@ describe("r2 raw backend", () => {
     expect(req.url).toBe(`https://acct.r2.cloudflarestorage.com/raw-bucket/${rawKey(sha)}`);
     expect(req.headers.get("if-none-match")).toBe("*");
     expect(req.headers.get("x-amz-checksum-sha256")).toBe(Buffer.from(sha, "hex").toString("base64"));
+    // the original bytes go to fetch (not a re-wrapped stream), so content-length is always sent
+    expect(bodies[0]).toBe(b);
   });
 
   it("refuses to use the public bucket as the raw bucket", () => {
