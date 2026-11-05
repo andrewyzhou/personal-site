@@ -68,7 +68,9 @@ export default function WeeklyMuscleVolume({ overview }: { overview: LiftsOvervi
         ))}
       </ul>
 
-      <table className="sr-only">
+      {/* sr-only on the table itself doesn't clip its width on mobile, so the wrapper carries it */}
+      <div className="sr-only">
+      <table>
         <caption>working sets per muscle group per week (secondary muscles count half)</caption>
         <thead>
           <tr>
@@ -91,6 +93,7 @@ export default function WeeklyMuscleVolume({ overview }: { overview: LiftsOvervi
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
