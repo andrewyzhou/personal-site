@@ -1,4 +1,4 @@
-// wall-clock <-> utc helpers. strong's share text has no zone, so the zone
+// wall-clock <-> utc helpers. share text has no zone, so the zone
 // comes from a linked watch recording when possible, else LIFT_TIMEZONE.
 
 export const DEFAULT_LIFT_TIMEZONE = "America/Los_Angeles";

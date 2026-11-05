@@ -2,17 +2,17 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/db", () => ({}));
 
-import { parseStrongCsv, parseStrongDuration } from "lift-core";
+import { parseWorkoutCsv, parseCsvDuration } from "lift-core";
 import {
   EXPORT_VERSION,
-  STRONG_CSV_HEADER,
+  WORKOUT_CSV_HEADER,
   assembleExport,
   chunkStream,
   exportJsonChunks,
-  strongCsvLines,
-  strongDuration,
+  workoutCsvLines,
+  csvDuration,
   toExportJson,
-  toStrongCsv,
+  toWorkoutCsv,
   type ExerciseRowIn,
   type ExportSet,
   type SetRowIn,
@@ -25,7 +25,7 @@ function wRow(p: Partial<WorkoutRowIn> & Pick<WorkoutRowIn, "id" | "title" | "st
     endedAt: null,
     durationS: null,
     notes: null,
-    source: "strong-text",
+    source: "share-text",
     status: "finished",
     templateId: null,
     workingSets: 0,
@@ -71,42 +71,42 @@ function sRow(workoutExerciseId: string, position: number, s: Partial<ExportSet>
 
 const WORKOUTS = [
   wRow({
-    id: "strong-b",
+    id: "share-b",
     title: "Legs, \"heavy\"",
     startedLocal: "2026-11-02T19:18",
     durationS: 3912,
     notes: "felt good\nknee a bit sore",
     startedAt: new Date("2026-11-03T03:18:00Z"),
   }),
-  wRow({ id: "strong-a", title: "Push Day", startedLocal: "2026-10-27T18:00", durationS: 2700 }),
+  wRow({ id: "share-a", title: "Push Day", startedLocal: "2026-10-27T18:00", durationS: 2700 }),
   wRow({ id: "app-empty", title: "Empty", startedLocal: "2026-10-28T08:00", status: "active" }),
 ];
 const EXERCISES = [
-  eRow("strong-a", 0, "Bench Press (Barbell)", { notes: "pause reps" }),
-  eRow("strong-a", 1, "Pull Up"),
-  eRow("strong-b", 1, "Rowing (Machine)"),
-  eRow("strong-b", 0, "Squat (Barbell)"),
+  eRow("share-a", 0, "Bench Press (Barbell)", { notes: "pause reps" }),
+  eRow("share-a", 1, "Pull Up"),
+  eRow("share-b", 1, "Rowing (Machine)"),
+  eRow("share-b", 0, "Squat (Barbell)"),
   eRow("gone", 0, "Orphan"),
 ];
 const SETS = [
-  sRow("strong-a:0", 1, { weight: 185, unit: "lb", reps: 5, rpe: 8 }),
-  sRow("strong-a:0", 0, { kind: "warmup", weight: 135, unit: "lb", reps: 5 }),
-  sRow("strong-a:0", 2, { weight: 185, unit: "lb", reps: 5, note: "grindy, but ok" }),
-  sRow("strong-a:0", 3, { kind: "drop", weight: 135, unit: "lb", reps: 10 }),
-  sRow("strong-a:0", 4, { weight: 205, unit: "lb", reps: 1, completed: false }),
-  sRow("strong-a:1", 0, { reps: 10, bodyweight: true }),
-  sRow("strong-a:1", 1, { weight: -40, unit: "lb", reps: 8, bodyweight: true }),
-  sRow("strong-a:1", 2, { kind: "failure", reps: 6, bodyweight: true }),
-  sRow("strong-b:0", 0, { weight: 100, unit: "kg", reps: 5 }),
-  sRow("strong-b:0", 1, { weight: 102.5, unit: "kg", reps: 3, rpe: 9.5 }),
-  sRow("strong-b:1", 0, { distanceM: 2000, durationS: 480 }),
+  sRow("share-a:0", 1, { weight: 185, unit: "lb", reps: 5, rpe: 8 }),
+  sRow("share-a:0", 0, { kind: "warmup", weight: 135, unit: "lb", reps: 5 }),
+  sRow("share-a:0", 2, { weight: 185, unit: "lb", reps: 5, note: "grindy, but ok" }),
+  sRow("share-a:0", 3, { kind: "drop", weight: 135, unit: "lb", reps: 10 }),
+  sRow("share-a:0", 4, { weight: 205, unit: "lb", reps: 1, completed: false }),
+  sRow("share-a:1", 0, { reps: 10, bodyweight: true }),
+  sRow("share-a:1", 1, { weight: -40, unit: "lb", reps: 8, bodyweight: true }),
+  sRow("share-a:1", 2, { kind: "failure", reps: 6, bodyweight: true }),
+  sRow("share-b:0", 0, { weight: 100, unit: "kg", reps: 5 }),
+  sRow("share-b:0", 1, { weight: 102.5, unit: "kg", reps: 3, rpe: 9.5 }),
+  sRow("share-b:1", 0, { distanceM: 2000, durationS: 480 }),
   sRow("missing:0", 0, { weight: 1, unit: "lb", reps: 1 }),
 ];
 
 describe("assembleExport", () => {
   it("nests rows in order and drops orphans", () => {
     const out = assembleExport(WORKOUTS, EXERCISES, SETS);
-    expect(out.map((w) => w.id)).toEqual(["strong-a", "app-empty", "strong-b"]);
+    expect(out.map((w) => w.id)).toEqual(["share-a", "app-empty", "share-b"]);
     expect(out[0].exercises.map((e) => e.name)).toEqual(["Bench Press (Barbell)", "Pull Up"]);
     expect(out[0].exercises[0].sets.map((s) => s.position)).toEqual([0, 1, 2, 3, 4]);
     expect(out[0].exercises[0].notes).toBe("pause reps");
@@ -134,19 +134,19 @@ describe("json export", () => {
   });
 });
 
-describe("strong csv export", () => {
+describe("workout csv export", () => {
   it("durations read back exactly", () => {
-    for (const s of [0, 30, 59, 60, 2700, 3600, 3912, 7261]) expect(parseStrongDuration(strongDuration(s))).toBe(s);
-    expect(strongDuration(3900)).toBe("1h 5m");
-    expect(strongDuration(2700)).toBe("45m");
-    expect(strongDuration(null)).toBe("");
+    for (const s of [0, 30, 59, 60, 2700, 3600, 3912, 7261]) expect(parseCsvDuration(csvDuration(s))).toBe(s);
+    expect(csvDuration(3900)).toBe("1h 5m");
+    expect(csvDuration(2700)).toBe("45m");
+    expect(csvDuration(null)).toBe("");
   });
 
-  it("writes strong's columns, quoting where needed", () => {
-    const csv = toStrongCsv(assembleExport(WORKOUTS, EXERCISES, SETS));
+  it("writes the export columns, quoting where needed", () => {
+    const csv = toWorkoutCsv(assembleExport(WORKOUTS, EXERCISES, SETS));
     const lines = csv.trimEnd().split("\n");
-    expect(lines[0]).toBe(STRONG_CSV_HEADER.join(","));
-    expect(STRONG_CSV_HEADER.slice(0, 12)).toEqual([
+    expect(lines[0]).toBe(WORKOUT_CSV_HEADER.join(","));
+    expect(WORKOUT_CSV_HEADER.slice(0, 12)).toEqual([
       "Date", "Workout Name", "Duration", "Exercise Name", "Set Order", "Weight", "Reps", "Distance", "Seconds", "Notes", "Workout Notes", "RPE",
     ]);
     expect(lines[1]).toBe("2026-10-27 18:00:00,Push Day,45m,Bench Press (Barbell),W,135,5,0,0,,,,lb,");
@@ -160,9 +160,9 @@ describe("strong csv export", () => {
     expect(csv).toContain('"felt good\nknee a bit sore"');
   });
 
-  it("round-trips through parseStrongCsv", () => {
+  it("round-trips through parseWorkoutCsv", () => {
     const exported = assembleExport(WORKOUTS, EXERCISES, SETS);
-    const { workouts, warnings } = parseStrongCsv(toStrongCsv(exported));
+    const { workouts, warnings } = parseWorkoutCsv(toWorkoutCsv(exported));
     expect(warnings).toEqual([]);
     expect(workouts).toHaveLength(2);
 
@@ -202,8 +202,8 @@ describe("strong csv export", () => {
   });
 
   it("an empty export is just the header", () => {
-    expect(toStrongCsv([])).toBe(STRONG_CSV_HEADER.join(",") + "\n");
-    expect(parseStrongCsv(toStrongCsv([]))).toEqual({ workouts: [], warnings: [] });
+    expect(toWorkoutCsv([])).toBe(WORKOUT_CSV_HEADER.join(",") + "\n");
+    expect(parseWorkoutCsv(toWorkoutCsv([]))).toEqual({ workouts: [], warnings: [] });
   });
 
   it("leaves out active and discarded workouts, even with completed sets; json keeps them", () => {
@@ -215,11 +215,11 @@ describe("strong csv export", () => {
     const exs = workouts.map((w) => eRow(w.id, 0, "Squat (Barbell)"));
     const sets = workouts.map((w) => sRow(`${w.id}:0`, 0, { weight: 100, unit: "kg", reps: 5 }));
     const exported = assembleExport(workouts, exs, sets);
-    const csv = toStrongCsv(exported);
+    const csv = toWorkoutCsv(exported);
     expect(csv).toContain("Done");
     expect(csv).not.toContain("Still Going");
     expect(csv).not.toContain("Tossed");
-    expect(parseStrongCsv(csv).workouts).toHaveLength(1);
+    expect(parseWorkoutCsv(csv).workouts).toHaveLength(1);
     const doc = toExportJson(exported, new Date(0), "UTC");
     expect(doc.workouts.map((w) => [w.id, w.status])).toEqual([["done", "finished"], ["binned", "discarded"], ["live", "active"]]);
   });
@@ -244,9 +244,9 @@ describe("streamed export", () => {
   const at = new Date("2026-11-04T20:00:00Z");
 
   it("csv streams the same bytes the builder makes", async () => {
-    expect([...strongCsvLines(exported)].join("")).toBe(toStrongCsv(exported));
-    expect((await drain(chunkStream(strongCsvLines(exported)))).text).toBe(toStrongCsv(exported));
-    expect((await drain(chunkStream(strongCsvLines([])))).text).toBe(toStrongCsv([]));
+    expect([...workoutCsvLines(exported)].join("")).toBe(toWorkoutCsv(exported));
+    expect((await drain(chunkStream(workoutCsvLines(exported)))).text).toBe(toWorkoutCsv(exported));
+    expect((await drain(chunkStream(workoutCsvLines([])))).text).toBe(toWorkoutCsv([]));
   });
 
   it("json streams the same document, compact", async () => {
@@ -259,9 +259,9 @@ describe("streamed export", () => {
 
   it("a big export arrives in several chunks, not one string", async () => {
     const many = Array.from({ length: 3000 }, (_, i) => ({ ...exported[0], id: `w${i}` }));
-    const { text, chunks } = await drain(chunkStream(strongCsvLines(many)));
+    const { text, chunks } = await drain(chunkStream(workoutCsvLines(many)));
     expect(chunks).toBeGreaterThan(1);
-    expect(text).toBe(toStrongCsv(many));
+    expect(text).toBe(toWorkoutCsv(many));
   });
 
   it("utf-8 survives chunk boundaries", async () => {

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { e1rm, fromKg, isWorkingSet, LB_PER_KG, setVolumeKg, summarizeWorkout, toKg } from "../math";
-import { parseStrongText } from "../parse-strong";
+import { parseShareText } from "../parse-share-text";
 import type { ParsedSet, ParsedWorkout } from "../types";
 
 function set(over: Partial<ParsedSet>): ParsedSet {
@@ -99,8 +99,8 @@ describe("isWorkingSet / setVolumeKg", () => {
 
 describe("summarizeWorkout", () => {
   it("summarizes the us push day fixture", () => {
-    const text = readFileSync(path.join(__dirname, "fixtures", "strong", "us-push-day.txt"), "utf8");
-    const s = summarizeWorkout(parseStrongText(text));
+    const text = readFileSync(path.join(__dirname, "fixtures", "share-text", "us-push-day.txt"), "utf8");
+    const s = summarizeWorkout(parseShareText(text));
     expect(s.exerciseCount).toBe(7);
     expect(s.unit).toBe("lb");
 

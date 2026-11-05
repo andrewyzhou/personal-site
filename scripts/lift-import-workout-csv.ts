@@ -1,7 +1,7 @@
-// one-time backfill of strong's "export data" csv into the lift tables.
-//   dry run (default, read-only): npm run lift:import-csv -- strong.csv [--unit lb|kg] [--json]
-//   write:                        npm run lift:import-csv -- strong.csv --unit lb --apply
-// takes the .csv, the .zip strong hands out, or a folder holding one csv.
+// one-time backfill of a workout app's "export data" csv into the lift tables.
+//   dry run (default, read-only): npm run lift:import-csv -- workouts.csv [--unit lb|kg] [--json]
+//   write:                        npm run lift:import-csv -- workouts.csv --unit lb --apply
+// takes the .csv, the .zip the app hands out, or a folder holding one csv.
 // workouts already logged (same start minute + title, or same minute + mostly
 // the same exercises) are skipped, so re-running only adds what's missing.
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -20,7 +20,7 @@ import {
 } from "../src/lib/lift/csv-report";
 import { buildWorkoutWrites, loadMergeRedirects } from "../src/lib/lift/ingest";
 import { linkWorkout } from "../src/lib/lift/link";
-import { csvIngestRow, planCsvWorkouts, type ExistingWorkoutKey } from "../src/lib/lift/sync/strong-csv";
+import { csvIngestRow, planCsvWorkouts, type ExistingWorkoutKey } from "../src/lib/lift/sync/workout-csv";
 
 const WORKOUTS_PER_BATCH = 10;
 // keeps each IN (...) list well under postgres' parameter cap
@@ -34,7 +34,7 @@ interface Args {
 }
 
 function usage(): never {
-  console.error("usage: npm run lift:import-csv -- <strong.csv | export.zip | folder> [--unit lb|kg] [--json] [--apply]");
+  console.error("usage: npm run lift:import-csv -- <workouts.csv | export.zip | folder> [--unit lb|kg] [--json] [--apply]");
   process.exit(1);
 }
 

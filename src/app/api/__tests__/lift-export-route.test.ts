@@ -11,14 +11,14 @@ import { GET } from "@/app/api/lift/export/route";
 import { ExportTooLargeError, type ExportWorkout } from "@/lib/lift/export";
 
 const WORKOUT: ExportWorkout = {
-  id: "strong-a",
+  id: "share-a",
   title: "Push Day",
   startedLocal: "2026-10-27T18:00",
   startedAt: null,
   endedAt: null,
   durationS: 2700,
   notes: "private note",
-  source: "strong-text",
+  source: "share-text",
   status: "finished",
   templateId: null,
   workingSets: 1,
@@ -133,7 +133,7 @@ describe("GET /api/lift/export", () => {
       version: 1,
       timezone: "America/Los_Angeles",
       counts: { workouts: 1, exercises: 1, sets: 1 },
-      workouts: [{ id: "strong-a", notes: "private note" }],
+      workouts: [{ id: "share-a", notes: "private note" }],
     });
   });
 

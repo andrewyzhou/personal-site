@@ -1,7 +1,7 @@
 import type { Equipment, Exercise, ExerciseCategory, MuscleRegion, TrackingType } from "../types";
 
-// hand-curated entries. names follow strong's "Movement (Equipment)" style because
-// strong share text is ingested by exact name. order matters: within a search tier
+// hand-curated entries. names follow the share text's "Movement (Equipment)" style because
+// share text is ingested by exact name. order matters: within a search tier
 // ties fall back to this order, so the most common variant of a movement goes first.
 //
 // ids are derived from the name once (slugify) and must never change after shipping.

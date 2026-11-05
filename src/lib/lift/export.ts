@@ -1,5 +1,5 @@
 // owner-only data export: every non-deleted workout with its exercises and sets,
-// as strong-style csv (round-trips through lift-core parseStrongCsv) or as a
+// as a workout csv (round-trips through lift-core parseWorkoutCsv) or as a
 // versioned json document. notes are included: the route is authenticated.
 
 import { asc, count, eq, isNull } from "drizzle-orm";
@@ -175,11 +175,11 @@ export function* exportJsonChunks(workouts: readonly ExportWorkout[], exportedAt
 }
 
 // ---------------------------------------------------------------------------
-// strong csv (pure)
+// workout csv (pure)
 
-// strong's export columns, plus the two unit columns its older exports carried:
+// the export columns, plus the two unit columns its older exports carried:
 // without them a kg set or a distance would silently come back as lb / miles
-export const STRONG_CSV_HEADER = [
+export const WORKOUT_CSV_HEADER = [
   "Date",
   "Workout Name",
   "Duration",
@@ -207,7 +207,7 @@ function csvDate(startedLocal: string): string {
 }
 
 /** seconds -> "1h 5m", "45m", "1h 5m 12s"; empty when unknown */
-export function strongDuration(s: number | null): string {
+export function csvDuration(s: number | null): string {
   if (s === null || !Number.isFinite(s) || s < 0) return "";
   const t = Math.round(s);
   const h = Math.floor(t / 3600);
@@ -223,17 +223,17 @@ export function strongDuration(s: number | null): string {
 const numText = (n: number | null) => (n === null || !Number.isFinite(n) ? "0" : String(n));
 
 /**
- * one row per completed set (strong's export has no unfinished sets), in
- * workout -> exercise -> set order. finished workouts only: strong never
+ * one row per completed set (the export has no unfinished sets), in
+ * workout -> exercise -> set order. finished workouts only: the export never
  * exports an active or discarded one, and a re-import would make them real
  * sessions. workouts with no completed sets have no row to live on and are
  * left out too; the json export keeps everything, with its status.
  */
-export function* strongCsvLines(workouts: readonly ExportWorkout[]): Generator<string> {
-  yield STRONG_CSV_HEADER.join(",") + "\n";
+export function* workoutCsvLines(workouts: readonly ExportWorkout[]): Generator<string> {
+  yield WORKOUT_CSV_HEADER.join(",") + "\n";
   for (const w of workouts) {
     if (w.status !== "finished") continue;
-    const head = [csvDate(w.startedLocal), w.title, strongDuration(w.durationS)];
+    const head = [csvDate(w.startedLocal), w.title, csvDuration(w.durationS)];
     for (const ex of w.exercises) {
       let n = 0;
       for (const s of ex.sets) {
@@ -243,7 +243,7 @@ export function* strongCsvLines(workouts: readonly ExportWorkout[]): Generator<s
           ...head,
           ex.nameRaw || ex.name,
           order,
-          // strong writes 0 for "not recorded" in its numeric columns
+          // the export writes 0 for "not recorded" in its numeric columns
           numText(s.weight),
           numText(s.reps),
           numText(s.distanceM),
@@ -260,9 +260,9 @@ export function* strongCsvLines(workouts: readonly ExportWorkout[]): Generator<s
   }
 }
 
-export function toStrongCsv(workouts: readonly ExportWorkout[]): string {
+export function toWorkoutCsv(workouts: readonly ExportWorkout[]): string {
   let out = "";
-  for (const line of strongCsvLines(workouts)) out += line;
+  for (const line of workoutCsvLines(workouts)) out += line;
   return out;
 }
 

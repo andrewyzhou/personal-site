@@ -403,9 +403,9 @@ describe("phone outbox -> server push (m1-era rows)", () => {
 const C = new Date("2026-10-01T01:00:00Z");
 const U = new Date("2026-10-01T02:00:00Z");
 
-function strongWorkout(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
+function sharedWorkout(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
   return {
-    id: "strong-Slug1",
+    id: "share-Slug1",
     title: "Evening Workout",
     startedLocal: "2026-09-30T18:12",
     startedAt: new Date("2026-10-01T01:12:00Z"),
@@ -413,11 +413,11 @@ function strongWorkout(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
     endedAt: null,
     durationS: 3900,
     notes: "felt good",
-    source: "strong-text",
+    source: "share-text",
     status: "finished",
     templateId: null,
     latestIngestId: "ing_x",
-    strongSlug: "Slug1",
+    shareSlug: "Slug1",
     workingSets: 3,
     volumeKg: 1000,
     muscleLoad: {},
@@ -429,13 +429,13 @@ function strongWorkout(over: Partial<LiftWorkoutRow> = {}): LiftWorkoutRow {
 }
 
 function snapshotRows() {
-  const strongCustom: ExerciseRow = {
+  const importedCustom: ExerciseRow = {
     id: customExerciseId("Belt Squat (Machine)"),
     name: "Belt Squat (Machine)",
     equipment: "machine",
     category: "strength",
     tracking: "weight_reps",
-    source: "strong",
+    source: "import",
     isCustom: true,
     archived: false,
     freeDbId: null,
@@ -443,28 +443,28 @@ function snapshotRows() {
     createdAt: C,
     updatedAt: U,
   };
-  const old = strongWorkout({ id: "strong-0123456789abcdef", strongSlug: null, startedAt: null, startedLocal: "2025-03-09T07:30", durationS: null });
-  const app = strongWorkout({ id: "w-app", source: "app", status: "discarded", deletedAt: U, utcOffsetMin: -420, title: "Push", latestIngestId: null, strongSlug: null, startedLocal: "2026-09-30T18:12" });
+  const old = sharedWorkout({ id: "share-0123456789abcdef", shareSlug: null, startedAt: null, startedLocal: "2025-03-09T07:30", durationS: null });
+  const app = sharedWorkout({ id: "w-app", source: "app", status: "discarded", deletedAt: U, utcOffsetMin: -420, title: "Push", latestIngestId: null, shareSlug: null, startedLocal: "2026-09-30T18:12" });
   const wes: LiftWorkoutExerciseRow[] = [
-    { id: "strong-Slug1:0", workoutId: "strong-Slug1", exerciseId: BENCH, position: 0, nameRaw: "Bench Press (Barbell)", notes: null, supersetGroup: null, restS: null, createdAt: C, updatedAt: U },
-    { id: "strong-Slug1:1", workoutId: "strong-Slug1", exerciseId: strongCustom.id, position: 1, nameRaw: "Belt Squat (Machine)", notes: "pin 4", supersetGroup: 1, restS: null, createdAt: C, updatedAt: U },
-    { id: "strong-0123456789abcdef:0", workoutId: old.id, exerciseId: "pull-up", position: 0, nameRaw: "Pull Up", notes: null, supersetGroup: null, restS: null, createdAt: C, updatedAt: U },
+    { id: "share-Slug1:0", workoutId: "share-Slug1", exerciseId: BENCH, position: 0, nameRaw: "Bench Press (Barbell)", notes: null, supersetGroup: null, restS: null, createdAt: C, updatedAt: U },
+    { id: "share-Slug1:1", workoutId: "share-Slug1", exerciseId: importedCustom.id, position: 1, nameRaw: "Belt Squat (Machine)", notes: "pin 4", supersetGroup: 1, restS: null, createdAt: C, updatedAt: U },
+    { id: "share-0123456789abcdef:0", workoutId: old.id, exerciseId: "pull-up", position: 0, nameRaw: "Pull Up", notes: null, supersetGroup: null, restS: null, createdAt: C, updatedAt: U },
   ];
   const set = (id: string, weId: string, over: Partial<LiftSetRow> = {}): LiftSetRow => ({
     id, workoutExerciseId: weId, position: 0, kind: "normal", weight: 185, unit: "lb", weightKg: 83.9, reps: 5, durationS: null, distanceM: null, rpe: null, bodyweight: false, note: null, e1rmKg: 97.9, completed: true, createdAt: C, updatedAt: U, ...over,
   });
   return {
-    customExercises: [strongCustom],
-    muscles: [{ exerciseId: strongCustom.id, region: "quads", role: "primary" }],
+    customExercises: [importedCustom],
+    muscles: [{ exerciseId: importedCustom.id, region: "quads", role: "primary" }],
     templateFolders: [],
     templates: [],
     templateExercises: [],
-    workouts: [strongWorkout(), old, app],
+    workouts: [sharedWorkout(), old, app],
     workoutExercises: wes,
     sets: [
-      set("strong-Slug1:0:0", "strong-Slug1:0", { kind: "warmup" }),
-      set("strong-Slug1:1:0", "strong-Slug1:1", { unit: null, weight: null, rpe: 9 }),
-      set("strong-0123456789abcdef:0:0", "strong-0123456789abcdef:0", { weight: 25, bodyweight: true, kind: "failure" }),
+      set("share-Slug1:0:0", "share-Slug1:0", { kind: "warmup" }),
+      set("share-Slug1:1:0", "share-Slug1:1", { unit: null, weight: null, rpe: 9 }),
+      set("share-0123456789abcdef:0:0", "share-0123456789abcdef:0", { weight: 25, bodyweight: true, kind: "failure" }),
     ],
     bodyweights: [{ id: "bw1", measuredAt: C, weight: 180, unit: "lb", note: null, createdAt: C, updatedAt: U }],
     programs: [
@@ -512,7 +512,7 @@ describe("server snapshot -> phone restore", () => {
     expect((sqlite.prepare("SELECT count(*) AS n FROM sets").get() as { n: number }).n).toBe(3);
   });
 
-  it("restored rows pushed back (edits of strong-ingested workouts) are accepted", () => {
+  it("restored rows pushed back (edits of share-ingested workouts) are accepted", () => {
     const snap = buildSnapshot(snapshotRows(), new Date(), TZ);
     const server = new FakeServer();
     // what the server already holds
@@ -532,7 +532,7 @@ describe("server snapshot -> phone restore", () => {
     expect(push(o, server).rejected).toEqual([]);
   });
 
-  it("pushing back a restored strong workout keeps its wall-clock start", () => {
+  it("pushing back a restored shared workout keeps its wall-clock start", () => {
     const rows = snapshotRows();
     const snap = buildSnapshot(rows, new Date(), TZ);
     for (const [i, p] of snap.workouts.entries()) {

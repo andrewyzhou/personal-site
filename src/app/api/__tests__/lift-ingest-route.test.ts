@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { ingest } = vi.hoisted(() => ({ ingest: vi.fn() }));
-vi.mock("@/lib/lift/ingest", () => ({ ingestStrongText: (...a: unknown[]) => ingest(...a) }));
+vi.mock("@/lib/lift/ingest", () => ({ ingestShareText: (...a: unknown[]) => ingest(...a) }));
 
-import { POST } from "@/app/api/lift/ingest/strong-text/route";
+import { POST } from "@/app/api/lift/ingest/share-text/route";
 
-const URL_ = "http://localhost/api/lift/ingest/strong-text";
+const URL_ = "http://localhost/api/lift/ingest/share-text";
 const TEXT = "Push Day\nWednesday, November 4, 2026 at 6:12 PM\n\nBench Press (Barbell)\nSet 1: 185 lb × 5";
 
 function req(body: BodyInit | null, headers: Record<string, string> = {}, token: string | null = "tok"): Request {
@@ -22,7 +22,7 @@ function result(status: "created" | "updated" | "duplicate" | "empty") {
     status,
     duplicate: status === "duplicate",
     ingestId: "ing_1",
-    workoutId: status === "empty" ? null : "strong-x",
+    workoutId: status === "empty" ? null : "share-x",
     summary: null,
     text: status === "empty" ? empty : "logged push day",
     details: status === "empty" ? empty : DETAILS,
@@ -31,7 +31,7 @@ function result(status: "created" | "updated" | "duplicate" | "empty") {
   };
 }
 
-describe("POST /api/lift/ingest/strong-text", () => {
+describe("POST /api/lift/ingest/share-text", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.LIFT_INGEST_TOKEN = "tok";
@@ -61,7 +61,7 @@ describe("POST /api/lift/ingest/strong-text", () => {
       duplicate: false,
       updated: false,
       ingestId: "ing_1",
-      workoutId: "strong-x",
+      workoutId: "share-x",
       summary: null,
       // the shortcut notification stays one line; details carries the breakdown
       text: "logged push day",
@@ -124,12 +124,12 @@ describe("POST /api/lift/ingest/strong-text", () => {
     ingest.mockResolvedValueOnce(result("duplicate"));
     const dup = await POST(req(TEXT, { "content-type": "text/plain" }));
     expect(dup.status).toBe(200);
-    expect(await dup.json()).toMatchObject({ ok: true, duplicate: true, updated: false, workoutId: "strong-x" });
+    expect(await dup.json()).toMatchObject({ ok: true, duplicate: true, updated: false, workoutId: "share-x" });
 
     ingest.mockResolvedValueOnce(result("updated"));
     const upd = await POST(req(TEXT, { "content-type": "text/plain" }));
     expect(upd.status).toBe(200);
-    expect(await upd.json()).toMatchObject({ ok: true, duplicate: false, updated: true, workoutId: "strong-x", details: DETAILS });
+    expect(await upd.json()).toMatchObject({ ok: true, duplicate: false, updated: true, workoutId: "share-x", details: DETAILS });
 
     ingest.mockResolvedValueOnce(result("empty"));
     const empty = await POST(req("hello", { "content-type": "text/plain" }));

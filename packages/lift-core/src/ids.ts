@@ -1,4 +1,4 @@
-// stable ids shared by the site (strong ingest) and the phone (custom exercises),
+// stable ids shared by the site (share-text ingest) and the phone (custom exercises),
 // so the same custom name maps to the same exercise row on both sides.
 import { normalizeName } from "./catalog";
 

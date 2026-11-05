@@ -460,7 +460,7 @@ export const QUERY_EXAMPLES = [
 ];
 
 export const HELP_TEXT = [
-  "share a workout from strong to this chat to log it, or ask:",
+  "share a workout to this chat to log it, or ask:",
   ...QUERY_EXAMPLES.map((q) => `· ${q}`),
   "times: today, yesterday, this/last week, this/last month, last 30 days, since oct 1, in march",
 ].join("\n");

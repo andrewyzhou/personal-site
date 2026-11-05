@@ -17,9 +17,9 @@ import {
   dedupeKey,
   partitionCsvWorkouts,
   planCsvWorkouts,
-} from "@/lib/lift/sync/strong-csv";
+} from "@/lib/lift/sync/workout-csv";
 
-// what parseStrongCsv returns for a tiny export (the parser itself is tested in lift-core)
+// what parseWorkoutCsv returns for a tiny export (the parser itself is tested in lift-core)
 const CSV = `Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE
 2024-01-02 18:00:00,Push Day,1h 5m,Bench Press (Barbell),1,185,5,0,0,,,
 2024-01-02 18:00:00,Push Day,1h 5m,Bench Press (Barbell),2,185,5,0,0,,,
@@ -56,7 +56,7 @@ function workout(title: string, startedLocal: string | null, exercise = "Bench P
   };
 }
 
-describe("strong csv import", () => {
+describe("workout csv import", () => {
   it("dedupes on start minute + normalized title", () => {
     expect(dedupeKey("  Push Day ", "2024-01-02T18:00")).toBe(dedupeKey("push day", "2024-01-02T18:00"));
     expect(dedupeKey("Push Day!", "2024-01-02T18:00")).toBe(dedupeKey("push day", "2024-01-02T18:00"));
@@ -66,8 +66,8 @@ describe("strong csv import", () => {
 
   it("derives stable ids from title + start", () => {
     const id = csvWorkoutId("Push Day", "2024-01-02T18:00");
-    expect(id).toMatch(/^strong-csv-[0-9a-f]{16}$/);
-    expect(id).toBe(`strong-csv-${sha256Hex("push day|2024-01-02T18:00").slice(0, 16)}`);
+    expect(id).toMatch(/^workout-csv-[0-9a-f]{16}$/);
+    expect(id).toBe(`workout-csv-${sha256Hex("push day|2024-01-02T18:00").slice(0, 16)}`);
     expect(csvWorkoutId(" push  day ", "2024-01-02T18:00")).toBe(id);
   });
 
@@ -94,7 +94,7 @@ describe("strong csv import", () => {
   it("plans csv workouts through the ingest planner with csv provenance and duration", () => {
     const sha = sha256Hex(CSV);
     const ingest = csvIngestRow(CSV, sha, []);
-    expect(ingest).toMatchObject({ id: `ing_${sha.slice(0, 24)}`, source: "strong-csv", rawSha256: sha, rawText: CSV, workoutId: null });
+    expect(ingest).toMatchObject({ id: `ing_${sha.slice(0, 24)}`, source: "workout-csv", rawSha256: sha, rawText: CSV, workoutId: null });
 
     const { plans, customIds } = planCsvWorkouts([workout("Push Day", "2024-01-02T18:00", "Bench Press (Barbell)", 3900)], {
       ingestId: ingest.id,
@@ -104,9 +104,9 @@ describe("strong csv import", () => {
     const w = plans[0].workout;
     expect(w).toMatchObject({
       id: csvWorkoutId("Push Day", "2024-01-02T18:00"),
-      source: "strong-csv",
+      source: "workout-csv",
       latestIngestId: ingest.id,
-      strongSlug: null,
+      shareSlug: null,
       startedLocal: "2024-01-02T18:00",
       startedAt: new Date("2024-01-03T02:00:00Z"),
       durationS: 3900,

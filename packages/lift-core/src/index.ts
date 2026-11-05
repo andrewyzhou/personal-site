@@ -1,5 +1,5 @@
 export * from "./types";
-export * from "./parse-strong";
+export * from "./parse-share-text";
 export * from "./math";
 export * from "./link";
 export * from "./catalog";
@@ -9,7 +9,7 @@ export * from "./sync";
 export * from "./ids";
 export * from "./calc";
 export * from "./history";
-export * from "./parse-strong-csv";
+export * from "./parse-workout-csv";
 export * from "./body";
 export * from "./prs";
 export * from "./progression";

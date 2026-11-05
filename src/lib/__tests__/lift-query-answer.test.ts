@@ -233,7 +233,7 @@ describe("lift bot answers", () => {
   it("help and unknown", async () => {
     const s = store();
     expect(await ask("/help", s)).toBe(HELP_TEXT);
-    expect(HELP_TEXT).toMatch(/^share a workout from strong to this chat to log it, or ask:/);
+    expect(HELP_TEXT).toMatch(/^share a workout to this chat to log it, or ask:/);
     expect(await ask("thanks", s)).toMatch(/^not sure what you're asking\. try:/);
     expect(await ask("best leg day", s)).toMatch(/^not sure what you're asking/);
     expect(s.calls).toEqual([]);

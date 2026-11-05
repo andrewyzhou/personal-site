@@ -1,14 +1,14 @@
-import { parseStrongDate } from "./parse-strong";
+import { parseShareDate } from "./parse-share-text";
 import type { DistanceUnit, ParsedExercise, ParsedSet, ParsedWorkout, ParseWarning, SetKind, WeightUnit } from "./types";
 
-export interface StrongCsvOptions {
-  /** unit the export's weight column is in (strong exports in the app's unit setting); default "lb" */
+export interface WorkoutCsvOptions {
+  /** unit the export's weight column is in (exports use the app's unit setting); default "lb" */
   weightUnit?: WeightUnit;
   /** unit of the distance column; default "mi" */
   distanceUnit?: "mi" | "km";
 }
 
-export interface StrongCsvResult {
+export interface WorkoutCsvResult {
   /** one per (date, workout name), oldest first; linkSlug is always null */
   workouts: ParsedWorkout[];
   warnings: ParseWarning[];
@@ -143,8 +143,8 @@ function distanceUnitOf(s: string): DistanceUnit | null {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** "2024-03-14 18:30:00" -> "2024-03-14T18:30"; also m/d/yyyy and strong's share-text dates */
-export function parseStrongCsvDate(s: string): string | null {
+/** "2024-03-14 18:30:00" -> "2024-03-14T18:30"; also m/d/yyyy and share-text dates */
+export function parseWorkoutCsvDate(s: string): string | null {
   const t = s.trim();
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(t);
   if (m) {
@@ -159,7 +159,7 @@ export function parseStrongCsvDate(s: string): string | null {
     if (ampm === "a" && h === 12) h = 0;
     return valid(Number(m[3]), Number(m[1]), Number(m[2]), h, Number(m[5] ?? 0));
   }
-  return t ? parseStrongDate(t) : null;
+  return t ? parseShareDate(t) : null;
 }
 
 function valid(y: number, mo: number, d: number, h: number, mi: number): string | null {
@@ -170,7 +170,7 @@ function valid(y: number, mo: number, d: number, h: number, mi: number): string 
 }
 
 /** "1h 5m" / "45m" / "1h" / "30s" / "1:05:00" / bare seconds -> seconds; null when unreadable */
-export function parseStrongDuration(s: string): number | null {
+export function parseCsvDuration(s: string): number | null {
   const t = s.trim().toLowerCase();
   if (!t) return null;
   if (/^\d+(\.\d+)?$/.test(t)) return Math.round(Number(t));
@@ -260,13 +260,13 @@ interface Group {
 }
 
 /**
- * parse strong's "export data" csv (comma or semicolon separated, quoted fields,
+ * parse a workout app's "export data" csv (comma or semicolon separated, quoted fields,
  * header row with Date, Workout Name, Duration, Exercise Name, Set Order,
  * Weight, Reps, Distance, Seconds, Notes, Workout Notes, RPE). tolerant:
  * unknown columns ignored, bad rows become warnings. the top-level warnings
  * list everything; each workout also carries the ones for its own rows.
  */
-export function parseStrongCsv(text: string, options?: StrongCsvOptions): StrongCsvResult {
+export function parseWorkoutCsv(text: string, options?: WorkoutCsvOptions): WorkoutCsvResult {
   const warnings: ParseWarning[] = [];
   const warn = (line: number, message: string, t: string, into?: ParsedWorkout) => {
     const w = { line, message, text: t };
@@ -285,7 +285,7 @@ export function parseStrongCsv(text: string, options?: StrongCsvOptions): Strong
   const header = records[headerIdx];
   const cols = mapHeader(header.fields);
   if (cols.date === undefined || cols.exercise === undefined) {
-    warn(header.line, "not a strong csv export: missing Date or Exercise Name column", header.raw.trim());
+    warn(header.line, "not a workout csv export: missing Date or Exercise Name column", header.raw.trim());
     return { workouts: [], warnings };
   }
   const get = (r: CsvRecord, c: Col) => {
@@ -304,7 +304,7 @@ export function parseStrongCsv(text: string, options?: StrongCsvOptions): Strong
     const key = `${dateText}\u0000${title}`;
     let g = groups.get(key);
     if (!g) {
-      const startedLocal = parseStrongCsvDate(dateText);
+      const startedLocal = parseWorkoutCsvDate(dateText);
       g = {
         workout: { title, startedLocal, exercises: [], notes: [], link: null, linkSlug: null, warnings: [], durationS: null },
         firstIndex: ri,
@@ -321,7 +321,7 @@ export function parseStrongCsv(text: string, options?: StrongCsvOptions): Strong
       const durText = get(r, "duration");
       if (durText) {
         g.durationSeen = true;
-        w.durationS = parseStrongDuration(durText);
+        w.durationS = parseCsvDuration(durText);
         if (w.durationS === null) warn(r.line, "unreadable duration", durText, w);
       }
     }
@@ -403,7 +403,7 @@ function rowToSet(
   // a half-read row would silently become a different set (e.g. bodyweight), so drop it
   if (unreadable.length) return `unreadable ${unreadable.join(", ")}`;
 
-  // strong writes 0 for "not recorded" in every numeric column
+  // the export writes 0 for "not recorded" in every numeric column
   const weight = weightRaw !== null && weightRaw !== 0 ? weightRaw : null;
   const reps = repsRaw !== null && repsRaw > 0 ? Math.round(repsRaw) : null;
   const distance = distRaw !== null && distRaw > 0 ? distRaw : null;

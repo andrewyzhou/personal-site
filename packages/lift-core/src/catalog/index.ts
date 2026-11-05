@@ -91,7 +91,7 @@ export function looseKey(name: string): string {
   return out.join(" ");
 }
 
-// strong prints attachment detail after a dash inside the parens: "(Cable - Straight Bar)"
+// share text prints attachment detail after a dash inside the parens: "(Cable - Straight Bar)"
 const DASH_SUFFIX = /\(\s*([^()]*?)\s+-\s+[^()]*\)\s*$/;
 
 function reducedSuffix(name: string): string | null {
@@ -130,7 +130,7 @@ function nameIndex(catalog: readonly Exercise[]): Map<string, Exercise> {
   return index;
 }
 
-/** exact canonical-name or alias match (after normalizeName); used by the strong ingest */
+/** exact canonical-name or alias match (after normalizeName); used by the share-text ingest */
 export function resolveExerciseName(name: string, catalog: readonly Exercise[] = EXERCISES): Exercise | undefined {
   const index = nameIndex(catalog);
   const hit = index.get(looseKey(name));

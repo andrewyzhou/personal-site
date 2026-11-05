@@ -225,7 +225,7 @@ describe("planSync", () => {
     expect(sqls[3]).toMatch(/ where "lift_workouts"."updated_at" <= excluded."updated_at"$/);
     expect(sqls[3]).toContain('"status" = excluded."status"');
     expect(sqls[3]).toContain('"deleted_at" = excluded."deleted_at"');
-    for (const kept of ["source", "created_at", "working_sets", "volume_kg", "muscle_load", "strong_slug", "latest_ingest_id"]) {
+    for (const kept of ["source", "created_at", "working_sets", "volume_kg", "muscle_load", "share_slug", "latest_ingest_id"]) {
       expect(sqls[3]).not.toContain(`"${kept}" = `);
     }
     expect(sqls[4]).toMatch(/^insert into "lift_workout_exercises" .* where "lift_workout_exercises"."updated_at" <= excluded."updated_at"$/);
@@ -289,7 +289,7 @@ describe("planSync", () => {
   });
 
   it("refuses new exercises and sets in imported workouts, but accepts edits of existing rows", () => {
-    const sw = "strong-Slug1";
+    const sw = "share-Slug1";
     const state = emptyState({
       workouts: new Set([sw]),
       workoutExercises: new Map([[`${sw}:0`, { workoutId: sw, exerciseId: "bench-press-barbell", tracking: "weight_reps" }]]),

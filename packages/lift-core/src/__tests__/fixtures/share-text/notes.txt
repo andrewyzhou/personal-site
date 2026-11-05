@@ -14,4 +14,4 @@ Set 1: 10
 Set 2: 9 reps
 Set 3: 1 rep
 
-https://strong.app.link/NotesA1
+https://example.com/w/NotesA1

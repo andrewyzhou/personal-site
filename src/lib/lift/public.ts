@@ -133,7 +133,7 @@ export function isLiftOnlyPublic(w: Pick<LiftWorkoutRow, "deletedAt" | "status">
 
 const LIFT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_:-]{0,99}$/;
 
-/** shape check for ids in urls ("strong-caterxeu", uuids) before they reach a query */
+/** shape check for ids in urls ("share-caterxeu", uuids) before they reach a query */
 export function isValidLiftId(id: string): boolean {
   return LIFT_ID_RE.test(id);
 }

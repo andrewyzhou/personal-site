@@ -18,13 +18,13 @@ import {
 import { timingFromLinks, type LinkedRecording } from "@/lib/lift/link";
 import { bearerMatches, safeEqual } from "@/lib/lift/auth";
 import { extractIncomingText, parseChatAllowlist } from "@/lib/lift/telegram";
-import { planStrongIngest, type ExerciseLine, type IngestSummary, type SetBrief } from "@/lib/lift/plan";
+import { planShareIngest, type ExerciseLine, type IngestSummary, type SetBrief } from "@/lib/lift/plan";
 
 // the owner's real share from 2026-11-02 (lift_ingests raw_text), byte for byte
 const FULL_BODY_B =
   "Full Body B\nMonday, November 2, 2026 at 7:18 PM\n\nSquat (Barbell)\nW1: 45 lb × 6 [Warm-up]\nW2: 135 lb × 4 [Warm-up]\n" +
   "Set 1: 185 lb × 5\nSet 2: 185 lb × 5\n\nDeadlift (Barbell)\nSet 1: 185 lb × 5\nSet 2: 185 lb × 4\n\n" +
-  "Bicep Curl (Dumbbell)\nSet 1: 35 lb × 6\nSet 2: 35 lb × 7\n\nhttps://link.strong.app/caterxeu\n";
+  "Bicep Curl (Dumbbell)\nSet 1: 35 lb × 6\nSet 2: 35 lb × 7\n\nhttps://example.com/w/caterxeu\n";
 
 const LB = 2.2046226218;
 
@@ -108,7 +108,7 @@ describe("lift summary text", () => {
 
   it("never names an outside service", () => {
     const text = formatIngestSummary(SUMMARY, [PRIMARY, { ...PRIMARY, activityId: 9, role: "duplicate" }]);
-    expect(text.toLowerCase()).not.toMatch(/strava|garmin|intervals|strong/);
+    expect(text.toLowerCase()).not.toMatch(/strava|garmin|intervals/);
   });
 
   it("formats days and sport labels", () => {
@@ -132,25 +132,25 @@ describe("lift details text", () => {
     process.env = { ...env };
   });
   const liftUrl = (id: string) => `https://www.andrewzhou.org/lifts/${publicLiftId(id)}`;
-  const plan = planStrongIngest(FULL_BODY_B, { source: "telegram", timezone: "America/Los_Angeles" });
+  const plan = planShareIngest(FULL_BODY_B, { source: "telegram", timezone: "America/Los_Angeles" });
   const summary = plan.summary!;
   const WEIGHTS: LinkedActivity = { ...PRIMARY, activityId: 16712345678, localTime: "19:16" };
 
   it("2026-11-02 (real): full body b, lift-only, links the lift page", () => {
-    expect(plan.workout!.workout.id).toBe("strong-caterxeu");
-    expect(formatIngestDetails(summary, [], { workoutId: "strong-caterxeu", warnings: plan.warnings })).toBe(
+    expect(plan.workout!.workout.id).toBe("share-caterxeu");
+    expect(formatIngestDetails(summary, [], { workoutId: "share-caterxeu", warnings: plan.warnings })).toBe(
       [
         "logged full body b · mon nov 2 · 3 exercises · 6 sets · 3,970 lb · watch: not linked yet",
         "squat (barbell): 2×5 @ 185 lb · top e1rm 216 lb",
         "deadlift (barbell): 185×5, 185×4 lb · top e1rm 216 lb",
         "bicep curl (dumbbell): 35×6, 35×7 lb · top e1rm 43 lb",
-        liftUrl("strong-caterxeu"),
+        liftUrl("share-caterxeu"),
       ].join("\n")
     );
   });
 
   it("never puts the internal id or share slug in the reply", () => {
-    const text = formatIngestDetails(summary, [], { workoutId: "strong-caterxeu", warnings: plan.warnings });
+    const text = formatIngestDetails(summary, [], { workoutId: "share-caterxeu", warnings: plan.warnings });
     expect(text).not.toContain("caterxeu");
     expect(text).toContain("/lifts/");
   });
@@ -158,21 +158,21 @@ describe("lift details text", () => {
   it("leaves the lift link out when there's no public id secret", () => {
     delete process.env.LIFT_PUBLIC_ID_SECRET;
     delete process.env.AUTH_SECRET;
-    expect(workoutUrl("strong-caterxeu", [])).toBeNull();
-    const text = formatIngestDetails(summary, [], { workoutId: "strong-caterxeu" });
+    expect(workoutUrl("share-caterxeu", [])).toBeNull();
+    const text = formatIngestDetails(summary, [], { workoutId: "share-caterxeu" });
     expect(text).not.toContain("/lifts/");
     expect(text).not.toContain("caterxeu");
     // a linked one still points at its recording
-    expect(workoutUrl("strong-caterxeu", [WEIGHTS])).toBe("https://www.andrewzhou.org/activities/16712345678");
+    expect(workoutUrl("share-caterxeu", [WEIGHTS])).toBe("https://www.andrewzhou.org/activities/16712345678");
   });
 
   it("leaves the link out when the links couldn't be read", () => {
-    const text = formatIngestDetails(summary, [], { workoutId: "strong-caterxeu", linksUnknown: true });
+    const text = formatIngestDetails(summary, [], { workoutId: "share-caterxeu", linksUnknown: true });
     expect(text).not.toMatch(/https:/);
   });
 
   it("links the watch recording when there is one, and says updated for an edit", () => {
-    const text = formatIngestDetails(summary, [WEIGHTS], { workoutId: "strong-caterxeu", updated: true });
+    const text = formatIngestDetails(summary, [WEIGHTS], { workoutId: "share-caterxeu", updated: true });
     const lines = text.split("\n");
     expect(lines[0]).toMatch(/^updated full body b · mon nov 2 · .* · watch: linked \(weight training 19:16\)$/);
     expect(lines.at(-1)).toBe(
@@ -182,18 +182,18 @@ describe("lift details text", () => {
   });
 
   it("points any linked recording at its page, preferring primary then overrun", () => {
-    expect(workoutUrl("strong-x", [{ ...PRIMARY, role: "overrun", activityId: 5 }])).toBe(
+    expect(workoutUrl("share-x", [{ ...PRIMARY, role: "overrun", activityId: 5 }])).toBe(
       "https://www.andrewzhou.org/activities/5"
     );
     // a lift-only url for a linked workout would 404, so even a duplicate link wins
-    expect(workoutUrl("strong-x", [{ ...PRIMARY, role: "duplicate", activityId: 7 }])).toBe("https://www.andrewzhou.org/activities/7");
+    expect(workoutUrl("share-x", [{ ...PRIMARY, role: "duplicate", activityId: 7 }])).toBe("https://www.andrewzhou.org/activities/7");
     expect(
-      workoutUrl("strong-x", [
+      workoutUrl("share-x", [
         { ...PRIMARY, role: "continuation", activityId: 8 },
         { ...PRIMARY, role: "primary", activityId: 9 },
       ])
     ).toBe("https://www.andrewzhou.org/activities/9");
-    expect(workoutUrl("strong-x", [])).toBe(liftUrl("strong-x"));
+    expect(workoutUrl("share-x", [])).toBe(liftUrl("share-x"));
   });
 
   it("truncates without splitting an emoji", () => {

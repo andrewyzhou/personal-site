@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ingestStrongText, type IngestResult } from "@/lib/lift/ingest";
+import { ingestShareText, type IngestResult } from "@/lib/lift/ingest";
 import type { IngestSource } from "@/lib/lift/plan";
 import { bearerMatches } from "@/lib/lift/auth";
 import { log } from "@/lib/log";
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    return respond(await ingestStrongText(body.text, { source: body.source }));
+    return respond(await ingestShareText(body.text, { source: body.source }));
   } catch (error) {
     log.error("api:lift/ingest", "ingest failed", error);
     return NextResponse.json({ ok: false, error: "ingest failed" }, { status: 500 });

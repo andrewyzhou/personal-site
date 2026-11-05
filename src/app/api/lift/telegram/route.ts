@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { looksLikeStrongText } from "lift-core";
-import { ingestStrongText } from "@/lib/lift/ingest";
+import { looksLikeShareText } from "lift-core";
+import { ingestShareText } from "@/lib/lift/ingest";
 import { answerLiftQuestion } from "@/lib/lift/query";
 import { safeEqual } from "@/lib/lift/auth";
 import {
@@ -53,11 +53,11 @@ export async function POST(request: Request) {
 
   let isWorkout = false;
   try {
-    isWorkout = looksLikeStrongText(incoming.text);
+    isWorkout = looksLikeShareText(incoming.text);
   } catch (error) {
     log.error("api:lift/telegram", "detect failed", error);
   }
-  // anything that isn't a strong share is a question (or help)
+  // anything that isn't a workout share is a question (or help)
   if (!isWorkout) {
     try {
       await reply(await answerLiftQuestion(incoming.text));
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await ingestStrongText(incoming.text, { source: "telegram" });
+    const result = await ingestShareText(incoming.text, { source: "telegram" });
     await reply(result.status === "empty" ? `couldn't log that: ${result.text}` : result.details || result.text);
     return NextResponse.json({ ok: true, handled: result.status, workoutId: result.workoutId });
   } catch (error) {

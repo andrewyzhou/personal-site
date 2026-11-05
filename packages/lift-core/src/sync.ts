@@ -202,7 +202,7 @@ export interface SyncSnapshot {
   templateFolders: TemplateFolderPayload[];
   templates: TemplatePayload[];
   templateExercises: TemplateExercisePayload[];
-  /** includes workouts that came from strong share text, as finished workouts */
+  /** includes workouts that came from share text, as finished workouts */
   workouts: WorkoutPayload[];
   workoutExercises: WorkoutExercisePayload[];
   sets: SetPayload[];
@@ -242,11 +242,11 @@ export interface SyncSnapshotPage<K extends SnapshotEntity = SnapshotEntity> {
 }
 
 /**
- * workouts that came from strong share text or a csv import ("strong-" ids).
+ * workouts that came from share text or a csv import ("share-" and "workout-csv-" ids).
  * the phone treats them as read-only history: the server refuses new exercises
  * or sets in them, since a re-share replaces their contents wholesale. the
  * phone's status still drives their soft delete (discarded hides, finished shows).
  */
 export function isImportedWorkoutId(id: string): boolean {
-  return id.startsWith("strong-");
+  return id.startsWith("share-") || id.startsWith("workout-csv-");
 }

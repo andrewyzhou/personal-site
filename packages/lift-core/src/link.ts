@@ -33,7 +33,7 @@ interface Span {
 }
 
 /**
- * pick which watch recordings belong to a lifting workout. strong's share text
+ * pick which watch recordings belong to a lifting workout. share text
  * only has a start time, so matching is by start (+-windowMin); split
  * recordings chain on as continuations; a second recording within the window
  * (two devices) is a duplicate. pure: never mutates the candidates.

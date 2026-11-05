@@ -20,8 +20,8 @@ vi.mock("lift-core", async (orig) => {
 });
 
 import { customExerciseId } from "lift-core";
-import { followMergeChains, ingestStrongText } from "@/lib/lift/ingest";
-import { planStrongIngest } from "@/lib/lift/plan";
+import { followMergeChains, ingestShareText } from "@/lib/lift/ingest";
+import { planShareIngest } from "@/lib/lift/plan";
 
 const db = drizzle(neon("postgresql://user:pass@127.0.0.1:1/none"), { schema });
 
@@ -51,12 +51,12 @@ describe("followMergeChains", () => {
   });
 });
 
-describe("planStrongIngest with redirects", () => {
+describe("planShareIngest with redirects", () => {
   it("logs a merged custom exercise against a catalog target", () => {
-    const plain = planStrongIngest(TEXT, { source: "api" });
+    const plain = planShareIngest(TEXT, { source: "api" });
     expect(plain.workout!.workoutExercises[0].exerciseId).toBe(CUSTOM);
 
-    const p = planStrongIngest(TEXT, { source: "api", redirects: new Map([[CUSTOM, "squat-barbell"]]) });
+    const p = planShareIngest(TEXT, { source: "api", redirects: new Map([[CUSTOM, "squat-barbell"]]) });
     const w = p.workout!;
     expect(w.workoutExercises[0]).toMatchObject({ exerciseId: "squat-barbell", nameRaw: NAME });
     expect(w.exercises.map((e) => e.id).sort()).toEqual(["bench-press-barbell", "squat-barbell"]);
@@ -66,14 +66,14 @@ describe("planStrongIngest with redirects", () => {
   });
 
   it("writes no exercise row for a custom target (it already exists)", () => {
-    const p = planStrongIngest(TEXT, { source: "api", redirects: new Map([[CUSTOM, "custom-target000000"]]) });
+    const p = planShareIngest(TEXT, { source: "api", redirects: new Map([[CUSTOM, "custom-target000000"]]) });
     expect(p.workout!.workoutExercises[0].exerciseId).toBe("custom-target000000");
     expect(p.workout!.exercises.map((e) => e.id)).toEqual(["bench-press-barbell"]);
     expect(p.summary!.exercises[0].custom).toBe(true);
   });
 });
 
-describe("ingestStrongText merge redirect", () => {
+describe("ingestShareText merge redirect", () => {
   let selects: unknown[][];
   const batch = vi.fn();
 
@@ -95,7 +95,7 @@ describe("ingestStrongText merge redirect", () => {
   it("looks up merges for custom exercises and re-plans against the target", async () => {
     // hop 1: the custom row was merged; hop 2: the target isn't merged further; then the sha lookup
     selects.push([{ id: CUSTOM, mergedInto: "squat-barbell" }], [{ id: "squat-barbell", mergedInto: null }], []);
-    const res = await ingestStrongText(TEXT, { source: "api" });
+    const res = await ingestShareText(TEXT, { source: "api" });
     expect(res.status).toBe("created");
     expect(res.summary!.exercises[0]).toMatchObject({ exerciseId: "squat-barbell", custom: false });
     type Sqlable = { toSQL(): { sql: string; params: unknown[] } };
@@ -107,7 +107,7 @@ describe("ingestStrongText merge redirect", () => {
 
   it("does nothing extra when nothing was merged", async () => {
     selects.push([{ id: CUSTOM, mergedInto: null }], []);
-    const res = await ingestStrongText(TEXT, { source: "api" });
+    const res = await ingestShareText(TEXT, { source: "api" });
     expect(res.summary!.exercises[0]).toMatchObject({ exerciseId: CUSTOM, custom: true });
   });
 });

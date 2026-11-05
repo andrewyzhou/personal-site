@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import {
@@ -16,8 +16,9 @@ import { log } from "@/lib/log";
 import { getWorkoutLinks, linkWorkout } from "./link";
 import { revalidateLiftPublic } from "./revalidate";
 import {
+  IMPORTED_SOURCES,
   pickEditTarget,
-  planStrongIngest,
+  planShareIngest,
   type EditCandidate,
   type EditLookup,
   type IngestPlan,
@@ -74,7 +75,7 @@ function unlessLinked(col: PgColumn): Record<string, SQL> {
 /**
  * every write for a planned ingest, in order, for one atomic db.batch. the
  * workout is upserted and its exercises replaced wholesale (sets cascade),
- * which is how an edited re-share of the same strong link lands.
+ * which is how an edited re-share of the same share link lands.
  */
 export function buildIngestBatch(db: Db, plan: IngestPlan): [BatchItem<"pg">, ...BatchItem<"pg">[]] {
   const first = db.insert(liftIngests).values(plan.ingest).onConflictDoNothing();
@@ -109,7 +110,7 @@ export function buildWorkoutWrites(db: Db, w: WorkoutPlan): BatchItem<"pg">[] {
           notes: excluded(t.notes),
           source: excluded(t.source),
           latestIngestId: excluded(t.latestIngestId),
-          strongSlug: excluded(t.strongSlug),
+          shareSlug: excluded(t.shareSlug),
           workingSets: excluded(t.workingSets),
           volumeKg: excluded(t.volumeKg),
           muscleLoad: excluded(t.muscleLoad),
@@ -268,15 +269,15 @@ export function keptEditsWarning(title: string, workoutId: string): LiftWarning 
 }
 
 /**
- * rows that could be the workout a share edits: its own id, the same strong
- * link, or a live strong workout starting the same minute. pickEditTarget
+ * rows that could be the workout a share edits: its own id, the same share
+ * link, or a live imported workout starting the same minute. pickEditTarget
  * re-checks every condition, so this only has to be a superset.
  */
 export function editCandidatesWhere(plannedId: string, slug: string | null, startedLocal: string | null): SQL {
   const t = liftWorkouts;
   const conds: (SQL | undefined)[] = [eq(t.id, plannedId)];
-  if (slug) conds.push(eq(t.strongSlug, slug));
-  if (startedLocal) conds.push(and(eq(t.startedLocal, startedLocal), like(t.source, "strong%"), isNull(t.deletedAt)));
+  if (slug) conds.push(eq(t.shareSlug, slug));
+  if (startedLocal) conds.push(and(eq(t.startedLocal, startedLocal), inArray(t.source, IMPORTED_SOURCES), isNull(t.deletedAt)));
   return or(...conds)!;
 }
 
@@ -286,7 +287,7 @@ export async function loadEditCandidates(db: Db, share: EditLookup): Promise<Edi
       id: liftWorkouts.id,
       title: liftWorkouts.title,
       startedLocal: liftWorkouts.startedLocal,
-      strongSlug: liftWorkouts.strongSlug,
+      shareSlug: liftWorkouts.shareSlug,
       source: liftWorkouts.source,
       deletedAt: liftWorkouts.deletedAt,
     })
@@ -316,12 +317,12 @@ export function ambiguousWarning(ids: readonly string[]): LiftWarning {
   };
 }
 
-export async function ingestStrongText(rawText: string, opts: { source: IngestSource }): Promise<IngestResult> {
-  let plan = planStrongIngest(rawText, { source: opts.source });
+export async function ingestShareText(rawText: string, opts: { source: IngestSource }): Promise<IngestResult> {
+  let plan = planShareIngest(rawText, { source: opts.source });
   const db = getDb();
   let redirects: ReadonlyMap<string, string> | undefined;
   const replan = (extra: Omit<PlanOptions, "source">) =>
-    planStrongIngest(rawText, { source: opts.source, redirects, ...extra });
+    planShareIngest(rawText, { source: opts.source, redirects, ...extra });
 
   // exercises merged on the phone keep resolving to the merge target
   const customIds = plan.summary?.exercises.filter((e) => e.custom).map((e) => e.exerciseId) ?? [];
@@ -356,7 +357,7 @@ export async function ingestStrongText(rawText: string, opts: { source: IngestSo
     } else {
       const share: EditLookup = {
         plannedId,
-        slug: plan.ingest.strongSlug ?? null,
+        slug: plan.ingest.shareSlug ?? null,
         title: plan.workout.workout.title,
         startedLocal: plan.parsed?.startedLocal ?? null,
         exerciseNames: plan.workout.workoutExercises.map((we) => we.nameRaw),
