@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { isNotNull } from "drizzle-orm";
 import type { ReplayData } from "../replay/build";
+import type { ActivityMetrics } from "../metrics/types";
 
 export interface RouteBounds {
   minLat: number;
@@ -47,6 +48,10 @@ export interface ActivitySettings {
   // heart rate zones: upper bounds of z1..z4 as fractions of max hr (z5 above)
   hrMaxBpm: number;
   hrZonePcts: number[];
+  // effort (training load) uses resting hr; pace zones need a threshold pace.
+  // optional: settings rows written before these existed read as null
+  hrRestBpm?: number | null;
+  thresholdPaceSPerKm?: number | null;
 }
 
 // stats straight from the untouched canonical track (device totals when the
@@ -308,6 +313,16 @@ export const activityReplays = pgTable("activity_replays", {
     .primaryKey()
     .references(() => activities.id, { onDelete: "cascade" }),
   data: jsonb("data").$type<ReplayData>(), // null: nothing to replay
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+// per-activity metrics (splits, best efforts, curves, zones, effort, climbs),
+// computed by republish from the published track only. one row per activity.
+export const activityMetrics = pgTable("activity_metrics", {
+  activityId: bigint("activity_id", { mode: "number" })
+    .primaryKey()
+    .references(() => activities.id, { onDelete: "cascade" }),
+  data: jsonb("data").$type<ActivityMetrics>(), // null: no timed track
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
