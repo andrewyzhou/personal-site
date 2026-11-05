@@ -1,8 +1,21 @@
 import type { NextConfig } from "next";
 import createMDX from "@next/mdx";
+import path from "node:path";
+
+// point @content at the fixture copy (alias targets are relative to the
+// project dir). scripts/design-build.mjs passes the turbopack root, which in a
+// git worktree with linked node_modules is the main checkout.
+function fixtureTurbopack(contentRoot: string) {
+  const root = path.resolve(process.env.DESIGN_TURBOPACK_ROOT ?? process.cwd());
+  const rel = path.relative(process.cwd(), path.resolve(contentRoot)).split(path.sep).join("/");
+  return { root, resolveAlias: { "@content/*": `./${rel}/*` } };
+}
 
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
+  // the design test harness builds against frozen fixture content (see
+  // tests/design/README.md); CONTENT_ROOT is unset everywhere else
+  ...(process.env.CONTENT_ROOT ? { turbopack: fixtureTurbopack(process.env.CONTENT_ROOT) } : {}),
   // workspace package shipped as typescript source
   transpilePackages: ["lift-core"],
   // cs180 portfolio lives in its own repo (andrewyzhou/cs180) on github pages;

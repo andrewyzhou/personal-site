@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { contentPath } from "@/lib/content-root";
 import matter from "gray-matter";
 
 export interface BlogFrontmatter {
@@ -16,7 +17,7 @@ export interface BlogPost extends BlogFrontmatter {
   content: string;
 }
 
-const CONTENT_DIR = path.join(process.cwd(), "content/blog");
+const CONTENT_DIR = contentPath("blog");
 
 // subdirectories of content/blog/ are intentionally not traversed — only
 // direct-child .mdx files are published. drafts live in content/blog/wip/

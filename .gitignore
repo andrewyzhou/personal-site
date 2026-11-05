@@ -11,6 +11,12 @@
 # testing
 /coverage
 
+# design harness output; only the linux screenshot baselines are committed
+/tests/design/.output
+/tests/design/.report
+/tests/design/__screenshots__/win32
+/tests/design/__screenshots__/darwin
+
 # next.js
 /.next/
 /out/

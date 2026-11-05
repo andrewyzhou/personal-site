@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { contentPath } from "@/lib/content-root";
 import yaml from "js-yaml";
 import { imageSize } from "image-size";
 import { log } from "./log";
@@ -74,7 +75,7 @@ export type PhotosEntry = Photoset | PhotoEssay;
 
 // ---------------------------------------------------------------------------
 
-const CONTENT_DIR = path.join(process.cwd(), "content/photos");
+const CONTENT_DIR = contentPath("photos");
 const PUBLIC_DIR = path.join(process.cwd(), "public/photos");
 
 // same convention as library/blog: subfolders of content/photos/ are not

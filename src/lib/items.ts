@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { contentPath } from "@/lib/content-root";
 import matter from "gray-matter";
 
 export type ItemCategory = "work" | "research" | "teaching" | "projects";
@@ -29,7 +30,7 @@ export interface ExperienceItem {
 }
 
 export function getItems(category: ItemCategory): ItemMeta[] {
-  const dir = path.join(process.cwd(), "content", category);
+  const dir = contentPath(category);
   if (!fs.existsSync(dir)) return [];
 
   return fs
