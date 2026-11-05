@@ -1,4 +1,11 @@
-import { BODY_FIGURES, MUSCLE_REGION_LABELS, loadIntensity, type BodyFigure as Figure, type MuscleRegion } from "lift-core";
+import {
+  BODY_FIGURES,
+  MUSCLE_REGION_LABELS,
+  loadIntensity,
+  type BodyFigure as Figure,
+  type BodyShape,
+  type MuscleRegion,
+} from "lift-core";
 
 // front + back figures shaded by normalized muscle load. plain svg, no client js.
 // fills are the site's own text color mixed over transparent, so both themes work.
@@ -19,13 +26,24 @@ export function intensity(load: number | undefined): number {
   }
 }
 
+// one shape can stand for several regions (a deltoid is front + side heads): show the heaviest
+export function shapeLoadOf(s: BodyShape, load: Partial<Record<MuscleRegion, number>>): number | undefined {
+  const regions = s.regions?.length ? s.regions : s.region ? [s.region] : [];
+  let best: number | undefined;
+  for (const r of regions) {
+    const v = load[r];
+    if (typeof v === "number" && Number.isFinite(v) && (best === undefined || v > best)) best = v;
+  }
+  return best;
+}
+
 function hasArt(f: Figure | undefined): f is Figure {
   return !!f && (f.outline.length > 0 || f.shapes.length > 0);
 }
 
 function boxOf(f: Figure): [number, number, number, number] {
   const n = f.viewBox.split(/[\s,]+/).map(Number);
-  return n.length === 4 && n.every(Number.isFinite) && n[2] > 0 && n[3] > 0 ? [n[0], n[1], n[2], n[3]] : [0, 0, 200, 420];
+  return n.length === 4 && n.every(Number.isFinite) && n[2] > 0 && n[3] > 0 ? [n[0], n[1], n[2], n[3]] : [0, 0, 165, 319];
 }
 
 export default function BodyFigure({
@@ -74,7 +92,7 @@ export default function BodyFigure({
                   <path
                     key={j}
                     d={s.d}
-                    fill={s.region ? LOAD_FILLS[intensity(load[s.region])] : "transparent"}
+                    fill={s.region ? LOAD_FILLS[intensity(shapeLoadOf(s, load))] : "transparent"}
                     stroke={SHAPE_STROKE}
                     strokeWidth={0.75}
                     strokeLinejoin="round"
