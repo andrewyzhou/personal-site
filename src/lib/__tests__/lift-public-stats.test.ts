@@ -197,6 +197,17 @@ describe("buildLiftsOverview", () => {
     expect(o.prs.some((p) => p.date === "2026-10-22" && hasWeight(p))).toBe(false);
   });
 
+  it("weighted pull-up prs keep the added load and drop e1rm and volume", () => {
+    const { input, add } = world();
+    const pull = (weight: number, reps: number) => ({ exerciseId: "pull-up", sets: [{ weight, reps, bodyweight: true }] });
+    add("a", "2026-10-01T10:00", [pull(25, 6)]);
+    add("b", "2026-10-08T10:00", [pull(30, 7)]);
+    const o = buildLiftsOverview(input, { today: TODAY, publicIdOf: pid });
+    const row = o.prs.find((p) => p.date === "2026-10-08");
+    expect(row?.records).toEqual([{ kind: "weight", label: "heaviest +30 lb × 7" }]);
+    expect(JSON.stringify(o.prs)).not.toContain("e1rm");
+  });
+
   it("caps the pr feed and the recent list", () => {
     const { input, add } = world();
     for (let i = 0; i < 40; i++) add(`w${i}`, `${addDays("2026-06-01", i)}T10:00`, [bench([100 + i * 5])]);

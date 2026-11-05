@@ -7,6 +7,9 @@ import {
   EXPORT_VERSION,
   STRONG_CSV_HEADER,
   assembleExport,
+  chunkStream,
+  exportJsonChunks,
+  strongCsvLines,
   strongDuration,
   toExportJson,
   toStrongCsv,
@@ -201,5 +204,68 @@ describe("strong csv export", () => {
   it("an empty export is just the header", () => {
     expect(toStrongCsv([])).toBe(STRONG_CSV_HEADER.join(",") + "\n");
     expect(parseStrongCsv(toStrongCsv([]))).toEqual({ workouts: [], warnings: [] });
+  });
+
+  it("leaves out active and discarded workouts, even with completed sets; json keeps them", () => {
+    const workouts = [
+      wRow({ id: "live", title: "Still Going", startedLocal: "2026-11-04T07:00", status: "active" }),
+      wRow({ id: "binned", title: "Tossed", startedLocal: "2026-11-03T07:00", status: "discarded" }),
+      wRow({ id: "done", title: "Done", startedLocal: "2026-11-02T07:00" }),
+    ];
+    const exs = workouts.map((w) => eRow(w.id, 0, "Squat (Barbell)"));
+    const sets = workouts.map((w) => sRow(`${w.id}:0`, 0, { weight: 100, unit: "kg", reps: 5 }));
+    const exported = assembleExport(workouts, exs, sets);
+    const csv = toStrongCsv(exported);
+    expect(csv).toContain("Done");
+    expect(csv).not.toContain("Still Going");
+    expect(csv).not.toContain("Tossed");
+    expect(parseStrongCsv(csv).workouts).toHaveLength(1);
+    const doc = toExportJson(exported, new Date(0), "UTC");
+    expect(doc.workouts.map((w) => [w.id, w.status])).toEqual([["done", "finished"], ["binned", "discarded"], ["live", "active"]]);
+  });
+});
+
+async function drain(stream: ReadableStream<Uint8Array>): Promise<{ text: string; chunks: number }> {
+  const reader = stream.getReader();
+  const dec = new TextDecoder();
+  let text = "";
+  let chunks = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks++;
+    text += dec.decode(value, { stream: true });
+  }
+  return { text: text + dec.decode(), chunks };
+}
+
+describe("streamed export", () => {
+  const exported = assembleExport(WORKOUTS, EXERCISES, SETS);
+  const at = new Date("2026-11-04T20:00:00Z");
+
+  it("csv streams the same bytes the builder makes", async () => {
+    expect([...strongCsvLines(exported)].join("")).toBe(toStrongCsv(exported));
+    expect((await drain(chunkStream(strongCsvLines(exported)))).text).toBe(toStrongCsv(exported));
+    expect((await drain(chunkStream(strongCsvLines([])))).text).toBe(toStrongCsv([]));
+  });
+
+  it("json streams the same document, compact", async () => {
+    const { text } = await drain(chunkStream(exportJsonChunks(exported, at, "America/Los_Angeles")));
+    expect(text).toBe(JSON.stringify(toExportJson(exported, at, "America/Los_Angeles")));
+    expect(JSON.parse(text)).toEqual(toExportJson(exported, at, "America/Los_Angeles"));
+    const empty = await drain(chunkStream(exportJsonChunks([], at, "UTC")));
+    expect(JSON.parse(empty.text)).toEqual(toExportJson([], at, "UTC"));
+  });
+
+  it("a big export arrives in several chunks, not one string", async () => {
+    const many = Array.from({ length: 3000 }, (_, i) => ({ ...exported[0], id: `w${i}` }));
+    const { text, chunks } = await drain(chunkStream(strongCsvLines(many)));
+    expect(chunks).toBeGreaterThan(1);
+    expect(text).toBe(toStrongCsv(many));
+  });
+
+  it("utf-8 survives chunk boundaries", async () => {
+    const { text } = await drain(chunkStream(["é".repeat(70_000), "ü"]));
+    expect(text).toBe("é".repeat(70_000) + "ü");
   });
 });

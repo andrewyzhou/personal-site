@@ -8,6 +8,7 @@ import {
   applyCommand,
   buildCsvReport,
   countDataRows,
+  MAX_ZIP_CSV_BYTES,
   csvFromZip,
   decodeCsv,
   fixExportHeader,
@@ -133,6 +134,31 @@ describe("input files", () => {
     });
     expect(csvFromZip(zip)).toEqual({ name: "export/strong.csv", text: SEMI });
     expect(csvFromZip(zipSync({ "a.txt": strToU8("no") }))).toBeNull();
+  });
+
+  // central directory entries: signature, then method at +10 and uncompressed size at +24
+  function patchCentral(zip: Uint8Array, name: string, patch: (view: DataView, at: number) => void): Uint8Array {
+    const out = zip.slice();
+    const view = new DataView(out.buffer);
+    for (let i = 0; i + 46 <= out.length; i++) {
+      if (view.getUint32(i, true) !== 0x02014b50) continue;
+      const len = view.getUint16(i + 28, true);
+      if (new TextDecoder().decode(out.subarray(i + 46, i + 46 + len)) === name) patch(view, i);
+    }
+    return out;
+  }
+
+  it("inflates only the first csv", () => {
+    const zip = zipSync({ "strong.csv": strToU8(SEMI), "later.csv": strToU8("x".repeat(500)) });
+    // an unknown method throws if fflate ever tries to inflate the second entry
+    const poisoned = patchCentral(zip, "later.csv", (v, at) => v.setUint16(at + 10, 99, true));
+    expect(csvFromZip(poisoned)).toEqual({ name: "strong.csv", text: SEMI });
+  });
+
+  it("refuses a csv entry that claims more than the size cap", () => {
+    const zip = zipSync({ "strong.csv": strToU8(SEMI) });
+    const huge = patchCentral(zip, "strong.csv", (v, at) => v.setUint32(at + 24, MAX_ZIP_CSV_BYTES + 1, true));
+    expect(() => csvFromZip(huge)).toThrow(/too large to import/);
   });
 
   it("decodes utf-16 re-saves", () => {

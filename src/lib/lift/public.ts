@@ -234,15 +234,19 @@ export function topRegions(load: Partial<Record<MuscleRegion, number>>, n = MUSC
     .slice(0, n);
 }
 
-function prLabel(hit: PrHit, unit: WeightUnit): string {
+/** `relative`: the loads are added to bodyweight ("+30 lb"), not the whole load */
+function prLabel(hit: PrHit, unit: WeightUnit, relative = false): string {
   const u = hit.set?.unit ?? unit;
+  const plus = relative ? "+" : "";
   switch (hit.kind) {
     case "e1rm":
       return `e1rm ${fmtNum(Math.round(fromKg(hit.value, u)))} ${u}`;
     case "weight":
-      return hit.set ? `heaviest ${fmtNum(hit.set.weight)} ${hit.set.unit} × ${hit.set.reps}` : `heaviest ${fmtNum(Math.round(fromKg(hit.value, u)))} ${u}`;
+      return hit.set
+        ? `heaviest ${plus}${fmtNum(hit.set.weight)} ${hit.set.unit} × ${hit.set.reps}`
+        : `heaviest ${plus}${fmtNum(Math.round(fromKg(hit.value, u)))} ${u}`;
     case "reps_at_weight":
-      return hit.set ? `${hit.set.reps} reps @ ${fmtNum(hit.set.weight)} ${hit.set.unit}` : `${hit.value} reps`;
+      return hit.set ? `${hit.set.reps} reps @ ${plus}${fmtNum(hit.set.weight)} ${hit.set.unit}` : `${hit.value} reps`;
     case "volume":
       return `volume ${fmtNum(Math.round(fromKg(hit.value, u)))} ${u}`;
     default:
@@ -251,6 +255,14 @@ function prLabel(hit: PrHit, unit: WeightUnit): string {
 }
 
 const PR_ORDER: PrKind[] = ["e1rm", "weight", "reps_at_weight", "volume"];
+
+// "+30 lb" on a pull-up isn't the whole load: no max to estimate, no tonnage to compare
+const RELATIVE_DROPS: ReadonlySet<PrKind> = new Set(["e1rm", "volume"]);
+
+/** a completed working set whose load is added to bodyweight (weighted pull-ups, dips) */
+function isAddedLoad(s: Pick<LiftSetInput, "kind" | "completed" | "bodyweight" | "weight">): boolean {
+  return s.completed && s.kind !== "warmup" && s.bodyweight && s.weight !== null && s.weight > 0;
+}
 
 /** prs for this workout; lift-core's detector may not be available yet, so any throw means none */
 export function safeWorkoutPrs(history: readonly HistorySet[], workoutId: string): PrHit[] {
@@ -286,6 +298,13 @@ export function serializeLiftWorkout(
   if (!isPublishableWorkout(workout)) return null;
 
   const hits = safeWorkoutPrs(options.history ?? [], workout.id);
+  const catalogIdOf = new Map(exercises.map((e) => [e.id, e.exerciseId]));
+  // per catalog exercise, so a lift logged twice in one workout is judged once
+  const relative = new Set<string>();
+  for (const s of sets) {
+    const id = catalogIdOf.get(s.workoutExerciseId);
+    if (id !== undefined && isAddedLoad(s)) relative.add(id);
+  }
   const setsByExercise = new Map<string, LiftSetInput[]>();
   for (const s of sets) {
     // skipped sets weren't lifted
@@ -321,6 +340,8 @@ export function serializeLiftWorkout(
           unitCounts[unit]++;
         }
         if (!top || kg > top.kg + 1e-9 || (Math.abs(kg - top.kg) <= 1e-9 && s.reps > top.reps)) top = { s, kg, reps: s.reps };
+        // same rule as the lift bot: an added load can't estimate a max
+        if (s.bodyweight) continue;
         const est = e1rm(kg, s.reps);
         if (est !== null && (bestKg === null || est > bestKg)) bestKg = est;
       }
@@ -329,12 +350,13 @@ export function serializeLiftWorkout(
 
       const displayUnit = asUnit(top?.s.unit ?? null) ?? "lb";
       // an exercise logged twice in one workout gets its prs once, on the first entry
+      const rel = relative.has(ex.exerciseId);
       const prs: PublicPr[] = seenPrExercises.has(ex.exerciseId)
         ? []
         : hits
-            .filter((h) => h.exerciseId === ex.exerciseId)
+            .filter((h) => h.exerciseId === ex.exerciseId && !(rel && RELATIVE_DROPS.has(h.kind)))
             .sort((a, b) => PR_ORDER.indexOf(a.kind) - PR_ORDER.indexOf(b.kind))
-            .map((h) => ({ exerciseId: ex.exerciseId, exerciseName: name, kind: h.kind, label: prLabel(h, displayUnit) }));
+            .map((h) => ({ exerciseId: ex.exerciseId, exerciseName: name, kind: h.kind, label: prLabel(h, displayUnit, rel) }));
       seenPrExercises.add(ex.exerciseId);
 
       return {

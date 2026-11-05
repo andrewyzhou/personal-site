@@ -22,11 +22,23 @@ import { addDays } from "./time";
 // ---------------------------------------------------------------------------
 // input files
 
+// years of strong history is a few mb; anything near this is a zip bomb or the wrong file
+export const MAX_ZIP_CSV_BYTES = 50 * 1024 * 1024;
+
 /** the first *.csv in a zip (strong's export is a single strong.csv), or null */
 export function csvFromZip(bytes: Uint8Array): { name: string; text: string } | null {
-  // only inflate the csv entries; mac zips carry __MACOSX/._ shadow copies
+  let taken = false;
   const files = unzipSync(bytes, {
-    filter: (f) => /\.csv$/i.test(f.name) && !/(^|\/)(__MACOSX\/|\._)/.test(f.name),
+    // mac zips carry __MACOSX/._ shadow copies; only the first real csv is inflated
+    filter: (f) => {
+      if (taken || !/\.csv$/i.test(f.name) || /(^|\/)(__MACOSX\/|\._)/.test(f.name)) return false;
+      // fflate sizes its output buffer from this header field, so check it before inflating
+      if (!(f.originalSize <= MAX_ZIP_CSV_BYTES)) {
+        throw new Error(`${f.name} is too large to import (${Math.round(f.originalSize / 1048576)} mb, limit ${MAX_ZIP_CSV_BYTES / 1048576} mb)`);
+      }
+      taken = true;
+      return true;
+    },
   });
   const name = Object.keys(files)[0];
   return name ? { name, text: decodeCsv(files[name]) } : null;

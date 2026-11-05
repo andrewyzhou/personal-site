@@ -28,7 +28,8 @@ import { exercises, getDb, liftSets, liftWorkoutExercises, liftWorkouts } from "
 // weights are as logged in `unit`; weightKg/volumeKg/e1rmKg are always kg.
 
 export const EXPORT_VERSION = 1;
-export const MAX_EXPORT_SETS = 200_000;
+// rows are held in memory before streaming starts, so the cap bounds that
+export const MAX_EXPORT_SETS = 100_000;
 
 export interface ExportSet {
   position: number;
@@ -165,6 +166,14 @@ export function toExportJson(workouts: ExportWorkout[], exportedAt: Date, timezo
   return { version: EXPORT_VERSION, exportedAt: exportedAt.toISOString(), timezone, counts: exportCounts(workouts), workouts };
 }
 
+/** the same document as toExportJson, compact, one workout per chunk (never one giant string) */
+export function* exportJsonChunks(workouts: readonly ExportWorkout[], exportedAt: Date, timezone: string): Generator<string> {
+  const head = { version: EXPORT_VERSION, exportedAt: exportedAt.toISOString(), timezone, counts: exportCounts(workouts) };
+  yield `${JSON.stringify(head).slice(0, -1)},"workouts":[`;
+  for (let i = 0; i < workouts.length; i++) yield (i ? "," : "") + JSON.stringify(workouts[i]);
+  yield "]}";
+}
+
 // ---------------------------------------------------------------------------
 // strong csv (pure)
 
@@ -215,12 +224,15 @@ const numText = (n: number | null) => (n === null || !Number.isFinite(n) ? "0" :
 
 /**
  * one row per completed set (strong's export has no unfinished sets), in
- * workout -> exercise -> set order. workouts with no completed sets have no
- * row to live on and are left out; the json export keeps everything.
+ * workout -> exercise -> set order. finished workouts only: strong never
+ * exports an active or discarded one, and a re-import would make them real
+ * sessions. workouts with no completed sets have no row to live on and are
+ * left out too; the json export keeps everything, with its status.
  */
-export function toStrongCsv(workouts: readonly ExportWorkout[]): string {
-  const lines = [STRONG_CSV_HEADER.join(",")];
+export function* strongCsvLines(workouts: readonly ExportWorkout[]): Generator<string> {
+  yield STRONG_CSV_HEADER.join(",") + "\n";
   for (const w of workouts) {
+    if (w.status !== "finished") continue;
     const head = [csvDate(w.startedLocal), w.title, strongDuration(w.durationS)];
     for (const ex of w.exercises) {
       let n = 0;
@@ -242,11 +254,41 @@ export function toStrongCsv(workouts: readonly ExportWorkout[]): string {
           s.weight !== null ? (s.unit ?? "") : "",
           s.distanceM !== null ? "m" : "",
         ];
-        lines.push(row.map(csvField).join(","));
+        yield row.map(csvField).join(",") + "\n";
       }
     }
   }
-  return lines.join("\n") + "\n";
+}
+
+export function toStrongCsv(workouts: readonly ExportWorkout[]): string {
+  let out = "";
+  for (const line of strongCsvLines(workouts)) out += line;
+  return out;
+}
+
+/** chunks -> a byte stream, pulled lazily so the whole body is never one string */
+export function chunkStream(chunks: Iterable<string>): ReadableStream<Uint8Array> {
+  const it = chunks[Symbol.iterator]();
+  const enc = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      // batch rows so it isn't one enqueue per csv line
+      let buf = "";
+      while (buf.length < 64 * 1024) {
+        const next = it.next();
+        if (next.done) {
+          if (buf) controller.enqueue(enc.encode(buf));
+          controller.close();
+          return;
+        }
+        buf += next.value;
+      }
+      controller.enqueue(enc.encode(buf));
+    },
+    cancel() {
+      it.return?.(undefined);
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
