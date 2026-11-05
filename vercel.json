@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/activities", "schedule": "0 14 * * *" },
-    { "path": "/api/lift/cron/link", "schedule": "30 14 * * *" }
+    { "path": "/api/lift/cron/link", "schedule": "30 14 * * *" },
+    { "path": "/api/listening/cron/collect", "schedule": "45 14 * * *" }
   ]
 }
