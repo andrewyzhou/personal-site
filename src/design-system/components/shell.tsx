@@ -1,4 +1,6 @@
 import { Icon } from "./data";
+import type { Brand } from "../brands";
+import { brandAttrs } from "./BrandRoot";
 import NextLink from "next/link";
 import type { ReactNode } from "react";
 import { Breadcrumbs, type Crumb } from "./actions";
@@ -30,19 +32,24 @@ const MenuIcon = () => (
 // (left column on wide screens) are the same structure styled three ways.
 export function AppShell({
   model,
-  variant = "topbar",
+  brand,
+  variant: variantProp,
   accent,
   theme,
   className,
   children,
 }: {
   model: ShellModel;
+  // a brand sets the shell variant, accent and component switches at once
+  brand?: Brand;
   variant?: "topbar" | "pill" | "rail";
   accent?: "neutral" | "blue" | "amber" | "green";
   theme?: "light" | "dark";
   className?: string;
   children: ReactNode;
 }) {
+  const variant = variantProp ?? brand?.shell ?? "topbar";
+  const attrs = brand ? brandAttrs(brand, theme) : { "data-accent": accent, "data-theme": theme };
   const bar = (
     <header className="ds-topbar">
       <Container width={variant === "rail" ? "wide" : "content"} className="ds-topbar-inner" as="div">
@@ -74,7 +81,7 @@ export function AppShell({
     </>
   );
   return (
-    <div className={cx("ds ds-shell", className)} data-variant={variant} data-accent={accent} data-theme={theme}>
+    <div className={cx("ds ds-shell", className)} data-variant={variant} {...attrs}>
       {bar}
       {variant === "rail" ? <div className="ds-shell-body">{body}</div> : body}
     </div>
