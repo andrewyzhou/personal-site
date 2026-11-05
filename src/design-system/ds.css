@@ -93,7 +93,8 @@
 .ds-heading {
   margin: 0;
   color: var(--ds-fg);
-  font-weight: var(--ds-weight-semibold);
+  font-family: var(--ds-font-display);
+  font-weight: var(--ds-heading-weight);
   text-wrap: balance;
 }
 .ds-heading[data-size="lg"] { font-size: var(--ds-text-lg); line-height: var(--ds-leading-lg); }
@@ -104,7 +105,6 @@
   font-size: clamp(var(--ds-text-3xl), 9vw, var(--ds-text-display));
   line-height: 1;
   letter-spacing: var(--ds-tracking-display);
-  font-weight: var(--ds-weight-semibold);
 }
 
 /* ----------------------------------------------------------------- links */
@@ -145,7 +145,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--ds-space-2);
-  min-height: 2.25rem;
+  min-height: var(--ds-control-h);
   padding: 0 var(--ds-space-4);
   border: 1px solid transparent;
   border-radius: var(--ds-radius-md);
@@ -158,7 +158,7 @@
   user-select: none;
   transition: background var(--ds-dur-fast) var(--ds-ease-standard), border-color var(--ds-dur-fast) var(--ds-ease-standard), color var(--ds-dur-fast) var(--ds-ease-standard);
 }
-.ds-btn[data-size="sm"] { min-height: 1.75rem; padding: 0 var(--ds-space-3); font-size: var(--ds-text-xs); }
+.ds-btn[data-size="sm"] { min-height: var(--ds-control-h-sm); padding: 0 var(--ds-space-3); font-size: var(--ds-text-xs); }
 .ds-btn[data-variant="primary"] { background: var(--ds-accent); color: var(--ds-on-accent); }
 .ds-btn[data-variant="primary"]:hover { background: color-mix(in oklch, var(--ds-accent) 88%, var(--ds-fg)); }
 .ds-btn[data-variant="secondary"] { background: var(--ds-bg-raised); color: var(--ds-fg); border-color: var(--ds-border); }
@@ -169,8 +169,8 @@
 .ds-btn[data-variant="danger"]:hover { background: color-mix(in oklch, var(--ds-danger) 10%, transparent); }
 .ds-btn:disabled,
 .ds-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
-.ds-btn[data-icon-only] { padding: 0; width: 2.25rem; }
-.ds-btn[data-icon-only][data-size="sm"] { width: 1.75rem; }
+.ds-btn[data-icon-only] { padding: 0; width: var(--ds-control-h); }
+.ds-btn[data-icon-only][data-size="sm"] { width: var(--ds-control-h-sm); }
 @media (pointer: coarse) {
   .ds-btn { min-height: var(--ds-hit); }
   .ds-btn[data-icon-only] { width: var(--ds-hit); }
@@ -183,7 +183,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--ds-space-1);
-  min-height: 1.75rem;
+  min-height: var(--ds-control-h-sm);
   padding: 0 var(--ds-space-3);
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-full);
@@ -204,7 +204,7 @@
   background: var(--ds-accent-subtle);
   border-color: transparent;
 }
-.ds-chip[data-size="lg"] { min-height: 2.25rem; padding: 0 var(--ds-space-4); font-size: var(--ds-text-base); }
+.ds-chip[data-size="lg"] { min-height: var(--ds-control-h); padding: 0 var(--ds-space-4); font-size: var(--ds-text-base); }
 @media (pointer: coarse) {
   .ds-chip { min-height: 2.25rem; }
 }
@@ -250,7 +250,8 @@
 .ds-stat { display: flex; flex-direction: column; gap: var(--ds-space-1); min-width: 0; }
 .ds-stat-value {
   color: var(--ds-fg);
-  font-weight: var(--ds-weight-semibold);
+  font-family: var(--ds-font-display);
+  font-weight: var(--ds-heading-weight);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -285,7 +286,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: var(--ds-space-3);
-  padding: var(--ds-space-3);
+  padding: var(--ds-row-pad) var(--ds-space-3);
   margin-inline: calc(-1 * var(--ds-space-3));
   border-radius: var(--ds-radius-md);
   color: inherit;
@@ -356,7 +357,7 @@ button.ds-row:hover { background: var(--ds-bg-hover); }
 .ds-field-error { font-size: var(--ds-text-xs); color: var(--ds-danger); }
 .ds-input {
   width: 100%;
-  min-height: 2.25rem;
+  min-height: var(--ds-control-h);
   padding: var(--ds-space-2) var(--ds-space-3);
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-md);
@@ -557,4 +558,41 @@ textarea.ds-input { min-height: 5.5rem; resize: vertical; }
   background-color: currentColor;
   -webkit-mask: var(--ds-icon) center / contain no-repeat;
   mask: var(--ds-icon) center / contain no-repeat;
+}
+
+/* ------------------------------------------------------- brand switches */
+/* set on the brand root by <BrandRoot> / <AppShell brand> */
+
+/* chips as a soft filled wash instead of a hairline */
+.ds[data-chip="filled"] .ds-chip { border-color: transparent; background: var(--ds-bg-hover); }
+.ds[data-chip="filled"] .ds-chip:hover { background: var(--ds-bg-active); }
+.ds[data-chip="filled"] .ds-chip[aria-pressed="true"],
+.ds[data-chip="filled"] .ds-chip[aria-selected="true"],
+.ds[data-chip="filled"] .ds-chip[aria-current="page"] { background: var(--ds-fg); color: var(--ds-bg); }
+
+/* inline links with the soft highlight box (the first site's signature),
+   now with a real hover state and enough padding to read as intentional */
+.ds[data-link="highlight"] .ds-link[data-variant="inline"] {
+  text-decoration: none;
+  background: var(--ds-accent-subtle);
+  box-shadow: 0 0 0 0.12em var(--ds-accent-subtle);
+  border-radius: var(--ds-radius-sm);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background var(--ds-dur-fast) var(--ds-ease-standard), box-shadow var(--ds-dur-fast) var(--ds-ease-standard);
+}
+.ds[data-link="highlight"] .ds-link[data-variant="inline"]:hover {
+  background: color-mix(in oklch, var(--ds-accent) 28%, transparent);
+  box-shadow: 0 0 0 0.12em color-mix(in oklch, var(--ds-accent) 28%, transparent);
+}
+
+/* stat rows split by hairlines */
+.ds[data-stats="divided"] .ds-stat-grid { gap: var(--ds-space-5) 0; }
+.ds[data-stats="divided"] .ds-stat { padding-inline: var(--ds-space-5); border-left: 1px solid var(--ds-divider); }
+.ds[data-stats="divided"] .ds-stat:first-child { padding-left: 0; border-left: 0; }
+/* the first stat of every row has no divider */
+.ds[data-stats="divided"] .ds-stat-grid[data-columns="2"] .ds-stat:nth-child(odd),
+.ds[data-stats="divided"] .ds-stat-grid[data-columns="4"] .ds-stat:nth-child(4n + 1) { padding-left: 0; border-left: 0; }
+@media (max-width: 639px) {
+  .ds[data-stats="divided"] .ds-stat-grid[data-columns="4"] .ds-stat:nth-child(odd) { padding-left: 0; border-left: 0; }
 }

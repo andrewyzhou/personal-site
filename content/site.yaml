@@ -12,6 +12,31 @@ site:
   titleSeparator: " · "
   notFoundTitle: not found
 
+# the site map: four hubs in the persistent nav. each hub gathers sections
+# that exist today; old urls (/blog/x, /activities/496, …) keep working and
+# sit under their hub in breadcrumbs.
+hubs:
+  - id: work
+    label: work
+    href: /work
+    intro: what i've worked on, researched, taught and built.
+    sections: [work, research, teaching, projects, coursework]
+  - id: writing
+    label: writing
+    href: /writing
+    intro: posts, and notes on what i've been reading and watching.
+    sections: [blog, library]
+  - id: photos
+    label: photos
+    href: /photos
+    intro: photos i've taken when i remember to bring a camera.
+    sections: [photos]
+  - id: training
+    label: training
+    href: /training
+    intro: runs, rides, hikes and lifts, recorded and logged.
+    sections: [activities, lifts]
+
 nav:
   home: home
   blog: blog

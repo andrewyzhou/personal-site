@@ -2,7 +2,12 @@
 
 .ds {
   --ds-font-sans: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-display: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
   --ds-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ds-heading-weight: 600;
+  --ds-control-h: 2.25rem;
+  --ds-control-h-sm: 1.75rem;
+  --ds-row-pad: 0.75rem;
   --ds-hit: 44px;
   --ds-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ds-ease-exit: cubic-bezier(0.4, 0, 1, 1);
@@ -517,6 +522,90 @@
   --ds-accent-subtle: oklch(57% 0.14 155 / 0.11);
   --ds-on-accent: oklch(100% 0.003 160);
   --ds-shadow-popover: 0 4px 16px oklch(0% 0 0 / 0.1), 0 1px 3px oklch(0% 0 0 / 0.06);
+}
+
+.ds[data-brand="b"] {
+  --ds-font-sans: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-display: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-heading-weight: 600;
+  --ds-radius-sm: 6px;
+  --ds-radius-md: 12px;
+  --ds-radius-lg: 20px;
+  --ds-control-h: 2.375rem;
+  --ds-control-h-sm: 1.875rem;
+  --ds-row-pad: 0.75rem;
+  --ds-dur-fast: 120ms;
+  --ds-dur-base: 180ms;
+  --ds-dur-slow: 280ms;
+  --ds-text-2xl: 1.925rem;
+  --ds-leading-2xl: 2.3375rem;
+  --ds-text-3xl: 2.75rem;
+  --ds-leading-3xl: 3.025rem;
+  --ds-text-display: 4.4rem;
+  --ds-leading-display: 4.4rem;
+}
+
+.ds[data-brand="a"] {
+  --ds-font-sans: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-display: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-heading-weight: 600;
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 12px;
+  --ds-control-h: 2rem;
+  --ds-control-h-sm: 1.625rem;
+  --ds-row-pad: 0.5rem;
+  --ds-dur-fast: 108ms;
+  --ds-dur-base: 162ms;
+  --ds-dur-slow: 252ms;
+  --ds-text-2xl: 1.575rem;
+  --ds-leading-2xl: 1.9125rem;
+  --ds-text-3xl: 2.25rem;
+  --ds-leading-3xl: 2.475rem;
+  --ds-text-display: 3.6rem;
+  --ds-leading-display: 3.6rem;
+}
+
+.ds[data-brand="c"] {
+  --ds-font-sans: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-display: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-heading-weight: 700;
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 12px;
+  --ds-control-h: 2.375rem;
+  --ds-control-h-sm: 1.875rem;
+  --ds-row-pad: 0.75rem;
+  --ds-dur-fast: 120ms;
+  --ds-dur-base: 180ms;
+  --ds-dur-slow: 280ms;
+  --ds-text-2xl: 1.75rem;
+  --ds-leading-2xl: 2.125rem;
+  --ds-text-3xl: 2.5rem;
+  --ds-leading-3xl: 2.75rem;
+  --ds-text-display: 4rem;
+  --ds-leading-display: 4rem;
+}
+
+.ds[data-brand="d"] {
+  --ds-font-sans: var(--font-funnel), "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-display: var(--font-garamond), "EB Garamond", ui-serif, Georgia, serif;
+  --ds-heading-weight: 500;
+  --ds-radius-sm: 2px;
+  --ds-radius-md: 4px;
+  --ds-radius-lg: 6px;
+  --ds-control-h: 2.375rem;
+  --ds-control-h-sm: 1.875rem;
+  --ds-row-pad: 0.75rem;
+  --ds-dur-fast: 96ms;
+  --ds-dur-base: 144ms;
+  --ds-dur-slow: 224ms;
+  --ds-text-2xl: 2.0125rem;
+  --ds-leading-2xl: 2.4437rem;
+  --ds-text-3xl: 2.875rem;
+  --ds-leading-3xl: 3.1625rem;
+  --ds-text-display: 4.6rem;
+  --ds-leading-display: 4.6rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

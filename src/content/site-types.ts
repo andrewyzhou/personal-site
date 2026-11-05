@@ -18,7 +18,16 @@ export type ExperienceTab =
   | "photos"
   | "coursework";
 
+export interface HubContent {
+  id: string;
+  label: string;
+  href: string;
+  intro: string;
+  sections: string[];
+}
+
 export interface SiteContent {
+  hubs: HubContent[];
   site: {
     name: string;
     title: string;

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { tokensCss } from "@/design-system/generate";
 import { colors, grayHex, type Accent, type Theme } from "@/design-system/tokens";
 import { isCurrent } from "@/design-system/components/ShellNav";
+import { BRANDS, DEFAULT_BRAND } from "@/design-system/brands";
 
 // oklch css string → [r,g,b] in 0..1 (alpha ignored; only opaque tokens are checked)
 function oklchToRgb(css: string): [number, number, number] {
@@ -70,6 +71,29 @@ describe("design tokens", () => {
     expect(grayHex(100)).toBe("#ffffff");
     expect(grayHex(0)).toBe("#000000");
     expect(grayHex(17.3)).toMatch(/^#([0-9a-f]{2})\1\1$/);
+  });
+});
+
+describe("brands", () => {
+  const css = tokensCss();
+  const layout = fs.readFileSync("src/app/layout.tsx", "utf8");
+  const loadedFonts = [...layout.matchAll(/variable: "(--font-[a-z-]+)"/g)].map((m) => m[1]);
+
+  it.each(Object.values(BRANDS))("brand $id is complete and buildable", (b) => {
+    expect(BRANDS[b.id]).toBe(b);
+    expect(["neutral", "blue", "amber", "green"]).toContain(b.accent);
+    expect(css).toContain(`.ds[data-brand="${b.id}"]`);
+    // a brand may only use faces the root layout actually loads
+    for (const stack of [b.type.display, b.type.body]) {
+      const v = stack.match(/var\((--font-[a-z-]+)\)/)?.[1];
+      expect(v && loadedFonts.includes(v), `${b.id}: ${stack}`).toBe(true);
+    }
+    expect(b.motion).toBeGreaterThan(0);
+    expect(b.type.displayScale).toBeGreaterThan(0.5);
+  });
+
+  it("the default brand exists", () => {
+    expect(BRANDS[DEFAULT_BRAND]).toBeDefined();
   });
 });
 

@@ -90,6 +90,13 @@ export function validateSite(raw: unknown): string[] {
   }
   const aff = get(raw, "hero.affiliation");
   if (!Array.isArray(aff) || !aff.every((s) => typeof s === "string")) errors.push("hero.affiliation must be a list of strings");
+  const hubs = get(raw, "hubs");
+  if (!Array.isArray(hubs) || hubs.length === 0) errors.push("hubs must be a non-empty list");
+  else
+    hubs.forEach((h, i) => {
+      for (const k of ["id", "label", "href", "intro"]) if (!h || typeof h[k] !== "string") errors.push(`hubs[${i}].${k} must be a string`);
+      if (!h || !Array.isArray(h.sections)) errors.push(`hubs[${i}].sections must be a list`);
+    });
   const social = get(raw, "social");
   if (!Array.isArray(social)) errors.push("social must be a list");
   else
