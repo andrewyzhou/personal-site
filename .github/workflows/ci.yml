@@ -18,3 +18,29 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
+
+  # renders the site from fixture content and holds v1 to its committed
+  # linux baselines (tests/design/README.md). when a baseline is missing it is
+  # written instead of compared, and every baseline is uploaded as an
+  # artifact so the coordinator can review and commit new ones.
+  design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:design
+      - run: npm run test:design -- --update-snapshots=missing
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-screenshots
+          path: |
+            tests/design/__screenshots__/linux
+            tests/design/.output
+            tests/design/.report
+          if-no-files-found: ignore

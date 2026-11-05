@@ -1,0 +1,12 @@
+# short blurb shown under each tab in the experience section.
+# `bio` is intentionally empty (the bio tab uses content/bio.mdx instead).
+# keep these one-line and lowercase to match the site's tone.
+
+work: building products and shipping code >:)
+research: exploring machine learning with interests in distributed training, computer vision, and computational biology!
+teaching: helping berkeley bears learn computer science :p
+projects: things i've built for fun and learning :D
+library: books, videos, podcasts, and courses i've been learning from — with my notes :3
+blog: writing, photos, and half-formed thoughts on what i've been up to <3
+photos: photos i've taken when i remember to bring a camera :3
+coursework: classes i've taken at berkeley with links to my notes & cheatsheets :)

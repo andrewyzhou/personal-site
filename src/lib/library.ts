@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { contentPath } from "@/lib/content-root";
 import matter from "gray-matter";
 
 export type LibraryType = "book" | "video" | "podcast" | "course" | "article";
@@ -23,7 +24,7 @@ export interface LibraryEntry extends LibraryFrontmatter {
   status: "in-progress" | "completed";
 }
 
-const CONTENT_DIR = path.join(process.cwd(), "content/library");
+const CONTENT_DIR = contentPath("library");
 
 // subdirectories of content/library/ are intentionally not traversed — only
 // direct-child .mdx files are published. drafts live in content/library/wip/
