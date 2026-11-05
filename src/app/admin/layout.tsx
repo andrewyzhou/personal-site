@@ -114,6 +114,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <Link href="/admin/privacy" className="font-sans text-gray text-sm link-highlight">
           privacy
         </Link>
+        <Link href="/admin/listening" className="font-sans text-gray text-sm link-highlight">
+          listening
+        </Link>
       </nav>
       {children}
     </AdminShell>
