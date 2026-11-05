@@ -65,8 +65,22 @@ describe("routeThumbDataUri with segments", () => {
 });
 
 describe("RouteThumb with segments", () => {
-  const pathD = (el: ReactElement | null) =>
-    ((el as ReactElement<{ children: ReactElement<{ d: string }> }>).props.children.props.d);
+  // the path is the first child (start/end markers follow it)
+  const pathD = (el: ReactElement | null) => {
+    const kids = (el as ReactElement<{ children: unknown }>).props.children;
+    const first = (Array.isArray(kids) ? kids[0] : kids) as ReactElement<{ d: string }>;
+    return first.props.d;
+  };
+
+  it("start and end markers only where legible", () => {
+    const markersOf = (el: ReactElement | null) => {
+      const kids = (el as ReactElement<{ children: unknown[] }>).props.children;
+      const frag = Array.isArray(kids) ? (kids[1] as ReactElement<{ children: ReactElement<{ "data-marker": string }>[] }> | null) : null;
+      return frag ? frag.props.children.map((c) => c.props["data-marker"]) : [];
+    };
+    expect(markersOf(RouteThumb({ polyline: encodeMultiPolyline([a, b]), height: 80 })).sort()).toEqual(["end", "start"]);
+    expect(markersOf(RouteThumb({ polyline: encodeMultiPolyline([a, b]), height: 30 }))).toEqual([]);
+  });
 
   it("one subpath per segment", () => {
     expect(moves(pathD(RouteThumb({ polyline: encodeMultiPolyline([a, b]) })))).toBe(2);
