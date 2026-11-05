@@ -26,6 +26,9 @@ export type RawKind =
   | "strava-export-file"
   | "strava-export-manifest"
   | "photo-original"
+  | "spotify-api"
+  | "spotify-export-zip"
+  | "spotify-export-file"
   | "pg-dump"
   | "text";
 

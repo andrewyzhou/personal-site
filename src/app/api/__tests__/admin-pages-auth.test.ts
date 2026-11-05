@@ -32,10 +32,18 @@ vi.mock("@/lib/r2", () => ({
 vi.mock("@/components/admin/EditActivity", () => ({ default: () => null }));
 vi.mock("@/components/admin/PrivacyAdmin", () => ({ default: () => null }));
 vi.mock("@/components/RouteThumb", () => ({ default: () => null }));
+vi.mock("@/components/admin/ListeningAdmin", () => ({ default: () => null }));
+vi.mock("@/lib/listening/admin-data", () => ({
+  loadListeningOverview: async () => {
+    dbCalls.n++;
+    throw new Error("db touched");
+  },
+}));
 
 import AdminDashboard from "@/app/admin/page";
 import AdminEditActivityPage from "@/app/admin/activities/[id]/page";
 import AdminPrivacyPage from "@/app/admin/privacy/page";
+import AdminListeningPage from "@/app/admin/listening/page";
 import { isAdminViewer } from "@/app/admin/require-admin";
 
 beforeEach(() => {
@@ -54,6 +62,7 @@ describe("admin pages without the layout", () => {
       expect(await AdminDashboard()).toBeNull();
       expect(await AdminEditActivityPage({ params: Promise.resolve({ id: "12" }) })).toBeNull();
       expect(await AdminPrivacyPage()).toBeNull();
+      expect(await AdminListeningPage()).toBeNull();
       expect(dbCalls.n).toBe(0);
       expect(r2Calls.n).toBe(0);
     });
@@ -65,5 +74,8 @@ describe("admin pages without the layout", () => {
     await expect(AdminEditActivityPage({ params: Promise.resolve({ id: "12" }) })).rejects.toThrow("db touched");
     expect(dbCalls.n).toBe(1);
     expect(await AdminPrivacyPage()).not.toBeNull();
+    // the listening page loads its data (and renders an error message when that fails)
+    expect(await AdminListeningPage()).not.toBeNull();
+    expect(dbCalls.n).toBe(2);
   });
 });

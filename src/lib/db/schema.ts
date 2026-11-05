@@ -386,3 +386,4 @@ export const counters = pgTable(
 export type CommentRow = typeof comments.$inferSelect;
 
 export * from "./lift-schema";
+export * from "./listening-schema";
