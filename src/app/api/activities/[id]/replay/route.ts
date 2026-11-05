@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { getDb, activities, activityReplays } from "@/lib/db";
 import { isPublic } from "@/lib/public-activity";
-import { publicReplay } from "@/lib/replay/build";
+import { publicReplay, type ReplayData } from "@/lib/replay/build";
+import { liveReplay, liveReplayEnabled } from "@/lib/replay/live";
 import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
@@ -27,12 +28,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const row = rows[0];
     if (!row || !isPublic(row) || row.mapHidden) return NextResponse.json({ replay: null }, { status: 404 });
 
-    const replays = await db
-      .select({ data: activityReplays.data })
-      .from(activityReplays)
-      .where(eq(activityReplays.activityId, id))
-      .limit(1);
-    const data = replays[0]?.data ?? null;
+    let data: ReplayData | null = null;
+    try {
+      const replays = await db
+        .select({ data: activityReplays.data })
+        .from(activityReplays)
+        .where(eq(activityReplays.activityId, id))
+        .limit(1);
+      data = replays[0]?.data ?? null;
+    } catch (error) {
+      if (!liveReplayEnabled()) throw error;
+    }
+    if (!data && liveReplayEnabled()) {
+      const full = await db.select().from(activities).where(eq(activities.id, id)).limit(1);
+      if (full[0]) data = await liveReplay(full[0]);
+    }
     if (!data) return NextResponse.json({ replay: null }, { status: 404 });
 
     return NextResponse.json(
