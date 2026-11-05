@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { looksLikeStrongText } from "lift-core";
 import { ingestStrongText } from "@/lib/lift/ingest";
+import { answerLiftQuestion } from "@/lib/lift/query";
 import { safeEqual } from "@/lib/lift/auth";
 import {
   extractIncomingText,
@@ -12,8 +13,6 @@ import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-const HELP_TEXT = "share a workout from strong to this chat to log it";
 
 // once the secret checks out this always answers 200: telegram retries any
 // non-2xx with backoff, and a retry storm of the same bad update helps nobody.
@@ -58,9 +57,16 @@ export async function POST(request: Request) {
   } catch (error) {
     log.error("api:lift/telegram", "detect failed", error);
   }
+  // anything that isn't a strong share is a question (or help)
   if (!isWorkout) {
-    await reply(HELP_TEXT);
-    return NextResponse.json({ ok: true, handled: "help" });
+    try {
+      await reply(await answerLiftQuestion(incoming.text));
+      return NextResponse.json({ ok: true, handled: "query" });
+    } catch (error) {
+      log.error("api:lift/telegram", "query failed", error);
+      await reply("couldn't answer that: something went wrong, try again in a bit");
+      return NextResponse.json({ ok: true, handled: "error" });
+    }
   }
 
   try {
