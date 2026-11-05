@@ -187,6 +187,17 @@ export function planRestore(target: ZoneRow, rows: ZoneRow[]): RestorePlan {
   return { unarchiveId: target.id, archiveIds };
 }
 
+// every row in the lineage of `id` when none of them is in effect; deleting an
+// archived zone is the only real delete (archived zones never shape output)
+export function planPurge(rows: Pick<ZoneRow, "id" | "replacesId" | "archivedAt">[], id: number): number[] {
+  const roots = lineageRoots(rows);
+  const root = roots.get(id);
+  if (root === undefined) throw new ZoneError(404, "zone not found");
+  const lineage = rows.filter((r) => roots.get(r.id) === root);
+  if (lineage.some((r) => !r.archivedAt)) throw new ZoneError(409, "archive the zone before deleting it");
+  return lineage.map((r) => r.id);
+}
+
 // every active version in the same lineage as `id`, newest first
 export function activeInLineage(rows: ZoneRow[], id: number): ZoneRow[] {
   const roots = lineageRoots(rows);
@@ -313,6 +324,12 @@ export async function archiveZone(id: number, opts: MutationOptions = {}): Promi
     .where(eq(privacyZones.id, id))
     .returning(columns);
   return { zone: rows[0], touched: [current.polygon] };
+}
+
+export async function purgeZone(id: number): Promise<{ deletedIds: number[] }> {
+  const ids = planPurge(await allRows(), id);
+  await getDb().delete(privacyZones).where(inArray(privacyZones.id, ids));
+  return { deletedIds: ids };
 }
 
 export async function restoreZone(id: number, opts: MutationOptions = {}): Promise<ZoneMutation> {
