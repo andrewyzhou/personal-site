@@ -12,6 +12,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { isNotNull } from "drizzle-orm";
+import type { ReplayData } from "../replay/build";
 
 export interface RouteBounds {
   minLat: number;
@@ -299,6 +300,16 @@ export const activitySuggestions = pgTable(
     index("activity_suggestions_activity_idx").on(t.activityId, t.status),
   ]
 );
+
+// published replay track (timed, post-cleaning/trim/fog), one row per activity,
+// written only by republish. kept out of activities so list queries stay small.
+export const activityReplays = pgTable("activity_replays", {
+  activityId: bigint("activity_id", { mode: "number" })
+    .primaryKey()
+    .references(() => activities.id, { onDelete: "cascade" }),
+  data: jsonb("data").$type<ReplayData>(), // null: nothing to replay
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
 
 export const activitySettings = pgTable("activity_settings", {
   id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
