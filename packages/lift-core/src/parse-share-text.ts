@@ -27,7 +27,14 @@ function normalizeLines(text: string): string[] {
 // ---------------------------------------------------------------------------
 // share link
 
+// the share link is a url ending the text's last non-empty line, on any host;
+// urls anywhere else are left alone (they're notes)
 const LINK_RE = /https?:\/\/[^\s/?#]+(?:[/?#]\S*)?$/i;
+
+function lastNonEmpty<T>(lines: T[], text: (l: T) => string): T | null {
+  for (let i = lines.length - 1; i >= 0; i--) if (text(lines[i])) return lines[i];
+  return null;
+}
 
 function slugOf(link: string): string | null {
   const path = link.replace(/^https?:\/\/[^/]+/i, "").split(/[?#]/)[0];
@@ -355,14 +362,12 @@ export function parseShareText(text: string): ParsedWorkout {
   }
 
   // pull the share link out first so it never reads as a title or note
-  for (const l of lines) {
-    const m = LINK_RE.exec(l.text);
-    if (!m) continue;
-    if (workout.link === null) {
-      workout.link = m[0].replace(/[).,;]+$/, "");
-      workout.linkSlug = slugOf(workout.link);
-    }
-    l.text = l.text.replace(LINK_RE, "").trim();
+  const tail = lastNonEmpty(lines, (l) => l.text);
+  const m = tail ? LINK_RE.exec(tail.text) : null;
+  if (tail && m) {
+    workout.link = m[0].replace(/[).,;]+$/, "");
+    workout.linkSlug = slugOf(workout.link);
+    tail.text = tail.text.slice(0, m.index).trim();
   }
 
   let i = 0;
@@ -520,7 +525,9 @@ export function looksLikeShareText(text: string): boolean {
   const lines = normalizeLines(text).filter(Boolean);
   const head = lines.slice(0, 4);
   const hasDate = head.some((l) => parseShareDate(l) !== null || looksDateish(l));
-  const hasLink = lines.some((l) => LINK_RE.test(l) && /example\.com\/\S+/i.test(l));
+  const tail = lastNonEmpty(lines, (l) => l);
+  const link = tail ? LINK_RE.exec(tail) : null;
+  const hasLink = link !== null && slugOf(link[0]) !== null;
 
   let goodSets = 0;
   for (const l of lines) {

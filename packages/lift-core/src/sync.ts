@@ -248,5 +248,5 @@ export interface SyncSnapshotPage<K extends SnapshotEntity = SnapshotEntity> {
  * phone's status still drives their soft delete (discarded hides, finished shows).
  */
 export function isImportedWorkoutId(id: string): boolean {
-  return id.startsWith("share-");
+  return id.startsWith("share-") || id.startsWith("workout-csv-");
 }

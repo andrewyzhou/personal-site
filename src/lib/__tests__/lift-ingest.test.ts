@@ -359,9 +359,9 @@ describe("editCandidatesWhere", () => {
   it("matches its own id, its link, or a live imported workout at the same minute", () => {
     const q = db.select().from(schema.liftWorkouts).where(editCandidatesWhere("share-y", "y", "2026-11-02T19:18")).toSQL();
     expect(q.sql).toMatch(
-      /where \("lift_workouts"."id" = \$1 or "lift_workouts"."share_slug" = \$2 or \("lift_workouts"."started_local" = \$3 and "lift_workouts"."source" like \$4 and "lift_workouts"."deleted_at" is null\)\)$/
+      /where \("lift_workouts"."id" = \$1 or "lift_workouts"."share_slug" = \$2 or \("lift_workouts"."started_local" = \$3 and "lift_workouts"."source" in \(\$4, \$5\) and "lift_workouts"."deleted_at" is null\)\)$/
     );
-    expect(q.params).toEqual(["share-y", "y", "2026-11-02T19:18", "share%"]);
+    expect(q.params).toEqual(["share-y", "y", "2026-11-02T19:18", "share-text", "workout-csv"]);
     const bare = db.select().from(schema.liftWorkouts).where(editCandidatesWhere("share-z", null, null)).toSQL();
     expect(bare.params).toEqual(["share-z"]);
   });

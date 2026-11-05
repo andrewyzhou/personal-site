@@ -438,6 +438,32 @@ describe("parseShareText: inline variations", () => {
     expect(w.linkSlug).toBe("Zz9");
   });
 
+  it("takes the slug from the last path segment and strips trailing punctuation", () => {
+    const w = parseShareText(head + "Set 1: 10 lb × 5\n\n(https://share.example.org/a/b/Last42).\n");
+    expect(w.link).toBe("https://share.example.org/a/b/Last42");
+    expect(w.linkSlug).toBe("Last42");
+  });
+
+  it("leaves urls that aren't at the end of the text in the notes", () => {
+    const text = "T\nTuesday, November 4, 2026 at 6:12 PM\n\nBench Press (Barbell)\nform video https://example.com/v/abc\nSet 1: 135 lb × 5\n";
+    const w = parseShareText(text);
+    expect(w.link).toBeNull();
+    expect(w.linkSlug).toBeNull();
+    expect(JSON.stringify(w.exercises)).toContain("https://example.com/v/abc");
+  });
+
+  it("detection counts a trailing link on any host, not one mid-text", () => {
+    const date = "Tuesday, November 4, 2026 at 6:12 PM";
+    expect(looksLikeShareText(`T\n${date}\nnothing logged\nhttps://example.net/w/q1`)).toBe(true);
+    expect(looksLikeShareText(`T\n${date}\nsee https://example.net/w/q1\nnothing logged`)).toBe(false);
+  });
+
+  it("a bare host with no path is a link without a slug", () => {
+    const w = parseShareText(head + "Set 1: 10 lb × 5\n\nhttps://example.com\n");
+    expect(w.link).toBe("https://example.com");
+    expect(w.linkSlug).toBeNull();
+  });
+
   it("never throws on odd input", () => {
     for (const t of ["", "\n\n\n", "   ", "Set 1:", "[[[", "×××", "W:", " ", head]) {
       expect(() => parseShareText(t)).not.toThrow();
