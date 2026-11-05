@@ -441,6 +441,12 @@ export function publicLiftCalendarEntry(w: LiftOnlyRow, coarsenStartMin: number)
 // ---------------------------------------------------------------------------
 // loaders
 
+// dev-only stand-in data (LIFT_PUBLIC_FIXTURE=1); imported only when on, never in production
+export function liftFixtureOn(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.LIFT_PUBLIC_FIXTURE === "1";
+}
+const fixture = () => import("./public-fixture");
+
 // lazy: route tests mock @/lib/db without the lift tables
 const workoutCols = () => ({
   id: liftWorkouts.id,
@@ -557,6 +563,7 @@ async function serializeMany(workouts: LiftWorkoutInput[], options: Omit<Seriali
 export async function loadActivityLiftWorkouts(activity: Pick<ActivityRow, "id" | "hidden">): Promise<PublicLiftWorkout[]> {
   if (!isPublic(activity)) return [];
   try {
+    if (liftFixtureOn()) return await (await fixture()).fixtureActivityWorkouts(activity.id);
     const rows = await getDb()
       .select(workoutCols())
       .from(liftWorkoutActivities)
@@ -623,6 +630,7 @@ export async function resolvePublicLiftId(
 
 /** a lift-only workout for /lifts/[publicId]; null for unknown, linked, deleted, discarded or disabled */
 export async function loadLiftOnlyWorkout(publicId: string): Promise<PublicLiftWorkout | null> {
+  if (liftFixtureOn()) return isPublicLiftId(publicId) ? (await fixture()).fixtureLiftOnlyWorkout(publicId) : null;
   const hit = await resolvePublicLiftId(publicId);
   if (!hit) return null;
   // the index can be up to a ttl old, so the row is re-checked live
@@ -639,6 +647,7 @@ export async function loadLiftOnlyWorkout(publicId: string): Promise<PublicLiftW
 
 /** title-only lookup for metadata (from the index, no detail queries) */
 export async function loadLiftOnlyTitle(publicId: string): Promise<string | null> {
+  if (liftFixtureOn()) return (await loadLiftOnlyWorkout(publicId))?.title ?? null;
   return (await resolvePublicLiftId(publicId))?.title ?? null;
 }
 
@@ -653,7 +662,7 @@ export async function loadLiftCalendar(index: () => Promise<LiftOnlyRow[]> = cac
 /** calendar entries for /api/activities; any failure is an empty list, never a broken calendar */
 export async function liftCalendarEntries(): Promise<CalendarActivity[]> {
   try {
-    const entries = await loadLiftCalendar();
+    const entries = liftFixtureOn() ? await (await fixture()).fixtureCalendar() : await loadLiftCalendar();
     return Array.isArray(entries) ? entries : [];
   } catch (error) {
     log.warn("lift:public", "lift calendar load failed", error);
