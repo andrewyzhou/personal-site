@@ -1,0 +1,27 @@
+name: collect listening
+
+# spotify only keeps the last ~50 plays, so the collector has to run often.
+# vercel hobby crons are daily-only (that one stays as a fallback); this hits
+# the same endpoint every 15 minutes.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: collect-listening
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: hit /api/listening/cron/collect
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -sS --fail-with-body --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/listening/cron/collect"
