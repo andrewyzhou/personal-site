@@ -158,7 +158,9 @@ export function createRawStore(backend: RawBackend, manifest: RawManifest): RawS
       let created = false;
       if (existing) {
         // same key with a different size can only mean a corrupt prior write
-        if (existing.size !== bytes.length) {
+        // size -1: the store did not report a length; the key is the content hash, so a
+        // present key is the same bytes unless a write was corrupted (verify() checks that)
+        if (existing.size !== -1 && existing.size !== bytes.length) {
           throw new RawIntegrityError(`raw object ${sha256} exists with size ${existing.size}, expected ${bytes.length}`);
         }
       } else {
@@ -267,10 +269,12 @@ export function rawBucket(): string {
 export function r2RawBackend(bucket: string = rawBucket()): RawBackend {
   return {
     async head(key) {
-      const res = await r2BucketFetch(bucket, key, { method: "HEAD" });
+      // identity: compressed responses (json) come back without content-length
+      const res = await r2BucketFetch(bucket, key, { method: "HEAD", headers: { "Accept-Encoding": "identity" } });
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`raw head failed: ${res.status} for ${key}`);
-      return { size: Number(res.headers.get("content-length") ?? -1) };
+      const length = res.headers.get("content-length");
+      return { size: length === null ? -1 : Number(length) };
     },
     async putIfAbsent(key, bytes, contentType, sha256) {
       const res = await r2BucketFetch(bucket, key, {

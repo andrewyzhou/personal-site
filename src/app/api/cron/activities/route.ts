@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { isStravaApiEnabled } from "@/lib/strava";
-import { syncStravaActivities } from "@/lib/strava-sync";
+import { syncStravaActivities, syncStravaPhotos } from "@/lib/strava-sync";
 import { isIntervalsConfigured, pullIntervalsActivities } from "@/lib/intervals";
 import { unauthorizedResponse } from "@/lib/admin-auth";
 import { log } from "@/lib/log";
@@ -35,6 +35,14 @@ export async function GET(request: Request) {
     } catch (error) {
       log.error("cron:activities", "strava sync failed", error);
       out.strava = { error: (error as Error).message };
+    }
+  }
+  if (isStravaApiEnabled()) {
+    try {
+      out.stravaPhotos = await syncStravaPhotos();
+    } catch (error) {
+      log.error("cron:activities", "strava photo sync failed", error);
+      out.stravaPhotos = { error: (error as Error).message };
     }
   }
   if (isIntervalsConfigured()) {

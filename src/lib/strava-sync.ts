@@ -18,7 +18,9 @@ import {
 import { cumulativeDistances, type TrackRecord } from "./geo";
 import type { ParsedTrackFile } from "./fit";
 import { getAccessToken, isStravaApiEnabled } from "./strava";
+import { importStravaPhotos, syncRecentStravaPhotos } from "./strava-photos";
 import { invalidateCache } from "./cache";
+import { log } from "./log";
 import { addActivitySource, findActivityIdBySource, knownExternalIds, storeRawPayload } from "./activity-sources";
 import { republish } from "./republish";
 import { staleMark } from "./privacy/stale";
@@ -49,6 +51,7 @@ interface StravaDetail {
   average_cadence?: number;
   average_watts?: number;
   max_watts?: number;
+  total_photo_count?: number;
   kilojoules?: number;
   suffer_score?: number | null;
   description?: string | null;
@@ -353,7 +356,23 @@ export async function applyStravaUpdate(stravaId: number): Promise<boolean> {
   }
   await setStravaMetadata(rowId, detail);
   await invalidateCache("activities_list", "activities_latest");
+  if (detail.total_photo_count) {
+    try {
+      await importStravaPhotos(rowId, stravaId, token);
+    } catch (error) {
+      log.warn("strava-sync", `photo import failed for ${stravaId}`, error);
+    }
+  }
   return true;
+}
+
+// daily: pick up photos added on strava after the fact (no webhook fires for those)
+export async function syncStravaPhotos(): Promise<{ checked: number; added: number; failures: number }> {
+  const token = await getAccessToken();
+  return syncRecentStravaPhotos(token, async (stravaId, startDate) => {
+    const byId = await getDb().select({ id: activities.id }).from(activities).where(eq(activities.externalId, String(stravaId))).limit(1);
+    return byId[0]?.id ?? (await findActivityIdBySource("strava", String(stravaId))) ?? (await findSameActivity(new Date(startDate)))?.id ?? null;
+  });
 }
 
 // strava-side delete → hide, never delete (history is only ever soft-removed).
