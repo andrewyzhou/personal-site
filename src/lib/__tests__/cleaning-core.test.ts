@@ -164,6 +164,9 @@ describe("cleaned stats", () => {
       ...DEFAULT_ACTIVITY_SETTINGS,
       autoApply: { enabled: true, minConfidence: 0.95 },
     });
+    // metrics inputs: kept when sane, null otherwise
+    expect(normalizeActivitySettings({ hrRestBpm: 52, thresholdPaceSPerKm: 270 })).toMatchObject({ hrRestBpm: 52, thresholdPaceSPerKm: 270 });
+    expect(normalizeActivitySettings({ hrRestBpm: 5, thresholdPaceSPerKm: "fast" })).toMatchObject({ hrRestBpm: null, thresholdPaceSPerKm: null });
   });
 });
 
