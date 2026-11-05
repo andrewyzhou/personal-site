@@ -141,3 +141,92 @@ pages:
     metaDescription: photos i've taken.
     intro: photos i've taken when i remember to bring a camera — film, phone, whatever. click into a set for the full thing.
     empty: no photos yet.
+  activity:
+    # the metrics section on an activity page (splits, efforts, curves, climbs, zones)
+    metrics:
+      headline:
+        movingTime: moving time
+        elapsedTime: elapsed time
+        gradeAdjustedPace: grade-adjusted pace
+        effort: effort
+      splits:
+        title: splits
+        unitToggle: split unit
+        units:
+          mi: mi
+          km: km
+        pace: pace
+        speed: speed
+        relative: "relative {rate}"
+        adjPace: adj. pace
+        adjPaceTitle: grade-adjusted pace
+        elev: elev
+        hr: hr
+        partial: partial
+        partialTitle: includes a fogged stretch
+        stopped: stopped
+      bestEfforts:
+        title: best efforts
+        distance: distance
+        time: time
+        pace: pace
+        # keyed by best effort key; every key must be present
+        labels:
+          "400m": 400 m
+          half-mile: 1/2 mile
+          "1k": 1 km
+          "1mi": 1 mile
+          "2mi": 2 mile
+          "5k": 5 km
+          "10k": 10 km
+          "15k": 15 km
+          "10mi": 10 mile
+          "20k": 20 km
+          half: half marathon
+          "30k": 30 km
+          marathon: marathon
+      curves:
+        power: power curve
+        powerNoun: power
+        speed: speed curve
+        speedNoun: speed
+        aria: "{title}: best average {noun} for each duration, {readout}"
+      climbs:
+        title: climbs
+        climb: climb
+        distance: distance
+        gain: gain
+        grade: grade avg / max
+        category: "cat {category}"
+        hc: hc
+      zones:
+        title: zones
+        heartRate: heart rate
+        pace: pace
+        zone: "z{n}"
+  records:
+    title: records
+    section: activities
+    link: records
+    intro: all-time bests, fitness and gear, from public activities
+    empty: nothing here yet.
+    bestEfforts: best efforts
+    bestSpeed: best average speed
+    bestPower: best average power
+    fitness: fitness
+    gear: gear
+    columns:
+      distance: distance
+      best: best
+      pace: pace
+      activity: activity
+      nextBest: next best
+      for: for
+      gear: gear
+      activities: activities
+      lastUsed: last used
+    unnamedActivity: activity
+    gearAlert: past 400 mi
+    fitnessAria: "fitness {fitness}, fatigue {fatigue} on {date}"
+    fitnessCaption: "{from} – {to} · fitness {fitness} (solid) · fatigue {fatigue} (dashed) · form {form}"
+    fitnessNote: "training load from heart rate: fitness is the 42-day average, fatigue the 7-day one."

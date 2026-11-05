@@ -10,6 +10,7 @@ import {
   chartX,
   colorFor,
   downsampleIndices,
+  fogMarks,
   formatMetric,
   gradeSeries,
   indexAtDistance,
@@ -62,6 +63,25 @@ function replay(segments: ReplaySegment[]): ReplayData {
     totalS: last.t[last.t.length - 1],
   };
 }
+
+describe("fogMarks", () => {
+  it("puts each fog gap where its segments meet (no width by distance)", () => {
+    const r = replay([seg(0, 10, 0), seg(400, 10, 0.01), seg(900, 10, 0.02)]);
+    const v = buildReplayView(r);
+    const marks = fogMarks(v, r.gaps);
+    expect(marks).toHaveLength(2);
+    const xs = chartX(v);
+    expect(marks[0]).toEqual([xs[9], xs[10]]);
+    expect(marks[0][0]).toBe(marks[0][1]); // hidden distance is never counted
+  });
+
+  it("skips cuts and spans the gap in time when the chart is by time", () => {
+    const r = replay([seg(0, 1, 0), seg(400, 1, 0)]); // no distance → x is time
+    const v = buildReplayView(r);
+    expect(fogMarks(v, r.gaps)).toEqual([[0, 400]]);
+    expect(fogMarks(v, [{ after: 0, kind: "cut" }])).toEqual([]);
+  });
+});
 
 describe("buildReplayView", () => {
   it("flattens segments with cumulative distance that does not jump gaps", () => {
@@ -118,7 +138,8 @@ describe("metrics", () => {
 
   it("formats each metric", () => {
     expect(formatMetric(1609.344 / 480, "pace")).toBe("8:00 /mi");
-    expect(formatMetric(0, "pace")).toBe("—");
+    expect(formatMetric(0, "pace")).toBe("stopped");
+    expect(formatMetric(0.2, "pace")).toBe("stopped");
     expect(formatMetric(10, "speed")).toBe("22.4 mph");
     expect(formatMetric(151.6, "hr")).toBe("152 bpm");
     expect(formatMetric(4.25, "grade")).toBe("+4.3%");

@@ -73,7 +73,66 @@ export interface SiteContent {
       completed: string;
     };
     photos: IndexPageContent & { empty: string };
+    activity: { metrics: ActivityMetricsContent };
+    records: RecordsPageContent;
   };
+}
+
+// best effort keys (see BEST_EFFORT_DISTANCES in src/lib/metrics/compute.ts);
+// site.yaml must label every one
+export const BEST_EFFORT_KEYS = ["400m", "half-mile", "1k", "1mi", "2mi", "5k", "10k", "15k", "10mi", "20k", "half", "30k", "marathon"] as const;
+export type BestEffortKey = (typeof BEST_EFFORT_KEYS)[number];
+
+export interface ActivityMetricsContent {
+  headline: { movingTime: string; elapsedTime: string; gradeAdjustedPace: string; effort: string };
+  splits: {
+    title: string;
+    unitToggle: string; // aria-label of the mi / km toggle
+    units: { mi: string; km: string };
+    pace: string;
+    speed: string;
+    relative: string; // "relative {rate}"
+    adjPace: string;
+    adjPaceTitle: string;
+    elev: string;
+    hr: string;
+    partial: string;
+    partialTitle: string;
+    stopped: string;
+  };
+  bestEfforts: { title: string; distance: string; time: string; pace: string; labels: Record<BestEffortKey, string> };
+  curves: { power: string; powerNoun: string; speed: string; speedNoun: string; aria: string };
+  climbs: { title: string; climb: string; distance: string; gain: string; grade: string; category: string; hc: string };
+  zones: { title: string; heartRate: string; pace: string; zone: string };
+}
+
+export interface RecordsPageContent {
+  title: string;
+  section: string; // "activities", for the page title
+  link: string; // link text from an activity page
+  intro: string;
+  empty: string;
+  bestEfforts: string;
+  bestSpeed: string;
+  bestPower: string;
+  fitness: string;
+  gear: string;
+  columns: {
+    distance: string;
+    best: string;
+    pace: string;
+    activity: string;
+    nextBest: string;
+    for: string;
+    gear: string;
+    activities: string;
+    lastUsed: string;
+  };
+  unnamedActivity: string;
+  gearAlert: string;
+  fitnessAria: string;
+  fitnessCaption: string;
+  fitnessNote: string;
 }
 
 export interface IndexPageContent {

@@ -29,6 +29,7 @@ import {
   type RawStats,
   activitySuggestions,
   activityReplays,
+  activityMetrics,
 } from "./db";
 import {
   CARD_POLYLINE_MAX_POINTS,
@@ -59,6 +60,9 @@ import { DEFAULT_ACTIVITY_SETTINGS, loadActivitySettings } from "./cleaning/sett
 import { detectSuggestions } from "./cleaning/detect";
 import { DETECTOR_VERSION, type Suggestion } from "./cleaning/types";
 import { buildReplay, type ReplayData } from "./replay/build";
+import { computeMetrics } from "./metrics/compute";
+import { metricSegments } from "./metrics/from-track";
+import type { ActivityMetrics } from "./metrics/types";
 import {
   CANONICAL_FORMAT_VERSION,
   TRACK_SOURCE_PRECEDENCE,
@@ -80,7 +84,8 @@ import { r2Get } from "./r2";
 // v2: privacy zones, distance policy, published start, photo pins
 // v3: cleaning edits, raw stats, hr zones, detector suggestions
 // v4: replay track
-export const PROCESSING_VERSION = 4;
+// v5: activity metrics (splits, best efforts, curves, zones, effort, climbs)
+export const PROCESSING_VERSION = 5;
 
 export type { ZoneInput } from "./privacy/fog";
 
@@ -181,6 +186,9 @@ export function inputsHash(input: {
     // hr zone bounds change hr_zones_s; auto-apply only matters through the
     // edits it creates, which are hashed themselves
     hrZones: input.activity ? { max: input.activity.hrMaxBpm, pcts: input.activity.hrZonePcts } : null,
+    // effort and pace zones in the metrics (absent keys keep older hashes stable)
+    ...(input.activity?.hrRestBpm != null ? { hrRest: input.activity.hrRestBpm } : {}),
+    ...(input.activity?.thresholdPaceSPerKm != null ? { thresholdPace: input.activity.thresholdPaceSPerKm } : {}),
     sportType: input.sportType ?? null,
     merged: input.merged ?? [],
     edits: [...input.edits].sort((a, b) => a.id - b.id),
@@ -304,6 +312,7 @@ export interface PublishedTrack {
   visible: FogSample[][];
   rawStats: RawStats; // the untouched track's stats
   replay: ReplayData | null; // the published track, timed, for the map replay
+  metrics: ActivityMetrics | null; // from the published (visible) samples only
   cleaned: boolean;
 }
 
@@ -470,6 +479,8 @@ export function publishTrack(
   } as PublicColumns;
   const rawParsed = canonicalToParsed(rawTrack);
   const byT = new Map(kept.map((r) => [r.t, r]));
+  const cumByT = new Map(kept.map((r, i) => [r.t, keptCum[i]]));
+  const sport = ctx.sportType ?? track.sportType;
   return {
     columns,
     visible: fog.segments,
@@ -478,7 +489,17 @@ export function publishTrack(
     // route-only tracks have made-up time: no replay
     replay: track.syntheticTime
       ? null
-      : buildReplay(fog.segments, segmentRun, (t) => byT.get(t), ctx.sportType ?? track.sportType),
+      : buildReplay(fog.segments, segmentRun, (t) => byT.get(t), sport),
+    // same visible samples the route and replay come from; no metric spans a gap
+    metrics: track.syntheticTime
+      ? null
+      : computeMetrics({
+          segments: metricSegments(fog.segments, (t) => byT.get(t), (t) => cumByT.get(t)),
+          sportType: sport,
+          hrMaxBpm: ctx.activity?.hrMaxBpm ?? null,
+          hrRestBpm: ctx.activity?.hrRestBpm ?? null,
+          thresholdPaceSPerKm: ctx.activity?.thresholdPaceSPerKm ?? null,
+        }),
   };
 }
 
@@ -608,6 +629,7 @@ export interface RepublishDeps {
   // flag another activity for rebuild (merge targets of an absorbed activity)
   markStale?(id: number): Promise<void>;
   writeReplay?(id: number, data: ReplayData | null): Promise<void>;
+  writeMetrics?(id: number, data: ActivityMetrics | null): Promise<void>;
 }
 
 export type RepublishResult =
@@ -737,6 +759,8 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     // the replay can't be re-fogged without the track: withdraw it while any
     // zone could touch it (it comes back with the next successful republish)
     if (near.length && deps.writeReplay) await deps.writeReplay(activityId, null);
+    // metrics too: splits/efforts computed before the zone could cover its stretch
+    if (near.length && deps.writeMetrics) await deps.writeMetrics(activityId, null);
   };
 
   // best source first; skip sources that hold no track, but stop (write
@@ -806,6 +830,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
       updatedAt: new Date(),
     }, startedAt);
     if (deps.writeReplay) await deps.writeReplay(activityId, published.replay);
+    if (deps.writeMetrics) await deps.writeMetrics(activityId, published.metrics);
     if (deps.markStale) for (const target of mergedInto) await deps.markStale(target);
     return { status: "published", id: activityId, hash, track: ref, changed, columns, canonicalTrackKey: stored ? key : null, pins };
   }
@@ -838,6 +863,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     }, startedAt);
     // no timed track: nothing to replay (an earlier replay never lingers)
     if (deps.writeReplay) await deps.writeReplay(activityId, null);
+    if (deps.writeMetrics) await deps.writeMetrics(activityId, null);
   }
   return { status: "no-source", id: activityId, hash: bestHash };
 }
@@ -928,6 +954,12 @@ export function defaultDeps(): RepublishDeps {
         .insert(activityReplays)
         .values({ activityId: id, data, updatedAt: new Date() })
         .onConflictDoUpdate({ target: activityReplays.activityId, set: { data, updatedAt: new Date() } });
+    },
+    async writeMetrics(id, data) {
+      await db
+        .insert(activityMetrics)
+        .values({ activityId: id, data, updatedAt: new Date() })
+        .onConflictDoUpdate({ target: activityMetrics.activityId, set: { data, updatedAt: new Date() } });
     },
     async markStale(id) {
       await db.update(activities).set({ needsRepublish: true, staleMarkedAt: new Date() }).where(eq(activities.id, id));

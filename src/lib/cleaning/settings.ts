@@ -7,10 +7,15 @@ export const DEFAULT_ACTIVITY_SETTINGS: ActivitySettings = {
   autoApply: { enabled: false, minConfidence: 0.9 },
   hrMaxBpm: 190,
   hrZonePcts: [0.6, 0.7, 0.8, 0.9],
+  hrRestBpm: null,
+  thresholdPaceSPerKm: null,
 };
 
 const num = (v: unknown, lo: number, hi: number, fallback: number) =>
   typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : fallback;
+
+const optNum = (v: unknown, lo: number, hi: number): number | null =>
+  typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : null;
 
 export function normalizeActivitySettings(raw: unknown): ActivitySettings {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -26,6 +31,9 @@ export function normalizeActivitySettings(raw: unknown): ActivitySettings {
     },
     hrMaxBpm: num(r.hrMaxBpm, 120, 230, DEFAULT_ACTIVITY_SETTINGS.hrMaxBpm),
     hrZonePcts: pcts,
+    // optional metrics inputs: null unless set (and sane)
+    hrRestBpm: optNum(r.hrRestBpm, 30, 110),
+    thresholdPaceSPerKm: optNum(r.thresholdPaceSPerKm, 150, 900), // 2:30–15:00 /km
   };
 }
 

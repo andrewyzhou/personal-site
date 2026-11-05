@@ -29,6 +29,17 @@ describe("content/site.yaml", () => {
     expect(errors).toContain("social[0] needs name and url");
   });
 
+  it("requires a label for every best effort key", () => {
+    const site = load("content/site.yaml") as SiteContent;
+    const labels: Record<string, string> = { ...site.pages.activity.metrics.bestEfforts.labels };
+    delete labels["half-mile"];
+    const broken = {
+      ...site,
+      pages: { ...site.pages, activity: { metrics: { ...site.pages.activity.metrics, bestEfforts: { ...site.pages.activity.metrics.bestEfforts, labels } } } },
+    };
+    expect(validateSite(broken)).toEqual(["pages.activity.metrics.bestEfforts.labels.half-mile must be a string"]);
+  });
+
   it("references only icons that exist", () => {
     const site = load("content/site.yaml") as SiteContent;
     for (const s of site.social) if (s.icon) expect(fs.existsSync(path.join("public", s.icon)), s.icon).toBe(true);
