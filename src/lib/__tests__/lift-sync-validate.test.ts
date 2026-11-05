@@ -214,6 +214,8 @@ describe("program payloads", () => {
 
   it("accepts a program and its delete", () => {
     expect(reason(program)).toBeNull();
+    const ruled = data.replace('"rules":{}', '"rules":{"te1":{"kind":"double","sets":3,"repsLo":8,"repsHi":12,"increment":2.5,"unit":"kg"}}');
+    expect(reason({ ...program, data: ruled })).toBeNull();
     expect(validateMutation(m("program", "delete", null, "p1")).ok).toBe(true);
   });
 
@@ -221,6 +223,11 @@ describe("program payloads", () => {
     ["data that isn't json", { ...program, data: "{" }, "payload.data is not valid json"],
     ["data of the wrong version", { ...program, data: data.replace('"version":1', '"version":9') }, "payload.data version must be 1"],
     ["a bad rule", { ...program, data: data.replace('"rules":{}', '"rules":{"te1":{"kind":"linear"}}') }, "payload.data rules.te1 is not a valid rule"],
+    [
+      "a rule increment in an unknown unit",
+      { ...program, data: data.replace('"rules":{}', '"rules":{"te1":{"kind":"linear","sets":3,"reps":5,"increment":5,"unit":"st"}}') },
+      "payload.data rules.te1.unit must be lb or kg",
+    ],
     ["oversized data", { ...program, data: "x".repeat(100_001) }, "payload.data length must be at most 100000"],
     ["a non-flag active", { ...program, active: true }, "payload.active must be 0 or 1"],
     ["an empty name", { ...program, name: "" }, "payload.name length must be 1..200"],

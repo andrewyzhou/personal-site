@@ -1,8 +1,8 @@
 import { StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { BODY_FIGURES, MUSCLE_REGION_LABELS, type BodyView, type MuscleRegion } from "lift-core";
+import { BODY_FIGURES, MUSCLE_REGION_LABELS, shapeLoad, shapeRegions, type BodyView, type MuscleRegion } from "lift-core";
 import { useColors } from "./theme";
-import { intensityOf, shapeLoadOf, topRegions } from "../lib/bodyLoad";
+import { intensityOf, topRegions } from "../lib/bodyLoad";
 
 interface Props {
   /** normalized 0..1 per region */
@@ -34,7 +34,7 @@ export function BodyFigure({ load, size = 220, views = ["front", "back"] }: Prop
           <Svg key={v} width={size * aspect(fig.viewBox)} height={size} viewBox={fig.viewBox}>
             {fig.outline ? <Path d={fig.outline} fill={c.steps[0]} stroke={c.border} strokeWidth={1.5} /> : null}
             {fig.shapes.map((s, i) => {
-              const step = s.region ? intensityOf(shapeLoadOf(s, load), STEPS) : 0;
+              const step = shapeRegions(s).length ? intensityOf(shapeLoad(s, load), STEPS) : 0;
               return <Path key={i} d={s.d} fill={c.steps[step] ?? c.steps[0]} stroke={c.border} strokeWidth={0.75} />;
             })}
           </Svg>

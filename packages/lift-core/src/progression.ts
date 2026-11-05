@@ -10,8 +10,10 @@ export const DEFAULT_DELOAD_AFTER = 3;
 export const DEFAULT_DELOAD_PCT = 10;
 
 interface RuleBase {
-  /** step in the caller's unit; default 5 lb / 2.5 kg */
+  /** step, in `unit`; default 5 lb / 2.5 kg in the caller's unit */
   increment?: number;
+  /** unit of `increment`, so switching the app's unit doesn't change what the rule means */
+  unit?: WeightUnit;
   /** consecutive failed sessions before a deload; 0 = never. default 3 */
   deloadAfter?: number;
   /** percent taken off on a deload. default 10 */
@@ -40,8 +42,9 @@ export interface PercentRule {
   reps: number;
   /** 1..100 */
   percent: number;
-  /** rounding step; default 5 lb / 2.5 kg */
+  /** rounding step, in `unit`; default 5 lb / 2.5 kg */
   increment?: number;
+  unit?: WeightUnit;
 }
 
 export type ProgressionRule = LinearRule | DoubleRule | PercentRule;
@@ -87,6 +90,30 @@ export function roundToIncrement(weight: number, step: number): number {
   return r3(Math.round(weight / step) * step);
 }
 
+/** like roundToIncrement, but a tie goes down: a repeat never gets heavier */
+function roundTiesDown(weight: number, step: number): number {
+  if (!(step > 0)) return r3(weight);
+  return r3(Math.ceil(r3(weight / step) - 0.5) * step);
+}
+
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+
+/** the rule's increment in the caller's unit, and the grid weights snap to */
+export function ruleSteps(rule: ProgressionRule, unit: WeightUnit): { step: number; grid: number } {
+  const plate = DEFAULT_INCREMENT[unit];
+  const inc = rule.increment != null && rule.increment > 0 ? rule.increment : null;
+  if (inc == null) return { step: plate, grid: plate };
+  const from = rule.unit ?? unit;
+  if (from !== unit) {
+    // a converted step lands off-plate, so snap to the caller's usual plates
+    return { step: r3(fromKg(toKg(inc, from), unit)), grid: plate };
+  }
+  if (rule.kind === "percent") return { step: inc, grid: inc };
+  // finest step both the default plates and the increment can make (7.5 lb -> 2.5)
+  const milli = gcd(Math.round(inc * 1000), Math.round(plate * 1000));
+  return { step: inc, grid: milli > 0 ? milli / 1000 : inc };
+}
+
 function fmt(n: number): string {
   return String(r3(n));
 }
@@ -98,12 +125,12 @@ export function formatTarget(t: Pick<NextTarget, "weight" | "reps" | "unit">): s
 
 /** "linear +5 lb · 3×5" for lists */
 export function describeRule(rule: ProgressionRule, unit: WeightUnit): string {
-  const inc = fmt(rule.increment ?? DEFAULT_INCREMENT[unit]);
+  const inc = rule.increment != null ? `${fmt(rule.increment)} ${rule.unit ?? unit}` : `${fmt(DEFAULT_INCREMENT[unit])} ${unit}`;
   switch (rule.kind) {
     case "linear":
-      return `linear +${inc} ${unit} · ${rule.sets}×${rule.reps}`;
+      return `linear +${inc} · ${rule.sets}×${rule.reps}`;
     case "double":
-      return `double +${inc} ${unit} · ${rule.sets}×${rule.repsLo}-${rule.repsHi}`;
+      return `double +${inc} · ${rule.sets}×${rule.repsLo}-${rule.repsHi}`;
     case "percent":
       return `${fmt(rule.percent)}% e1rm · ${rule.sets}×${rule.reps}`;
   }
@@ -188,7 +215,7 @@ export function nextTarget(
   unit: WeightUnit,
   opts: NextTargetOptions = {}
 ): NextTarget {
-  const step = rule.increment != null && rule.increment > 0 ? rule.increment : DEFAULT_INCREMENT[unit];
+  const { step, grid } = ruleSteps(rule, unit);
   const out = (weight: number | null, reps: number, action: ProgressionAction, reason: string): NextTarget => ({
     sets: plan(rule.sets, weight, reps, unit),
     weight,
@@ -201,7 +228,7 @@ export function nextTarget(
   if (rule.kind === "percent") {
     const max = opts.e1rm ?? bestE1rm([lastSessionSets, ...(opts.history ?? [])], unit);
     if (max == null || !(max > 0)) return out(opts.startWeight ?? null, rule.reps, "start", "no e1rm yet: pick a weight");
-    const weight = roundToIncrement((max * rule.percent) / 100, step);
+    const weight = roundToIncrement((max * rule.percent) / 100, grid);
     return out(weight, rule.reps, "percent", `${fmt(rule.percent)}% of ${fmt(Math.round(max))} ${unit} e1rm`);
   }
 
@@ -216,25 +243,28 @@ export function nextTarget(
   // linear: target reps on every set; double: the top of the range on every set
   if (succeeded(rule, w, false)) {
     const top = rule.kind === "linear" ? rule.reps : rule.repsHi;
-    return out(r3(w.weight + step), firstReps, "increase", `+${fmt(step)} ${unit}: hit ${scheme(top)} last time`);
+    // snapped, so a converted or odd weight still lands on plates; never below a real increase
+    let up = roundToIncrement(w.weight + step, grid);
+    if (up <= w.weight) up = r3(up + grid);
+    return out(up, firstReps, "increase", `+${fmt(step)} ${unit}: hit ${scheme(top)} last time`);
   }
 
   if (rule.kind === "double" && succeeded(rule, w, true)) {
     // inside the range: same weight, one more rep than the weakest set
     const low = Math.min(...w.reps.slice(0, rule.sets));
     const reps = Math.max(rule.repsLo, Math.min(rule.repsHi, low + 1));
-    return out(w.weight, reps, "repeat", `same weight: build to ${scheme(rule.repsHi)}`);
+    return out(roundTiesDown(w.weight, grid), reps, "repeat", `same weight: build to ${scheme(rule.repsHi)}`);
   }
 
   const streak = Math.max(1, failureStreak(rule, [lastSessionSets, ...(opts.history ?? [])], unit));
   const after = rule.deloadAfter ?? DEFAULT_DELOAD_AFTER;
   if (after > 0 && streak >= after) {
     const pct = rule.deloadPct ?? DEFAULT_DELOAD_PCT;
-    const weight = Math.max(0, roundToIncrement(w.weight * (1 - pct / 100), step));
+    const weight = Math.max(0, roundToIncrement(w.weight * (1 - pct / 100), grid));
     return out(weight, firstReps, "deload", `-${fmt(pct)}%: missed ${scheme(firstReps)} ${streak} times`);
   }
   const tail = after > 0 ? ` (${streak} of ${after})` : "";
-  return out(w.weight, firstReps, "repeat", `repeat: missed ${scheme(firstReps)}${tail}`);
+  return out(roundTiesDown(w.weight, grid), firstReps, "repeat", `repeat: missed ${scheme(firstReps)}${tail}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +283,10 @@ export function parseRule(v: unknown): ProgressionRule | null {
   if (sets == null) return null;
   const base: RuleBase = {};
   const inc = posNum(o.increment, 1000);
+  // rules saved before the unit was stored meant lb
+  const unit: WeightUnit | undefined = o.unit === "kg" || o.unit === "lb" ? o.unit : inc != null ? "lb" : undefined;
   if (inc != null) base.increment = inc;
+  if (unit) base.unit = unit;
   if (typeof o.deloadAfter === "number" && Number.isInteger(o.deloadAfter) && o.deloadAfter >= 0 && o.deloadAfter <= 50) {
     base.deloadAfter = o.deloadAfter;
   }
@@ -273,7 +306,10 @@ export function parseRule(v: unknown): ProgressionRule | null {
       const reps = posInt(o.reps, 100);
       const percent = posNum(o.percent, 100);
       if (reps == null || percent == null) return null;
-      return inc != null ? { kind: "percent", sets, reps, percent, increment: inc } : { kind: "percent", sets, reps, percent };
+      const rule: PercentRule = { kind: "percent", sets, reps, percent };
+      if (inc != null) rule.increment = inc;
+      if (unit) rule.unit = unit;
+      return rule;
     }
     default:
       return null;

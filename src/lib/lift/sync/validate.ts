@@ -1,7 +1,6 @@
 import {
-  MAX_PROGRAM_DATA_LENGTH,
   MUSCLE_REGIONS,
-  checkProgramData,
+  checkProgramText,
   SYNC_ENTITIES,
   SYNC_MAX_BATCH,
   SYNC_PROTOCOL_VERSION,
@@ -199,18 +198,9 @@ const plannedSet: Check = (v) =>
 
 const muscle = oneOf(MUSCLE_REGIONS);
 
-// json text of lift-core's ProgramData, checked strictly so the jsonb column only holds real programs
-const programData: Check = (v) => {
-  if (typeof v !== "string") return "must be a json string";
-  if (v.length > MAX_PROGRAM_DATA_LENGTH) return `length must be at most ${MAX_PROGRAM_DATA_LENGTH}`;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(v);
-  } catch {
-    return "is not valid json";
-  }
-  return checkProgramData(parsed);
-};
+// json text of lift-core's ProgramData, checked strictly so the jsonb column only holds real programs.
+// the phone runs the same check before saving, so what it keeps always syncs
+const programData: Check = (v) => checkProgramText(v);
 
 export const PAYLOAD_SHAPES: Record<SyncEntity, Shape> = {
   workout: {

@@ -4,6 +4,7 @@ import { DEFAULT_DELOAD_AFTER, DEFAULT_INCREMENT, defaultRule, type ProgressionK
 import { Chip } from "../library/Chip";
 import { NumField } from "../library/NumField";
 import { useColors } from "../theme";
+import { MAX_RULE_INCREMENT, MAX_RULE_REPS, MAX_RULE_SETS, ruleInt, ruleProblem, withRepRange } from "../../lib/programs";
 
 interface Props {
   rule: ProgressionRule | null;
@@ -27,9 +28,10 @@ const HELP: Record<ProgressionKind, string> = {
 /** rule picker for one template exercise: kind chips, then the kind's numbers */
 export function RuleEditor({ rule, unit, onChange }: Props) {
   const c = useColors();
-  // a blank field keeps the last good value instead of making the rule invalid
-  const int = (v: number | null, fallback: number) => (v != null && v >= 1 ? Math.round(v) : fallback);
   const patch = (p: Partial<ProgressionRule>) => rule && onChange({ ...rule, ...p } as ProgressionRule);
+  // the step is stored with its unit, so a later lb/kg switch doesn't change it
+  const incUnit = rule?.unit ?? unit;
+  const problem = rule ? ruleProblem(rule) : null;
 
   return (
     <View style={styles.wrap}>
@@ -39,7 +41,7 @@ export function RuleEditor({ rule, unit, onChange }: Props) {
             key={k.label}
             label={k.label}
             selected={(rule?.kind ?? null) === k.kind}
-            onPress={() => onChange(k.kind ? (rule?.kind === k.kind ? rule : defaultRule(k.kind)) : null)}
+            onPress={() => onChange(k.kind ? (rule?.kind === k.kind ? rule : { ...defaultRule(k.kind), unit }) : null)}
           />
         ))}
       </View>
@@ -48,24 +50,40 @@ export function RuleEditor({ rule, unit, onChange }: Props) {
           <Text style={{ color: c.muted, fontSize: 13 }}>{HELP[rule.kind]}</Text>
           <View style={styles.row}>
             <Field label="sets">
-              <NumField integer value={rule.sets} onChange={(v) => patch({ sets: int(v, rule.sets) })} />
+              <NumField
+                integer
+                value={rule.sets}
+                max={MAX_RULE_SETS}
+                onChange={(v) => patch({ sets: ruleInt(v, rule.sets, MAX_RULE_SETS) })}
+              />
             </Field>
             {rule.kind === "double" ? (
               <>
                 <Field label="reps from">
-                  <NumField integer value={rule.repsLo} onChange={(v) => patch({ repsLo: int(v, rule.repsLo) })} />
+                  <NumField
+                    integer
+                    value={rule.repsLo}
+                    max={MAX_RULE_REPS}
+                    onChange={(v) => onChange(withRepRange(rule, v, rule.repsHi))}
+                  />
                 </Field>
                 <Field label="to">
                   <NumField
                     integer
                     value={rule.repsHi}
-                    onChange={(v) => patch({ repsHi: Math.max(rule.repsLo, int(v, rule.repsHi)) })}
+                    max={MAX_RULE_REPS}
+                    onChange={(v) => onChange(withRepRange(rule, rule.repsLo, v))}
                   />
                 </Field>
               </>
             ) : (
               <Field label="reps">
-                <NumField integer value={rule.reps} onChange={(v) => patch({ reps: int(v, rule.reps) })} />
+                <NumField
+                  integer
+                  value={rule.reps}
+                  max={MAX_RULE_REPS}
+                  onChange={(v) => patch({ reps: ruleInt(v, rule.reps, MAX_RULE_REPS) })}
+                />
               </Field>
             )}
             {rule.kind === "percent" ? (
@@ -79,11 +97,12 @@ export function RuleEditor({ rule, unit, onChange }: Props) {
             ) : null}
           </View>
           <View style={styles.row}>
-            <Field label={rule.kind === "percent" ? `round to (${unit})` : `step (${unit})`}>
+            <Field label={rule.kind === "percent" ? `round to (${incUnit})` : `step (${incUnit})`}>
               <NumField
                 value={rule.increment ?? null}
-                placeholder={String(DEFAULT_INCREMENT[unit])}
-                onChange={(v) => patch({ increment: v != null && v > 0 ? v : undefined })}
+                placeholder={String(DEFAULT_INCREMENT[incUnit])}
+                max={MAX_RULE_INCREMENT}
+                onChange={(v) => patch(v != null && v > 0 ? { increment: v, unit: incUnit } : { increment: undefined })}
               />
             </Field>
             {rule.kind !== "percent" ? (
@@ -98,6 +117,7 @@ export function RuleEditor({ rule, unit, onChange }: Props) {
               </Field>
             ) : null}
           </View>
+          {problem ? <Text style={{ color: c.danger, fontSize: 13 }}>{problem}</Text> : null}
         </>
       ) : null}
     </View>

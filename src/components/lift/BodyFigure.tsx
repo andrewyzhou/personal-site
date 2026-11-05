@@ -2,8 +2,9 @@ import {
   BODY_FIGURES,
   MUSCLE_REGION_LABELS,
   loadIntensity,
+  shapeLoad,
+  shapeRegions,
   type BodyFigure as Figure,
-  type BodyShape,
   type MuscleRegion,
 } from "lift-core";
 
@@ -24,17 +25,6 @@ export function intensity(load: number | undefined): number {
   } catch {
     return load === undefined || !(load > 0) ? 0 : Math.min(STEPS, Math.max(1, Math.ceil(load * STEPS)));
   }
-}
-
-// one shape can stand for several regions (a deltoid is front + side heads): show the heaviest
-export function shapeLoadOf(s: BodyShape, load: Partial<Record<MuscleRegion, number>>): number | undefined {
-  const regions = s.regions?.length ? s.regions : s.region ? [s.region] : [];
-  let best: number | undefined;
-  for (const r of regions) {
-    const v = load[r];
-    if (typeof v === "number" && Number.isFinite(v) && (best === undefined || v > best)) best = v;
-  }
-  return best;
 }
 
 function hasArt(f: Figure | undefined): f is Figure {
@@ -92,7 +82,7 @@ export default function BodyFigure({
                   <path
                     key={j}
                     d={s.d}
-                    fill={s.region ? LOAD_FILLS[intensity(shapeLoadOf(s, load))] : "transparent"}
+                    fill={shapeRegions(s).length ? LOAD_FILLS[intensity(shapeLoad(s, load))] : "transparent"}
                     stroke={SHAPE_STROKE}
                     strokeWidth={0.75}
                     strokeLinejoin="round"

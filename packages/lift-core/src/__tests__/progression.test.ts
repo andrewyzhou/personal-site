@@ -102,10 +102,42 @@ describe("linear", () => {
     expect(t.reason).toBe("+2.5 kg: hit 3×5 last time");
   });
 
-  it("converts last session's unit into the caller's", () => {
+  it("converts last session's unit into the caller's, snapped to plates", () => {
+    // 100 kg = 220.46 lb, +5 -> 225.46 -> 225
     const t = nextTarget(linear, sets(100, 5, 5, 5).map((s) => ({ ...s, unit: "kg" as const })), "lb");
     expect(t.unit).toBe("lb");
-    expect(t.weight).toBeCloseTo(225.462, 2);
+    expect(t.weight).toBe(225);
+    expect(t.sets[0]!.weight).toBe(225);
+  });
+
+  it("lb history with a kg preference: increase and repeat land on 2.5 kg plates", () => {
+    // 225 lb = 102.06 kg
+    expect(nextTarget(linear, sets(225, 5, 5, 5), "kg").weight).toBe(105);
+    expect(nextTarget(linear, sets(225, 5, 5, 4), "kg")).toMatchObject({ weight: 102.5, action: "repeat", unit: "kg" });
+    // 50 lb = 22.68 kg
+    expect(nextTarget(double, sets(50, 10, 9, 9), "kg").weight).toBe(22.5);
+  });
+
+  it("a repeat at an off-plate weight rounds down on a tie", () => {
+    expect(nextTarget(linear, sets(102.5, 5, 5, 4), "lb").weight).toBe(100);
+    expect(nextTarget(linear, sets(186, 5, 5, 4), "lb").weight).toBe(185);
+  });
+
+  it("an increase always goes up, even from an off-plate weight", () => {
+    expect(nextTarget(linear, sets(186, 5, 5, 5), "lb").weight).toBe(190);
+    expect(nextTarget({ ...linear, increment: 1, unit: "lb" }, sets(185, 5, 5, 5), "lb").weight).toBe(186);
+    expect(nextTarget({ ...linear, increment: 7.5, unit: "lb" }, sets(225, 5, 5, 5), "lb").weight).toBe(232.5);
+  });
+
+  it("the increment keeps its own unit when the caller's unit changes", () => {
+    const rule: ProgressionRule = { ...linear, increment: 10, unit: "lb" };
+    const kg = sets(100, 5, 5, 5).map((s) => ({ ...s, unit: "kg" as const }));
+    // +10 lb = 4.536 kg on 100 kg -> 104.54 -> 105
+    const t = nextTarget(rule, kg, "kg");
+    expect(t.weight).toBe(105);
+    expect(t.reason).toBe("+4.536 kg: hit 3×5 last time");
+    // a tiny converted step still moves up a plate
+    expect(nextTarget({ ...linear, increment: 1, unit: "lb" }, kg, "kg").weight).toBe(102.5);
   });
 
   it("first session: no weight, or the start weight", () => {
@@ -203,5 +235,16 @@ describe("helpers", () => {
     expect(parseRule({ kind: "nope", sets: 3, reps: 5 })).toBeNull();
     expect(parseRule(null)).toBeNull();
     expect(parseRule({ kind: "linear", sets: 3, reps: 5, increment: -1, deloadAfter: 2 })).toEqual({ kind: "linear", sets: 3, reps: 5, deloadAfter: 2 });
+  });
+
+  it("parseRule keeps the increment's unit, reading a missing one as lb", () => {
+    expect(parseRule({ kind: "linear", sets: 3, reps: 5, increment: 2.5, unit: "kg" })).toMatchObject({ increment: 2.5, unit: "kg" });
+    expect(parseRule({ kind: "linear", sets: 3, reps: 5, increment: 10 })).toMatchObject({ increment: 10, unit: "lb" });
+    expect(parseRule({ kind: "percent", sets: 3, reps: 5, percent: 70, increment: 2.5 })).toMatchObject({ unit: "lb" });
+    expect(parseRule({ kind: "linear", sets: 3, reps: 5 })).not.toHaveProperty("unit");
+  });
+
+  it("describeRule shows the increment in its own unit", () => {
+    expect(describeRule({ ...linear, increment: 2.5, unit: "kg" }, "lb")).toBe("linear +2.5 kg · 3×5");
   });
 });

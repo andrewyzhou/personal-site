@@ -9,6 +9,9 @@ import {
   pruneRules,
   removeWeek,
   ruleFor,
+  ruleInt,
+  ruleProblem,
+  withRepRange,
   setDay,
   setDayCount,
   setRule,
@@ -115,7 +118,7 @@ describe("progressionHint", () => {
 
 describe("progressLabel", () => {
   it("reads like the list subtitle", () => {
-    const p = setDay(setDay(emptyProgram(2, 2), 0, 0, "a"), 1, 1, "b");
+    const p = { ...setDay(setDay(emptyProgram(2, 2), 0, 0, "a"), 1, 1, "b"), startedAt: 0 };
     expect(progressLabel(programProgress(p, []))).toBe("week 1 · day 1 · 0/2");
     expect(progressLabel(programProgress(p, [{ templateId: "a", startedAt: 1 }]))).toBe("week 2 · day 2 · 1/2");
     expect(progressLabel(programProgress(p, [{ templateId: "a", startedAt: 1 }, { templateId: "b", startedAt: 2 }]))).toBe("finished · 2/2");
@@ -123,5 +126,29 @@ describe("progressLabel", () => {
       "week 1 · day 1 · 0/2 · round 2"
     );
     expect(progressLabel(programProgress(emptyProgram(1, 3), []))).toBe("no training days yet");
+  });
+});
+
+describe("rule editing", () => {
+  it("ruleInt clamps and keeps the last good value for blanks", () => {
+    expect(ruleInt(500, 3, 50)).toBe(50);
+    expect(ruleInt(4.6, 3, 50)).toBe(5);
+    expect(ruleInt(null, 3, 50)).toBe(3);
+    expect(ruleInt(0, 3, 50)).toBe(3);
+  });
+
+  it("raising the bottom of the range drags the top along", () => {
+    const d = { kind: "double" as const, sets: 3, repsLo: 8, repsHi: 12 };
+    expect(withRepRange(d, 15, d.repsHi)).toMatchObject({ repsLo: 15, repsHi: 15 });
+    expect(withRepRange(d, d.repsLo, 6)).toMatchObject({ repsLo: 8, repsHi: 8 });
+    expect(withRepRange(d, 400, 400)).toMatchObject({ repsLo: 100, repsHi: 100 });
+  });
+
+  it("ruleProblem runs the server's check", () => {
+    expect(ruleProblem(linear)).toBeNull();
+    expect(ruleProblem({ ...linear, increment: 2.5, unit: "kg" })).toBeNull();
+    expect(ruleProblem({ ...linear, sets: 51 })).toMatch(/won't save/);
+    expect(ruleProblem({ kind: "double", sets: 3, repsLo: 12, repsHi: 8 })).toMatch(/won't save/);
+    expect(ruleProblem({ ...linear, unit: "st" as never })).toBe("unit must be lb or kg");
   });
 });

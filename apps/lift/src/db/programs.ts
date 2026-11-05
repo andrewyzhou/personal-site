@@ -4,10 +4,12 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { randomUUID } from "expo-crypto";
 import {
+  checkProgramText,
   emptyProgram,
   parseProgramData,
   programProgress,
   serializeProgramData,
+  skipNextDay,
   type ProgramData,
   type ProgramProgress,
   type SessionSet,
@@ -17,6 +19,7 @@ import { notify } from "./events";
 import { writeOutbox } from "./outbox";
 import { programs, sets, templateExercises, workoutExercises, workouts, type ProgramRow, type WorkoutRow } from "./schema";
 import { getPreferredUnit } from "./bodyweight";
+import { getSetting, setSetting } from "./settings";
 import { startWorkoutFromTemplate } from "./templates";
 import { bumpedAt } from "../lib/clock";
 import { validateName } from "../lib/names";
@@ -43,6 +46,14 @@ export interface ProgramDetail {
 
 const detail = (row: ProgramRow): ProgramDetail => ({ row, data: parseProgramData(row.data) });
 
+/** serialized program text, refused here with the server's own check so it can't be rejected on push */
+function checkedData(data: ProgramData): string {
+  const text = serializeProgramData(data);
+  const why = checkProgramText(text);
+  if (why) throw new Error(`program ${why}`);
+  return text;
+}
+
 export function listPrograms(): ProgramDetail[] {
   return db
     .select()
@@ -67,7 +78,7 @@ export function createProgram(name: string, data: ProgramData = emptyProgram(4, 
   return write((tx) => {
     const row = tx
       .insert(programs)
-      .values({ id: randomUUID(), name: clean, data: serializeProgramData(data), active: 0, createdAt: now, updatedAt: now })
+      .values({ id: randomUUID(), name: clean, data: checkedData(data), active: 0, createdAt: now, updatedAt: now })
       .returning()
       .get();
     writeOutbox(tx, "program", row.id, "insert", row);
@@ -77,7 +88,7 @@ export function createProgram(name: string, data: ProgramData = emptyProgram(4, 
 
 function update(tx: Tx, current: ProgramRow, patch: { name?: string; data?: ProgramData; active?: 0 | 1 }, now: number): ProgramRow {
   const name = patch.name ?? current.name;
-  const data = patch.data ? serializeProgramData(patch.data) : current.data;
+  const data = patch.data ? checkedData(patch.data) : current.data;
   const active = patch.active ?? (current.active ? 1 : 0);
   // an unchanged save writes nothing, so it doesn't sync a no-op
   if (name === current.name && data === current.data && active === current.active) return current;
@@ -130,7 +141,8 @@ export function skipProgramDay(id: string, now = Date.now()): void {
     const current = tx.select().from(programs).where(eq(programs.id, id)).get();
     if (!current) return;
     const data = parseProgramData(current.data);
-    update(tx, current, { data: { ...data, skipped: data.skipped + 1 } }, now);
+    // rebased on the progress so far, so the skip isn't lost behind later workouts
+    update(tx, current, { data: skipNextDay(data, completedTemplateWorkouts(data.startedAt, tx), now) }, now);
   });
 }
 
@@ -144,8 +156,9 @@ export function deleteProgram(id: string): void {
 // ---------------------------------------------------------------------------
 // progress + history reads
 
-/** finished template workouts since `since`, oldest first */
+/** finished template workouts since `since`, oldest first; none for a program that hasn't started */
 export function completedTemplateWorkouts(since: number | null, q: Reader = db): { templateId: string | null; startedAt: number }[] {
+  if (since == null) return [];
   const where = and(eq(workouts.status, "finished"), isNotNull(workouts.templateId));
   return q
     .select({ templateId: workouts.templateId, startedAt: workouts.startedAt })
@@ -153,7 +166,7 @@ export function completedTemplateWorkouts(since: number | null, q: Reader = db):
     .where(where)
     .orderBy(asc(workouts.startedAt))
     .all()
-    .filter((w) => since == null || w.startedAt >= since);
+    .filter((w) => w.startedAt >= since);
 }
 
 export function getProgramProgress(p: Pick<ProgramDetail, "data">, q: Reader = db): ProgramProgress {
@@ -229,13 +242,42 @@ export function startNextProgramDay(id: string, now = Date.now()): StartProgramD
     },
   });
   if (!result) return { kind: "missing_template" };
-  return { kind: result.started ? "started" : "in_progress", workout: result.workout };
+  if (!result.started) return { kind: "in_progress", workout: result.workout };
+  // running a day of a program that never started starts it, so this workout counts
+  if (program.data.startedAt == null) {
+    write((tx) => {
+      const current = tx.select().from(programs).where(eq(programs.id, id)).get();
+      if (!current) return;
+      const data = parseProgramData(current.data);
+      if (data.startedAt == null) update(tx, current, { data: { ...data, startedAt: result.workout.startedAt } }, now);
+    });
+  }
+  setSetting("programWorkout", JSON.stringify({ workoutId: result.workout.id, programId: id }));
+  return { kind: "started", workout: result.workout };
 }
 
-/** the program whose rules apply to a workout of this template: the active one if it uses it */
-export function programForTemplate(templateId: string | null): ProgramDetail | undefined {
+const usesTemplate = (p: ProgramDetail, templateId: string) => p.data.weeks.some((w) => w.days.some((d) => d.templateId === templateId));
+
+/** the program a workout was started from by "start next day", if any */
+function startedFrom(workoutId: string): string | null {
+  try {
+    const v = JSON.parse(getSetting("programWorkout") ?? "null") as { workoutId?: unknown; programId?: unknown } | null;
+    return v && v.workoutId === workoutId && typeof v.programId === "string" ? v.programId : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * the program whose rules apply to a workout of this template: the one it was
+ * started from (followed or not), else the active one if it uses the template
+ */
+export function programForTemplate(templateId: string | null, workoutId: string | null = null): ProgramDetail | undefined {
   if (!templateId) return undefined;
+  const fromId = workoutId ? startedFrom(workoutId) : null;
+  const from = fromId ? getProgram(fromId) : undefined;
+  if (from && usesTemplate(from, templateId)) return from;
   const active = getActiveProgram();
-  if (active && active.data.weeks.some((w) => w.days.some((d) => d.templateId === templateId))) return active;
+  if (active && usesTemplate(active, templateId)) return active;
   return undefined;
 }
