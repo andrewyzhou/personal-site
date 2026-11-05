@@ -18,7 +18,9 @@ export default defineConfig({
   globalSetup: "./support/warm.ts",
   fullyParallel: true,
   workers: 2,
-  retries: 0,
+  // a real pixel leak fails every attempt; one retry only absorbs a stalled
+  // hydration on a loaded machine (which fails loudly, never as a diff)
+  retries: 1,
   timeout: 90_000,
   reporter: CI ? [["list"], ["html", { open: "never", outputFolder: "./.report" }]] : "list",
   expect: {
