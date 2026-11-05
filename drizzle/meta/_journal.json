@@ -71,6 +71,13 @@
       "when": 1793848417939,
       "tag": "0009_lift_programs",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793850145636,
+      "tag": "0010_listening",
+      "breakpoints": true
     }
   ]
 }
