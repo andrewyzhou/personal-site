@@ -1,0 +1,6 @@
+/* applied only while a v1 screenshot is taken. the hero quote rotates on a
+   timer forever and its italic overhang escaped a mask box, so it's hidden
+   (its box still takes the same space, so layout is still compared). */
+p.whitespace-pre-line.italic {
+  visibility: hidden !important;
+}

@@ -32,7 +32,7 @@ export function ShellNav({ items, layout }: { items: NavItem[]; layout: "bar" | 
     >
       {items.map((i) => (
         <li key={i.href}>
-          <Link href={i.href} variant="nav" current={isCurrent(pathname, i.href)}>
+          <Link href={i.href} variant="nav" current={[i.href, ...(i.match ?? [])].some((h) => isCurrent(pathname, h))}>
             {i.label}
           </Link>
         </li>

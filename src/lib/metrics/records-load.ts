@@ -31,7 +31,15 @@ export interface PublicRecords {
 export const EMPTY_RECORDS: PublicRecords = { efforts: {}, powerCurve: [], speedCurve: [], fitness: [], gear: [] };
 
 export async function loadPublicRecords(today: string): Promise<PublicRecords> {
-  const db = getDb();
+  // no database (e.g. the design harness builds from fixtures): empty records,
+  // the same as when every read below fails
+  let db: ReturnType<typeof getDb>;
+  try {
+    db = getDb();
+  } catch (error) {
+    log.error("metrics:records", "no database", error);
+    return EMPTY_RECORDS;
+  }
   let gear: GearTotal[] = [];
   try {
     const rows = await db

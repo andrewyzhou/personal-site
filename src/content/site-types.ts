@@ -26,8 +26,32 @@ export interface HubContent {
   sections: string[];
 }
 
+export interface HubPagesContent {
+  home: { explore: string; latest: string; seeAll: string };
+  writing: { all: string; posts: string; notes: string; post: string; note: string; empty: string };
+  training: {
+    all: string;
+    runs: string;
+    rides: string;
+    hikes: string;
+    walks: string;
+    lifts: string;
+    other: string;
+    thisWeek: string;
+    sessions: string;
+    distanceYear: string;
+    total: string;
+    records: string;
+    liftsOverview: string;
+    empty: string;
+    more: string;
+  };
+}
+
 export interface SiteContent {
   hubs: HubContent[];
+  shell: { menu: string; theme: string };
+  hubPages: HubPagesContent;
   site: {
     name: string;
     title: string;
