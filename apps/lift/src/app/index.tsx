@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { getActiveWorkout, startWorkout } from "../db/workouts";
-import { listFolders, listTemplates, templateExerciseCounts } from "../db/templates";
+import { getTemplate, listFolders, listTemplates, templateExerciseCounts } from "../db/templates";
+import { getActiveProgram, getProgramProgress } from "../db/programs";
+import { startProgramDay } from "../components/library/startProgramDay";
+import { progressLabel } from "../lib/programs";
 import { templateLastUsed } from "../db/quickStart";
 import { checkRestoreOffer, dismissRestoreOffer, restoreFromServer } from "../db/restore";
 import { Button } from "../components/Button";
@@ -21,6 +24,7 @@ const LINKS: { label: string; href: Href }[] = [
   { label: "history", href: "/history" },
   { label: "exercises", href: "/exercises" },
   { label: "templates", href: "/templates" },
+  { label: "programs", href: "/programs" },
   { label: "bodyweight", href: "/bodyweight" },
   { label: "calculators", href: "/calculators" },
   { label: "settings", href: "/settings" },
@@ -39,6 +43,13 @@ export default function Home() {
     () => recentTemplates(sections.flatMap((s) => s.templates), templateLastUsed()),
     [sections, version]
   );
+  const nextUp = useMemo(() => {
+    const program = getActiveProgram();
+    if (!program) return null;
+    const progress = getProgramProgress(program);
+    const template = progress.next ? getTemplate(progress.next.templateId) : undefined;
+    return { program, progress, template };
+  }, [version]);
   const [offerRestore, setOfferRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -101,6 +112,31 @@ export default function Home() {
         </View>
       ) : (
         <>
+          {nextUp ? (
+            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={{ color: c.muted, fontSize: 13 }}>next up · {nextUp.program.row.name}</Text>
+              {nextUp.progress.next ? (
+                <>
+                  <Text style={[styles.title, { color: c.strong }]}>{nextUp.template?.name ?? "missing template"}</Text>
+                  <Text style={{ color: c.muted }}>{progressLabel(nextUp.progress)}</Text>
+                  <Button
+                    label={nextUp.template ? `start ${nextUp.template.name}` : "fix program"}
+                    onPress={() =>
+                      nextUp.template
+                        ? startProgramDay(nextUp.program.row.id)
+                        : router.push({ pathname: "/programs/[id]", params: { id: nextUp.program.row.id } })
+                    }
+                    style={styles.gap}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.title, { color: c.strong }]}>program finished</Text>
+                  <Button label="programs" variant="plain" onPress={() => router.push("/programs")} style={styles.gap} />
+                </>
+              )}
+            </View>
+          ) : null}
           {quick.map((t) => (
             <Button key={t.id} label={`start ${t.name}`} onPress={() => startTemplate(t.id)} />
           ))}

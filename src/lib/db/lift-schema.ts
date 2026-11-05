@@ -12,6 +12,7 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import { isNotNull } from "drizzle-orm";
+import type { ProgramData } from "lift-core";
 import { activities } from "./schema";
 
 // lifting tracker. text primary keys everywhere: ids are derived from content
@@ -265,6 +266,18 @@ export const liftBodyweights = pgTable(
   (t) => [index("lift_bodyweights_measured_at_idx").on(t.measuredAt)]
 );
 
+// training programs from the phone. data is lift-core's ProgramData; the
+// template ids inside it aren't foreign keys, so deleting a template never
+// blocks or cascades into a program
+export const liftPrograms = pgTable("lift_programs", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  data: jsonb("data").$type<ProgramData>().notNull(),
+  active: boolean("active").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 // one row per phone outbox entry seen, so a retried push is a no-op
 export const liftSyncLog = pgTable(
   "lift_sync_log",
@@ -307,3 +320,5 @@ export type LiftBodyweightRow = typeof liftBodyweights.$inferSelect;
 export type NewLiftBodyweightRow = typeof liftBodyweights.$inferInsert;
 export type LiftSyncLogRow = typeof liftSyncLog.$inferSelect;
 export type NewLiftSyncLogRow = typeof liftSyncLog.$inferInsert;
+export type LiftProgramRow = typeof liftPrograms.$inferSelect;
+export type NewLiftProgramRow = typeof liftPrograms.$inferInsert;

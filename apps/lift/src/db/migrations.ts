@@ -133,6 +133,20 @@ export const MIGRATIONS: readonly (readonly string[])[] = [
 
     `ALTER TABLE outbox ADD COLUMN rejected TEXT`,
   ],
+
+  // 3: b4 training programs. data is lift-core ProgramData json; template ids
+  // inside it aren't fks, so a deleted template just shows as missing
+  [
+    `CREATE TABLE programs (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      data TEXT NOT NULL DEFAULT '{}',
+      active INTEGER NOT NULL DEFAULT 0 CHECK (active IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX programs_active_idx ON programs (active)`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

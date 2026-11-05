@@ -196,6 +196,9 @@ export default function Settings() {
           if (!restoring) confirmRestore();
         }}
       />
+
+      <Text style={[styles.section, { color: c.text }]}>credits</Text>
+      <Text style={{ color: c.muted, fontSize: 13 }}>body figure art: react-native-body-highlighter, mit</Text>
     </ScrollView>
   );
 }

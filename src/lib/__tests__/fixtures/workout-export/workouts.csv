@@ -1,0 +1,738 @@
+Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),W,95,8,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),W,140,3,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),1,185,5,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),2,185,5,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),3,185,5,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Bench Press (Barbell),F,185,4,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Overhead Press (Barbell),1,105,6,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Overhead Press (Barbell),2,105,6,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Overhead Press (Barbell),3,105,6,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Incline Bench Press (Dumbbell),1,60,10,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Incline Bench Press (Dumbbell),2,60,10,0,0,,,9
+2026-04-02 17:31:54,Push Day,1h 9m,Incline Bench Press (Dumbbell),3,60,10,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Lateral Raise (Dumbbell),1,20,12,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Lateral Raise (Dumbbell),2,20,12,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Lateral Raise (Dumbbell),3,20,11,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Lateral Raise (Dumbbell),D,10,12,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Triceps Pushdown (Cable),1,50,12,0,0,,,
+2026-04-02 17:31:54,Push Day,1h 9m,Triceps Pushdown (Cable),2,50,12,0,0,,,8
+2026-04-02 17:31:54,Push Day,1h 9m,Triceps Pushdown (Cable),F,50,12,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Deadlift (Barbell),W,160,8,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Deadlift (Barbell),W,235,3,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Deadlift (Barbell),1,315,3,0,0,,,8
+2026-04-06 17:46:16,Pull Day,1h 3m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Deadlift (Barbell),2,315,3,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Deadlift (Barbell),3,315,3,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Pull Up,1,0,8,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Pull Up,2,0,8,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Pull Up,3,0,8,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Bent Over Row (Barbell),1,155,8,0,0,,,9
+2026-04-06 17:46:16,Pull Day,1h 3m,Bent Over Row (Barbell),2,155,8,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Bent Over Row (Barbell),3,155,7,0,0,,,7
+2026-04-06 17:46:16,Pull Day,1h 3m,Face Pull (Cable),1,40,15,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Face Pull (Cable),2,40,15,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Face Pull (Cable),3,40,14,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Bicep Curl (Dumbbell),1,30,10,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Bicep Curl (Dumbbell),2,30,10,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Bicep Curl (Dumbbell),3,30,10,0,0,,,7
+2026-04-06 17:46:16,Pull Day,1h 3m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-04-06 17:46:16,Pull Day,1h 3m,Bicep Curl (Dumbbell),D,15,10,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),W,125,8,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),W,190,3,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),1,250,5,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),2,250,5,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),3,250,5,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Squat (Barbell),F,250,4,0,0,,,8
+2026-04-11 06:54:58,Leg Day,53m,Romanian Deadlift (Barbell),1,185,8,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Romanian Deadlift (Barbell),2,185,8,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Romanian Deadlift (Barbell),3,185,8,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Leg Press,1,365,10,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Leg Press,2,365,10,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Leg Press,3,365,9,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Zercher Wobble Hold (Barbell),1,135,0,0,30,,,
+2026-04-11 06:54:58,Leg Day,53m,Zercher Wobble Hold (Barbell),2,135,0,0,30,,,
+2026-04-11 06:54:58,Leg Day,53m,Leg Curl (Machine),1,90,12,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Leg Curl (Machine),2,90,12,0,0,,,9
+2026-04-11 06:54:58,Leg Day,53m,Leg Curl (Machine),3,90,12,0,0,,,
+2026-04-11 06:54:58,Leg Day,53m,Plank,1,0,0,0,75,,,
+2026-04-11 06:54:58,Leg Day,53m,Plank,2,0,0,0,90,,,
+2026-04-15 12:25:14,Full Body,45m,Squat (Barbell),1,230,5,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Squat (Barbell),2,230,5,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Squat (Barbell),3,230,4,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Bench Press (Barbell),1,180,6,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Bench Press (Barbell),2,180,6,0,0,,"slept 5h
+skipped last set, gym packed",9
+2026-04-15 12:25:14,Full Body,45m,Bench Press (Barbell),3,180,6,0,0,,"slept 5h
+skipped last set, gym packed",7
+2026-04-15 12:25:14,Full Body,45m,Chin Up,1,0,8,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Chin Up,2,0,8,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Chin Up,3,0,8,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Hip Thrust (Barbell),1,230,10,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Hip Thrust (Barbell),2,230,10,0,0,,"slept 5h
+skipped last set, gym packed",
+2026-04-15 12:25:14,Full Body,45m,Hip Thrust (Barbell),3,230,9,0,0,,"slept 5h
+skipped last set, gym packed",9
+2026-04-15 12:25:14,Full Body,45m,Running (Treadmill),1,0,0,1.84,1324,,"slept 5h
+skipped last set, gym packed",
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),W,95,8,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),W,145,3,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),1,190,5,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),2,190,5,0,0,"left shoulder ""clicky"", paused reps",,
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),3,190,5,0,0,,,9
+2026-04-20 17:04:05,Push Day,1h 3m,Bench Press (Barbell),4,190,5,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Overhead Press (Barbell),1,110,6,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Overhead Press (Barbell),2,110,6,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Overhead Press (Barbell),3,110,6,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Incline Bench Press (Dumbbell),1,60,10,0,0,,,7
+2026-04-20 17:04:05,Push Day,1h 3m,Incline Bench Press (Dumbbell),2,60,10,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Incline Bench Press (Dumbbell),3,60,10,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Lateral Raise (Dumbbell),1,20,12,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Lateral Raise (Dumbbell),2,20,12,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Lateral Raise (Dumbbell),3,20,12,0,0,,,8
+2026-04-20 17:04:05,Push Day,1h 3m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Lateral Raise (Dumbbell),D,10,12,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Triceps Pushdown (Cable),1,50,12,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Triceps Pushdown (Cable),2,50,12,0,0,,,
+2026-04-20 17:04:05,Push Day,1h 3m,Triceps Pushdown (Cable),3,50,11,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Deadlift (Barbell),W,165,8,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Deadlift (Barbell),W,245,3,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Deadlift (Barbell),1,325,3,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-04-24 07:01:14,Pull Day,51m,Deadlift (Barbell),2,325,3,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Deadlift (Barbell),3,325,3,0,0,,,7
+2026-04-24 07:01:14,Pull Day,51m,Pull Up,1,0,8,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Pull Up,2,0,8,0,0,,,9
+2026-04-24 07:01:14,Pull Day,51m,Pull Up,3,0,7,0,0,,,9
+2026-04-24 07:01:14,Pull Day,51m,Bent Over Row (Barbell),1,160,8,0,0,,,9
+2026-04-24 07:01:14,Pull Day,51m,Bent Over Row (Barbell),2,160,8,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Bent Over Row (Barbell),3,160,7,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Face Pull (Cable),1,40,15,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Face Pull (Cable),2,40,15,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Face Pull (Cable),3,40,15,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Bicep Curl (Dumbbell),1,30,10,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Bicep Curl (Dumbbell),2,30,10,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Bicep Curl (Dumbbell),3,30,10,0,0,,,7
+2026-04-24 07:01:14,Pull Day,51m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-04-24 07:01:14,Pull Day,51m,Bicep Curl (Dumbbell),D,15,10,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),W,130,8,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),W,190,3,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),1,255,5,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),2,255,5,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),3,255,5,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Squat (Barbell),4,255,4,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Romanian Deadlift (Barbell),1,190,8,0,0,,,8
+2026-04-29 19:33:34,Leg Day,1h 16m,Romanian Deadlift (Barbell),2,190,8,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Romanian Deadlift (Barbell),3,190,8,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Leg Press,1,375,10,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Leg Press,2,375,10,0,0,,,9
+2026-04-29 19:33:34,Leg Day,1h 16m,Leg Press,3,375,10,0,0,,,7
+2026-04-29 19:33:34,Leg Day,1h 16m,Leg Curl (Machine),1,95,12,0,0,,,7
+2026-04-29 19:33:34,Leg Day,1h 16m,Leg Curl (Machine),2,95,12,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Leg Curl (Machine),3,95,11,0,0,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Plank,1,0,0,0,75,,,
+2026-04-29 19:33:34,Leg Day,1h 16m,Plank,2,0,0,0,90,,,
+2026-05-03 06:10:00,Full Body,50m,Squat (Barbell),1,235,5,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Squat (Barbell),2,235,5,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Squat (Barbell),3,235,4,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Bench Press (Barbell),1,180,6,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Bench Press (Barbell),2,180,6,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Bench Press (Barbell),3,180,6,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Chin Up,1,0,8,0,0,,,7
+2026-05-03 06:10:00,Full Body,50m,Chin Up,2,0,8,0,0,,,8
+2026-05-03 06:10:00,Full Body,50m,Chin Up,3,0,8,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Hip Thrust (Barbell),1,235,10,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Hip Thrust (Barbell),2,235,10,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Hip Thrust (Barbell),3,235,9,0,0,,,
+2026-05-03 06:10:00,Full Body,50m,Running (Treadmill),1,0,0,2.22,997,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),W,100,8,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),W,145,3,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),1,195,5,0,0,,,9
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),2,195,5,0,0,,,9
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),3,195,5,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Bench Press (Barbell),4,195,5,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Overhead Press (Barbell),1,110,6,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Overhead Press (Barbell),2,110,6,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Overhead Press (Barbell),F,110,5,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Incline Bench Press (Dumbbell),1,65,10,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Incline Bench Press (Dumbbell),2,65,10,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Incline Bench Press (Dumbbell),3,65,9,0,0,,,7
+2026-05-08 17:51:26,Push Day,1h 15m,Lateral Raise (Dumbbell),1,20,12,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Lateral Raise (Dumbbell),2,20,12,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Lateral Raise (Dumbbell),3,20,11,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Lateral Raise (Dumbbell),D,10,12,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Triceps Pushdown (Cable),1,50,12,0,0,,,8
+2026-05-08 17:51:26,Push Day,1h 15m,Triceps Pushdown (Cable),2,50,12,0,0,,,
+2026-05-08 17:51:26,Push Day,1h 15m,Triceps Pushdown (Cable),F,50,12,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Deadlift (Barbell),W,165,8,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Deadlift (Barbell),W,250,3,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Deadlift (Barbell),1,330,3,0,0,,,9
+2026-05-12 19:44:39,Pull Day,58m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-05-12 19:44:39,Pull Day,58m,Deadlift (Barbell),2,330,3,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Deadlift (Barbell),3,330,3,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Pull Up,1,0,8,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Pull Up,2,0,8,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Pull Up,3,0,8,0,0,,,8
+2026-05-12 19:44:39,Pull Day,58m,Bent Over Row (Barbell),1,165,8,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Bent Over Row (Barbell),2,165,8,0,0,,,7
+2026-05-12 19:44:39,Pull Day,58m,Bent Over Row (Barbell),F,165,8,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Face Pull (Cable),1,40,15,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Face Pull (Cable),2,40,15,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Face Pull (Cable),3,40,15,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Bicep Curl (Dumbbell),1,30,10,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Bicep Curl (Dumbbell),2,30,10,0,0,,,8
+2026-05-12 19:44:39,Pull Day,58m,Bicep Curl (Dumbbell),3,30,10,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-05-12 19:44:39,Pull Day,58m,Bicep Curl (Dumbbell),D,15,10,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),W,130,8,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),W,195,3,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),1,260,5,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),2,260,5,0,0,,,9
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),3,260,5,0,0,,,9
+2026-05-17 18:54:57,Leg Day,49m,Squat (Barbell),4,260,4,0,0,,,7
+2026-05-17 18:54:57,Leg Day,49m,Romanian Deadlift (Barbell),1,195,8,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Romanian Deadlift (Barbell),2,195,8,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Romanian Deadlift (Barbell),3,195,7,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Leg Press,1,380,10,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Leg Press,2,380,10,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Leg Press,3,380,9,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Leg Curl (Machine),1,95,12,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Leg Curl (Machine),2,95,12,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Leg Curl (Machine),3,95,12,0,0,,,
+2026-05-17 18:54:57,Leg Day,49m,Plank,1,0,0,0,75,,,
+2026-05-17 18:54:57,Leg Day,49m,Plank,2,0,0,0,90,,,
+2026-05-21 07:14:50,Full Body,51m,Squat (Barbell),1,240,5,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Squat (Barbell),2,240,5,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Squat (Barbell),3,240,4,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Bench Press (Barbell),1,185,6,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Bench Press (Barbell),2,185,6,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Bench Press (Barbell),3,185,6,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Chin Up,1,0,8,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Chin Up,2,0,8,0,0,,"new ""program"" week 1, deload next",9
+2026-05-21 07:14:50,Full Body,51m,Chin Up,F,0,8,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Hip Thrust (Barbell),1,240,10,0,0,,"new ""program"" week 1, deload next",7
+2026-05-21 07:14:50,Full Body,51m,Hip Thrust (Barbell),2,240,10,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Hip Thrust (Barbell),F,240,10,0,0,,"new ""program"" week 1, deload next",
+2026-05-21 07:14:50,Full Body,51m,Running (Treadmill),1,0,0,1.84,1287,,"new ""program"" week 1, deload next",
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),W,100,8,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),W,150,3,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),1,200,5,0,0,,,9
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),2,200,5,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),3,200,5,0,0,,,8
+2026-05-26 17:20:21,Push Day,1h 0m,Bench Press (Barbell),4,200,4,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Overhead Press (Barbell),1,115,6,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Overhead Press (Barbell),2,115,6,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Overhead Press (Barbell),3,115,6,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Incline Bench Press (Dumbbell),1,65,10,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Incline Bench Press (Dumbbell),2,65,10,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Incline Bench Press (Dumbbell),3,65,10,0,0,,,7
+2026-05-26 17:20:21,Push Day,1h 0m,Lateral Raise (Dumbbell),1,20,12,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Lateral Raise (Dumbbell),2,20,12,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Lateral Raise (Dumbbell),F,20,11,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Lateral Raise (Dumbbell),D,10,12,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Triceps Pushdown (Cable),1,55,12,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Triceps Pushdown (Cable),2,55,12,0,0,,,
+2026-05-26 17:20:21,Push Day,1h 0m,Triceps Pushdown (Cable),3,55,12,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Deadlift (Barbell),W,170,8,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Deadlift (Barbell),W,255,3,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Deadlift (Barbell),1,340,3,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Deadlift (Barbell),2,340,3,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Deadlift (Barbell),3,340,3,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Pull Up,1,0,8,0,0,,,8
+2026-05-30 06:20:57,Pull Day,1h 12m,Pull Up,2,0,8,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Pull Up,3,0,7,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Bent Over Row (Barbell),1,165,8,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Bent Over Row (Barbell),2,165,8,0,0,,,8
+2026-05-30 06:20:57,Pull Day,1h 12m,Bent Over Row (Barbell),3,165,8,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Face Pull (Cable),1,45,15,0,0,,,9
+2026-05-30 06:20:57,Pull Day,1h 12m,Face Pull (Cable),2,45,15,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Face Pull (Cable),3,45,15,0,0,,,8
+2026-05-30 06:20:57,Pull Day,1h 12m,Bicep Curl (Dumbbell),1,30,10,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Bicep Curl (Dumbbell),2,30,10,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Bicep Curl (Dumbbell),3,30,10,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-05-30 06:20:57,Pull Day,1h 12m,Bicep Curl (Dumbbell),D,15,10,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),W,135,8,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),W,200,3,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),1,265,5,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),2,265,5,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),3,265,5,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Squat (Barbell),F,265,4,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Romanian Deadlift (Barbell),1,200,8,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Romanian Deadlift (Barbell),2,200,8,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Romanian Deadlift (Barbell),3,200,8,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Leg Press,1,390,10,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Leg Press,2,390,10,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Leg Press,3,390,9,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Zercher Wobble Hold (Barbell),1,145,0,0,30,,,
+2026-06-04 12:14:20,Leg Day,48m,Zercher Wobble Hold (Barbell),2,145,0,0,30,,,
+2026-06-04 12:14:20,Leg Day,48m,Leg Curl (Machine),1,100,12,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Leg Curl (Machine),2,100,12,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Leg Curl (Machine),3,100,11,0,0,,,
+2026-06-04 12:14:20,Leg Day,48m,Plank,1,0,0,0,75,,,
+2026-06-04 12:14:20,Leg Day,48m,Plank,2,0,0,0,90,,,
+2026-06-04 12:14:20,Leg Day,48m,Bench Press (Barbell),5,12o,5,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Squat (Barbell),1,245,5,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Squat (Barbell),2,245,5,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Squat (Barbell),3,245,4,0,0,,,8
+2026-06-08 18:37:25,Full Body,1h 3m,Bench Press (Barbell),1,190,6,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Bench Press (Barbell),2,190,6,0,0,,,7
+2026-06-08 18:37:25,Full Body,1h 3m,Bench Press (Barbell),3,190,5,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Chin Up,1,0,8,0,0,,,7
+2026-06-08 18:37:25,Full Body,1h 3m,Chin Up,2,0,8,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Chin Up,3,0,7,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Hip Thrust (Barbell),1,245,10,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Hip Thrust (Barbell),2,245,10,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Hip Thrust (Barbell),3,245,10,0,0,,,
+2026-06-08 18:37:25,Full Body,1h 3m,Running (Treadmill),1,0,0,1.76,1447,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),W,105,8,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),W,155,3,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),1,205,5,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),2,205,5,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),3,205,5,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Bench Press (Barbell),4,205,5,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Overhead Press (Barbell),1,115,6,0,0,,,7
+2026-06-13 18:45:32,Push Day,1h 7m,Overhead Press (Barbell),2,115,6,0,0,,,9
+2026-06-13 18:45:32,Push Day,1h 7m,Overhead Press (Barbell),3,115,6,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Incline Bench Press (Dumbbell),1,65,10,0,0,,,8
+2026-06-13 18:45:32,Push Day,1h 7m,Incline Bench Press (Dumbbell),2,65,10,0,0,,,9
+2026-06-13 18:45:32,Push Day,1h 7m,Incline Bench Press (Dumbbell),3,65,10,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Lateral Raise (Dumbbell),1,20,12,0,0,,,7
+2026-06-13 18:45:32,Push Day,1h 7m,Lateral Raise (Dumbbell),2,20,12,0,0,,,9
+2026-06-13 18:45:32,Push Day,1h 7m,Lateral Raise (Dumbbell),3,20,12,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Lateral Raise (Dumbbell),D,10,12,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Triceps Pushdown (Cable),1,55,12,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Triceps Pushdown (Cable),2,55,12,0,0,,,
+2026-06-13 18:45:32,Push Day,1h 7m,Triceps Pushdown (Cable),3,55,11,0,0,,,9
+2026-06-17 18:46:49,Conditioning,1h 3m,Rowing (Machine),1,0,0,1.98,1258,,,
+2026-06-17 18:46:49,Conditioning,1h 3m,Sled Push (Turf),1,200,0,0.02,0,,,
+2026-06-17 18:46:49,Conditioning,1h 3m,Sled Push (Turf),2,200,0,0.02,0,,,
+2026-06-17 18:46:49,Conditioning,1h 3m,Sled Push (Turf),3,200,0,0.02,0,,,
+2026-06-17 18:46:49,Conditioning,1h 3m,Push Up,1,0,20,0,0,,,
+2026-06-17 18:46:49,Conditioning,1h 3m,Push Up,2,0,20,0,0,,,
+2026-06-17 18:46:49,Conditioning,1h 3m,Push Up,3,0,20,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),W,135,8,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),W,205,3,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),1,270,5,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),2,270,5,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),3,270,5,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Squat (Barbell),4,270,5,0,0,,,8
+2026-06-22 18:54:50,Leg Day,51m,Romanian Deadlift (Barbell),1,205,8,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Romanian Deadlift (Barbell),2,205,8,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Romanian Deadlift (Barbell),F,205,8,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Leg Press,1,400,10,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Leg Press,2,400,10,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Leg Press,3,400,10,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Leg Curl (Machine),1,100,12,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Leg Curl (Machine),2,100,12,0,0,,,
+2026-06-22 18:54:50,Leg Day,51m,Leg Curl (Machine),3,100,12,0,0,,,8
+2026-06-22 18:54:50,Leg Day,51m,Plank,1,0,0,0,75,,,
+2026-06-22 18:54:50,Leg Day,51m,Plank,2,0,0,0,90,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Squat (Barbell),1,250,5,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Squat (Barbell),2,250,5,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Squat (Barbell),3,250,5,0,0,,,7
+2026-06-26 07:08:49,Full Body,1h 6m,Bench Press (Barbell),1,195,6,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Bench Press (Barbell),2,195,6,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Bench Press (Barbell),3,195,6,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Chin Up,1,0,8,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Chin Up,2,0,8,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Chin Up,3,0,8,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Hip Thrust (Barbell),1,250,10,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Hip Thrust (Barbell),2,250,10,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Hip Thrust (Barbell),3,250,9,0,0,,,
+2026-06-26 07:08:49,Full Body,1h 6m,Running (Treadmill),1,0,0,1.98,1065,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),W,105,8,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),W,155,3,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),1,205,5,0,0,,,7
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),2,205,5,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),3,205,5,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Bench Press (Barbell),4,205,5,0,0,,,9
+2026-07-01 07:28:04,Push Day,1h 0m,Overhead Press (Barbell),1,120,6,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Overhead Press (Barbell),2,120,6,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Overhead Press (Barbell),3,120,6,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Incline Bench Press (Dumbbell),1,65,10,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Incline Bench Press (Dumbbell),2,65,10,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Incline Bench Press (Dumbbell),3,65,10,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Lateral Raise (Dumbbell),1,20,12,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Lateral Raise (Dumbbell),2,20,12,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Lateral Raise (Dumbbell),3,20,12,0,0,,,9
+2026-07-01 07:28:04,Push Day,1h 0m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Lateral Raise (Dumbbell),D,10,12,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Triceps Pushdown (Cable),1,55,12,0,0,,,9
+2026-07-01 07:28:04,Push Day,1h 0m,Triceps Pushdown (Cable),2,55,12,0,0,,,
+2026-07-01 07:28:04,Push Day,1h 0m,Triceps Pushdown (Cable),3,55,12,0,0,,,8
+2026-07-05 06:32:31,Pull Day,1h 16m,Deadlift (Barbell),W,180,8,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Deadlift (Barbell),W,265,3,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Deadlift (Barbell),1,355,3,0,0,"belt on
+felt strong",,
+2026-07-05 06:32:31,Pull Day,1h 16m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Deadlift (Barbell),2,355,3,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Deadlift (Barbell),F,355,3,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Pull Up,1,0,8,0,0,"belt on
+felt strong",,
+2026-07-05 06:32:31,Pull Day,1h 16m,Pull Up,2,0,8,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Pull Up,3,0,8,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bent Over Row (Barbell),1,175,8,0,0,"belt on
+felt strong",,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bent Over Row (Barbell),2,175,8,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bent Over Row (Barbell),3,175,7,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Face Pull (Cable),1,45,15,0,0,"belt on
+felt strong",,7
+2026-07-05 06:32:31,Pull Day,1h 16m,Face Pull (Cable),2,45,15,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Face Pull (Cable),F,45,14,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bicep Curl (Dumbbell),1,35,10,0,0,"belt on
+felt strong",,7
+2026-07-05 06:32:31,Pull Day,1h 16m,Bicep Curl (Dumbbell),2,35,10,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bicep Curl (Dumbbell),F,35,9,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bicep Curl (Dumbbell),D,25,10,0,0,,,
+2026-07-05 06:32:31,Pull Day,1h 16m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),W,140,8,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),W,205,3,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),1,275,5,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),2,275,5,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),3,275,5,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Squat (Barbell),4,275,5,0,0,,,9
+2026-07-10 19:44:27,Leg Day,1h 14m,Romanian Deadlift (Barbell),1,210,8,0,0,,,7
+2026-07-10 19:44:27,Leg Day,1h 14m,Romanian Deadlift (Barbell),2,210,8,0,0,,,8
+2026-07-10 19:44:27,Leg Day,1h 14m,Romanian Deadlift (Barbell),3,210,8,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Leg Press,1,410,10,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Leg Press,2,410,10,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Leg Press,3,410,10,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Leg Curl (Machine),1,100,12,0,0,,,9
+2026-07-10 19:44:27,Leg Day,1h 14m,Leg Curl (Machine),2,100,12,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Leg Curl (Machine),F,100,12,0,0,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Plank,1,0,0,0,75,,,
+2026-07-10 19:44:27,Leg Day,1h 14m,Plank,2,0,0,0,90,,,
+2026-07-14 12:54:45,Full Body,54m,Squat (Barbell),1,255,5,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Squat (Barbell),2,255,5,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Squat (Barbell),3,255,5,0,0,,,8
+2026-07-14 12:54:45,Full Body,54m,Bench Press (Barbell),1,200,6,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Bench Press (Barbell),2,200,6,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Bench Press (Barbell),3,200,6,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Chin Up,1,0,8,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Chin Up,2,0,8,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Chin Up,3,0,7,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Hip Thrust (Barbell),1,255,10,0,0,,,8
+2026-07-14 12:54:45,Full Body,54m,Hip Thrust (Barbell),2,255,10,0,0,,,9
+2026-07-14 12:54:45,Full Body,54m,Hip Thrust (Barbell),3,255,10,0,0,,,
+2026-07-14 12:54:45,Full Body,54m,Running (Treadmill),1,0,0,1.64,1350,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),W,105,8,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),W,160,3,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),1,210,5,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),2,210,5,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),3,210,5,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Bench Press (Barbell),4,210,5,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Overhead Press (Barbell),1,120,6,0,0,,,7
+2026-07-19 19:09:04,Push Day,48m,Overhead Press (Barbell),2,120,6,0,0,,,8
+2026-07-19 19:09:04,Push Day,48m,Overhead Press (Barbell),3,120,5,0,0,,,8
+2026-07-19 19:09:04,Push Day,48m,Incline Bench Press (Dumbbell),1,70,10,0,0,,,7
+2026-07-19 19:09:04,Push Day,48m,Incline Bench Press (Dumbbell),2,70,10,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Incline Bench Press (Dumbbell),3,70,10,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Lateral Raise (Dumbbell),1,25,12,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Lateral Raise (Dumbbell),2,25,12,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Lateral Raise (Dumbbell),F,25,11,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Lateral Raise (Dumbbell),D,20,12,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Triceps Pushdown (Cable),1,55,12,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Triceps Pushdown (Cable),2,55,12,0,0,,,
+2026-07-19 19:09:04,Push Day,48m,Triceps Pushdown (Cable),F,55,11,0,0,,,8
+2026-07-23 19:04:04,Pull Day,48m,Deadlift (Barbell),W,180,8,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Deadlift (Barbell),W,270,3,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Deadlift (Barbell),1,360,3,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-07-23 19:04:04,Pull Day,48m,Deadlift (Barbell),2,360,3,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Deadlift (Barbell),3,360,3,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Pull Up,1,0,8,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Pull Up,2,0,8,0,0,,,9
+2026-07-23 19:04:04,Pull Day,48m,Pull Up,3,0,8,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bent Over Row (Barbell),1,180,8,0,0,,,9
+2026-07-23 19:04:04,Pull Day,48m,Bent Over Row (Barbell),2,180,8,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bent Over Row (Barbell),3,180,8,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Face Pull (Cable),1,45,15,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Face Pull (Cable),2,45,15,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Face Pull (Cable),3,45,15,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bicep Curl (Dumbbell),1,35,10,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bicep Curl (Dumbbell),2,35,10,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bicep Curl (Dumbbell),3,35,10,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bicep Curl (Dumbbell),D,25,10,0,0,,,
+2026-07-23 19:04:04,Pull Day,48m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),W,145,8,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),W,215,3,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),1,285,5,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),2,285,5,0,0,,,7
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),3,285,5,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Squat (Barbell),4,285,5,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Romanian Deadlift (Barbell),1,215,8,0,0,,,7
+2026-07-28 18:17:06,Leg Day,1h 14m,Romanian Deadlift (Barbell),2,215,8,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Romanian Deadlift (Barbell),F,215,8,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Leg Press,1,415,10,0,0,,,7
+2026-07-28 18:17:06,Leg Day,1h 14m,Leg Press,2,415,10,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Leg Press,F,415,10,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Zercher Wobble Hold (Barbell),1,155,0,0,30,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Zercher Wobble Hold (Barbell),2,155,0,0,30,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Leg Curl (Machine),1,105,12,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Leg Curl (Machine),2,105,12,0,0,,,9
+2026-07-28 18:17:06,Leg Day,1h 14m,Leg Curl (Machine),3,105,11,0,0,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Plank,1,0,0,0,75,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,Plank,2,0,0,0,90,,,
+2026-07-28 18:17:06,Leg Day,1h 14m,,1,0,0,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Squat (Barbell),1,260,5,0,0,,,8
+2026-08-01 18:33:55,Full Body,1h 2m,Squat (Barbell),2,260,5,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Squat (Barbell),3,260,5,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Bench Press (Barbell),1,205,6,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Bench Press (Barbell),2,205,6,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Bench Press (Barbell),3,205,5,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Chin Up,1,0,8,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Chin Up,2,0,8,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Chin Up,3,0,7,0,0,,,9
+2026-08-01 18:33:55,Full Body,1h 2m,Hip Thrust (Barbell),1,260,10,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Hip Thrust (Barbell),2,260,10,0,0,,,
+2026-08-01 18:33:55,Full Body,1h 2m,Hip Thrust (Barbell),3,260,9,0,0,,,8
+2026-08-01 18:33:55,Full Body,1h 2m,Running (Treadmill),1,0,0,2.38,1447,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),W,110,8,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),W,160,3,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),1,215,5,0,0,,,9
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),2,215,5,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),3,215,5,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Bench Press (Barbell),4,215,5,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Overhead Press (Barbell),1,125,6,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Overhead Press (Barbell),2,125,6,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Overhead Press (Barbell),F,125,6,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Incline Bench Press (Dumbbell),1,70,10,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Incline Bench Press (Dumbbell),2,70,10,0,0,,,8
+2026-08-06 18:52:33,Push Day,1h 5m,Incline Bench Press (Dumbbell),3,70,10,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Lateral Raise (Dumbbell),1,25,12,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Lateral Raise (Dumbbell),2,25,12,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Lateral Raise (Dumbbell),3,25,11,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Lateral Raise (Dumbbell),D,20,12,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Triceps Pushdown (Cable),1,60,12,0,0,,,9
+2026-08-06 18:52:33,Push Day,1h 5m,Triceps Pushdown (Cable),2,60,12,0,0,,,
+2026-08-06 18:52:33,Push Day,1h 5m,Triceps Pushdown (Cable),3,60,11,0,0,,,
+2026-08-10 07:23:08,Pull Day,45m,Deadlift (Barbell),W,185,8,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Deadlift (Barbell),W,280,3,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Deadlift (Barbell),1,370,3,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Deadlift (Barbell),Rest Timer,0,0,0,120,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Deadlift (Barbell),2,370,3,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Deadlift (Barbell),F,370,3,0,0,,"hotel gym; dumbbells only to 50",7
+2026-08-10 07:23:08,Pull Day,45m,Pull Up,1,0,8,0,0,,"hotel gym; dumbbells only to 50",8
+2026-08-10 07:23:08,Pull Day,45m,Pull Up,2,0,8,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Pull Up,3,0,8,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Bent Over Row (Barbell),1,180,8,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Bent Over Row (Barbell),2,180,8,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Bent Over Row (Barbell),F,180,7,0,0,,"hotel gym; dumbbells only to 50",7
+2026-08-10 07:23:08,Pull Day,45m,Face Pull (Cable),1,45,15,0,0,,"hotel gym; dumbbells only to 50",7
+2026-08-10 07:23:08,Pull Day,45m,Face Pull (Cable),2,45,15,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Face Pull (Cable),3,45,14,0,0,,"hotel gym; dumbbells only to 50",8
+2026-08-10 07:23:08,Pull Day,45m,Bicep Curl (Dumbbell),1,35,10,0,0,,"hotel gym; dumbbells only to 50",7
+2026-08-10 07:23:08,Pull Day,45m,Bicep Curl (Dumbbell),2,35,10,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Bicep Curl (Dumbbell),3,35,9,0,0,,"hotel gym; dumbbells only to 50",8
+2026-08-10 07:23:08,Pull Day,45m,Bicep Curl (Dumbbell),D,25,10,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-10 07:23:08,Pull Day,45m,Bicep Curl (Dumbbell),D,20,10,0,0,,"hotel gym; dumbbells only to 50",
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),W,145,8,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),W,220,3,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),1,290,5,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),2,290,5,0,0,,,8
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),3,290,5,0,0,,,8
+2026-08-15 17:13:19,Leg Day,1h 15m,Squat (Barbell),4,290,4,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Romanian Deadlift (Barbell),1,220,8,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Romanian Deadlift (Barbell),2,220,8,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Romanian Deadlift (Barbell),3,220,7,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Leg Press,1,425,10,0,0,,,8
+2026-08-15 17:13:19,Leg Day,1h 15m,Leg Press,2,425,10,0,0,,,8
+2026-08-15 17:13:19,Leg Day,1h 15m,Leg Press,3,425,10,0,0,,,9
+2026-08-15 17:13:19,Leg Day,1h 15m,Leg Curl (Machine),1,105,12,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Leg Curl (Machine),2,105,12,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Leg Curl (Machine),3,105,11,0,0,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Plank,1,0,0,0,75,,,
+2026-08-15 17:13:19,Leg Day,1h 15m,Plank,2,0,0,0,90,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Squat (Barbell),1,265,5,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Squat (Barbell),2,265,5,0,0,,,9
+2026-08-19 07:11:05,Full Body,1h 12m,Squat (Barbell),3,265,4,0,0,,,9
+2026-08-19 07:11:05,Full Body,1h 12m,Bench Press (Barbell),1,210,6,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Bench Press (Barbell),2,210,6,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Bench Press (Barbell),3,210,5,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Chin Up,1,0,8,0,0,,,9
+2026-08-19 07:11:05,Full Body,1h 12m,Chin Up,2,0,8,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Chin Up,3,0,7,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Hip Thrust (Barbell),1,265,10,0,0,,,
+2026-08-19 07:11:05,Full Body,1h 12m,Hip Thrust (Barbell),2,265,10,0,0,,,9
+2026-08-19 07:11:05,Full Body,1h 12m,Hip Thrust (Barbell),F,265,10,0,0,,,8
+2026-08-19 07:11:05,Full Body,1h 12m,Running (Treadmill),1,0,0,1.56,941,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),W,110,8,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),W,165,3,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),1,220,5,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),2,220,5,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),3,220,5,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Bench Press (Barbell),4,220,4,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Overhead Press (Barbell),1,125,6,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Overhead Press (Barbell),2,125,6,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Overhead Press (Barbell),3,125,6,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Incline Bench Press (Dumbbell),1,70,10,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Incline Bench Press (Dumbbell),2,70,10,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Incline Bench Press (Dumbbell),3,70,10,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Lateral Raise (Dumbbell),1,25,12,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Lateral Raise (Dumbbell),2,25,12,0,0,,,7
+2026-08-24 12:03:16,Push Day,1h 5m,Lateral Raise (Dumbbell),3,25,12,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Lateral Raise (Dumbbell),D,20,12,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Triceps Pushdown (Cable),1,60,12,0,0,,,
+2026-08-24 12:03:16,Push Day,1h 5m,Triceps Pushdown (Cable),2,60,12,0,0,,,9
+2026-08-24 12:03:16,Push Day,1h 5m,Triceps Pushdown (Cable),3,60,11,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Deadlift (Barbell),W,190,8,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Deadlift (Barbell),W,280,3,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Deadlift (Barbell),1,375,3,0,0,,,7
+2026-08-28 19:44:42,Pull Day,1h 15m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Deadlift (Barbell),2,375,3,0,0,,,8
+2026-08-28 19:44:42,Pull Day,1h 15m,Deadlift (Barbell),3,375,2,0,0,,,9
+2026-08-28 19:44:42,Pull Day,1h 15m,Pull Up,1,0,8,0,0,,,9
+2026-08-28 19:44:42,Pull Day,1h 15m,Pull Up,2,0,8,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Pull Up,3,0,8,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bent Over Row (Barbell),1,185,8,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bent Over Row (Barbell),2,185,8,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bent Over Row (Barbell),F,185,8,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Face Pull (Cable),1,50,15,0,0,,,8
+2026-08-28 19:44:42,Pull Day,1h 15m,Face Pull (Cable),2,50,15,0,0,,,7
+2026-08-28 19:44:42,Pull Day,1h 15m,Face Pull (Cable),F,50,15,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bicep Curl (Dumbbell),1,35,10,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bicep Curl (Dumbbell),2,35,10,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bicep Curl (Dumbbell),3,35,10,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bicep Curl (Dumbbell),D,25,10,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Banded Pallof Walkout,1,0,10,0,0,,,
+2026-08-28 19:44:42,Pull Day,1h 15m,Banded Pallof Walkout,2,0,10,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),W,150,8,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),W,220,3,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),1,295,5,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),2,295,5,0,0,,,8
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),3,295,5,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Squat (Barbell),4,295,5,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Romanian Deadlift (Barbell),1,225,8,0,0,,,9
+2026-09-02 07:21:24,Leg Day,47m,Romanian Deadlift (Barbell),2,225,8,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Romanian Deadlift (Barbell),3,225,7,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Leg Press,1,435,10,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Leg Press,2,435,10,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Leg Press,3,435,10,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Leg Curl (Machine),1,110,12,0,0,,,9
+2026-09-02 07:21:24,Leg Day,47m,Leg Curl (Machine),2,110,12,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Leg Curl (Machine),3,110,12,0,0,,,
+2026-09-02 07:21:24,Leg Day,47m,Plank,1,0,0,0,75,,,
+2026-09-02 07:21:24,Leg Day,47m,Plank,2,0,0,0,90,,,
+2026-09-06 06:37:49,Full Body,50m,Squat (Barbell),1,270,5,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Squat (Barbell),2,270,5,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Squat (Barbell),F,270,5,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Bench Press (Barbell),1,210,6,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Bench Press (Barbell),2,210,6,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Bench Press (Barbell),3,210,5,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Chin Up,1,0,8,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Chin Up,2,0,8,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Chin Up,3,0,8,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Hip Thrust (Barbell),1,270,10,0,0,,,7
+2026-09-06 06:37:49,Full Body,50m,Hip Thrust (Barbell),2,270,10,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Hip Thrust (Barbell),3,270,9,0,0,,,
+2026-09-06 06:37:49,Full Body,50m,Running (Treadmill),1,0,0,2.05,941,,,
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),W,115,8,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),W,170,3,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),1,225,5,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),Rest Timer,0,0,0,120,,,
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),2,225,5,0,0,,,8
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),3,225,5,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Bench Press (Barbell),4,225,4,0,0,,,7
+2026-09-11 12:39:08,Push Day,52m,Overhead Press (Barbell),1,130,6,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Overhead Press (Barbell),2,130,6,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Overhead Press (Barbell),3,130,5,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Incline Bench Press (Dumbbell),1,75,10,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Incline Bench Press (Dumbbell),2,75,10,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Incline Bench Press (Dumbbell),3,75,10,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Lateral Raise (Dumbbell),1,25,12,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Lateral Raise (Dumbbell),2,25,12,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Lateral Raise (Dumbbell),3,25,11,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Lateral Raise (Dumbbell),D,20,12,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Lateral Raise (Dumbbell),D,15,12,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Triceps Pushdown (Cable),1,60,12,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Triceps Pushdown (Cable),2,60,12,0,0,,,
+2026-09-11 12:39:08,Push Day,52m,Triceps Pushdown (Cable),3,60,11,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Deadlift (Barbell),W,195,8,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Deadlift (Barbell),W,290,3,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Deadlift (Barbell),1,385,3,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Deadlift (Barbell),Rest Timer,0,0,0,120,,,
+2026-09-15 12:44:40,Pull Day,47m,Deadlift (Barbell),2,385,3,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Deadlift (Barbell),3,385,3,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Pull Up,1,0,8,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Pull Up,2,0,8,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Pull Up,3,0,8,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Bent Over Row (Barbell),1,190,8,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Bent Over Row (Barbell),2,190,8,0,0,,,8
+2026-09-15 12:44:40,Pull Day,47m,Bent Over Row (Barbell),F,190,7,0,0,,,8
+2026-09-15 12:44:40,Pull Day,47m,Face Pull (Cable),1,50,15,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Face Pull (Cable),2,50,15,0,0,,,8
+2026-09-15 12:44:40,Pull Day,47m,Face Pull (Cable),3,50,14,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Bicep Curl (Dumbbell),1,35,10,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Bicep Curl (Dumbbell),2,35,10,0,0,,,8
+2026-09-15 12:44:40,Pull Day,47m,Bicep Curl (Dumbbell),3,35,10,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Bicep Curl (Dumbbell),D,25,10,0,0,,,
+2026-09-15 12:44:40,Pull Day,47m,Bicep Curl (Dumbbell),D,20,10,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),W,150,8,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),W,225,3,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),1,300,5,0,0,,,9
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),Rest Timer,0,0,0,120,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),2,300,5,0,0,,,7
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),3,300,5,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Squat (Barbell),4,300,5,0,0,,,8
+2026-09-20 19:49:57,Leg Day,1h 15m,Romanian Deadlift (Barbell),1,225,8,0,0,,,8
+2026-09-20 19:49:57,Leg Day,1h 15m,Romanian Deadlift (Barbell),2,225,8,0,0,,,9
+2026-09-20 19:49:57,Leg Day,1h 15m,Romanian Deadlift (Barbell),3,225,8,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Leg Press,1,440,10,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Leg Press,2,440,10,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Leg Press,3,440,9,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Zercher Wobble Hold (Barbell),1,165,0,0,30,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Zercher Wobble Hold (Barbell),2,165,0,0,30,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Leg Curl (Machine),1,110,12,0,0,,,9
+2026-09-20 19:49:57,Leg Day,1h 15m,Leg Curl (Machine),2,110,12,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Leg Curl (Machine),F,110,11,0,0,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Plank,1,0,0,0,75,,,
+2026-09-20 19:49:57,Leg Day,1h 15m,Plank,2,0,0,0,90,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Squat (Barbell),1,280,5,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Squat (Barbell),2,280,5,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Squat (Barbell),F,280,4,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Bench Press (Barbell),1,215,6,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Bench Press (Barbell),2,215,6,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Bench Press (Barbell),3,215,5,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Chin Up,1,0,8,0,0,,,7
+2026-09-24 12:31:23,Full Body,1h 10m,Chin Up,2,0,8,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Chin Up,3,0,8,0,0,,,7
+2026-09-24 12:31:23,Full Body,1h 10m,Hip Thrust (Barbell),1,280,10,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Hip Thrust (Barbell),2,280,10,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Hip Thrust (Barbell),3,280,10,0,0,,,
+2026-09-24 12:31:23,Full Body,1h 10m,Running (Treadmill),1,0,0,2.09,1004,,,
