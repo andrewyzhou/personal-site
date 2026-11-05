@@ -34,6 +34,7 @@ const bigBtn = "card-bg rounded-lg font-sans text-off-white text-sm";
 const label = "font-sans text-gray text-xs";
 const value = "font-sans text-off-white text-sm";
 
+const n = (v: number | undefined) => (v ?? 0).toLocaleString();
 const fmtTime = (s: string | null) => (s ? new Date(s).toLocaleString() : "never");
 
 function ago(s: string | null): string {
@@ -116,7 +117,7 @@ function PlaysTable({ plays }: { plays: RecentPlay[] }) {
   );
 }
 
-export default function ListeningAdmin({ data }: { data: ListeningAdminData }) {
+export default function ListeningAdmin({ data, syncUrl = "/api/admin/listening/sync" }: { data: ListeningAdminData; syncUrl?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"sync" | "dry" | null>(null);
   const [result, setResult] = useState<SyncResult | null>(null);
@@ -125,7 +126,7 @@ export default function ListeningAdmin({ data }: { data: ListeningAdminData }) {
     setBusy(dryRun ? "dry" : "sync");
     setResult(null);
     try {
-      const res = await fetch("/api/admin/listening/sync", {
+      const res = await fetch(syncUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dryRun }),
@@ -198,8 +199,8 @@ export default function ListeningAdmin({ data }: { data: ListeningAdminData }) {
         <Row k="cursor" v={fmtTime(s?.cursorPlayedAt ?? null)} />
         {stats && (
           <Row
-            k="last run did"
-            v={`${stats.inserted} new · ${stats.merged} merged · ${stats.duplicates} seen · ${stats.metadata.artists + stats.metadata.albums} lookups${stats.possibleGap ? " · possible gap" : ""}`}
+            k="result"
+            v={`${stats.inserted} new · ${stats.merged} merged · ${stats.duplicates} seen · ${stats.metadata.tracks + stats.metadata.artists + stats.metadata.albums} metadata rows${stats.possibleGap ? " · possible gap" : ""}`}
           />
         )}
         <div className="flex" style={{ gap: "8px", marginTop: "10px" }}>
@@ -247,7 +248,7 @@ export default function ListeningAdmin({ data }: { data: ListeningAdminData }) {
           <Row k="range" v={data.counts.first ? `${new Date(data.counts.first).toLocaleDateString()} → ${new Date(data.counts.last!).toLocaleDateString()}` : "—"} />
           <Row
             k="metadata"
-            v={`${data.counts.tracks} tracks · ${data.counts.artists} artists${data.counts.artistsIncomplete ? ` (${data.counts.artistsIncomplete} pending)` : ""} · ${data.counts.albums} albums`}
+            v={`${n(data.counts.tracks)} tracks · ${n(data.counts.artists)} artists${data.counts.artistsIncomplete ? ` (${data.counts.artistsIncomplete} pending)` : ""} · ${n(data.counts.albums)} albums`}
           />
         </Card>
       )}
@@ -256,7 +257,7 @@ export default function ListeningAdmin({ data }: { data: ListeningAdminData }) {
         {data.lastImport && imp ? (
           <>
             <Row k="imported" v={`${ago(data.lastImport.createdAt)} · ${data.lastImport.filename ?? ""}`} />
-            <Row k="plays" v={`${imp.plays ?? 0} (${imp.inserted ?? 0} new, ${imp.mergedWithApi ?? 0} merged, ${imp.alreadyImported ?? 0} already in)`} />
+            <Row k="plays" v={`${n(imp.plays)} (${n(imp.inserted)} new, ${n(imp.mergedWithApi)} merged, ${n(imp.alreadyImported)} already in)`} />
             {imp.range?.from && (
               <Row k="range" v={`${new Date(imp.range.from).toLocaleDateString()} → ${new Date(imp.range.to!).toLocaleDateString()}`} />
             )}
