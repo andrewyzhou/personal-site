@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { ingest, looksLike } = vi.hoisted(() => ({ ingest: vi.fn(), looksLike: vi.fn() }));
+const { ingest, looksLike, answer } = vi.hoisted(() => ({ ingest: vi.fn(), looksLike: vi.fn(), answer: vi.fn() }));
 vi.mock("@/lib/lift/ingest", () => ({ ingestShareText: (...a: unknown[]) => ingest(...a) }));
+vi.mock("@/lib/lift/query", () => ({ answerLiftQuestion: (...a: unknown[]) => answer(...a) }));
 vi.mock("lift-core", () => ({ looksLikeShareText: (t: string) => looksLike(t) }));
 
 import { POST } from "@/app/api/lift/telegram/route";
@@ -37,6 +38,7 @@ describe("POST /api/lift/telegram", () => {
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     looksLike.mockImplementation((t: string) => t.includes("Set 1"));
+    answer.mockResolvedValue("share a workout to this chat to log it, or ask:");
     ingest.mockResolvedValue({ status: "created", workoutId: "share-x", text: "logged push day · wed nov 4", details: DETAILS });
   });
 
@@ -64,20 +66,48 @@ describe("POST /api/lift/telegram", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("answers /start and chatter with help", async () => {
+  it("answers anything that isn't a share as a question", async () => {
     const res = await POST(update(msg("/start")));
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, handled: "query" });
     expect(ingest).not.toHaveBeenCalled();
+    expect(answer).toHaveBeenCalledWith("/start");
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://api.telegram.org/bot123:abc/sendMessage");
     expect((init as RequestInit).method).toBe("POST");
     expect(sentBodies()[0]).toEqual({
       chat_id: 42,
-      text: "share a workout to this chat to log it",
+      text: "share a workout to this chat to log it, or ask:",
       reply_to_message_id: 7,
       allow_sending_without_reply: true,
     });
+  });
+
+  it("relays the query answer", async () => {
+    answer.mockResolvedValueOnce("squat (barbell) prs:\nheaviest 285 lb × 3 · tue nov 3");
+    await POST(update(msg("squat pr")));
+    expect(answer).toHaveBeenCalledWith("squat pr");
+    expect(sentBodies()[0].text).toBe("squat (barbell) prs:\nheaviest 285 lb × 3 · tue nov 3");
+  });
+
+  it("explains a failed query without leaking the error", async () => {
+    answer.mockRejectedValueOnce(new Error("connect ECONNREFUSED postgres://secret@db"));
+    const res = await POST(update(msg("squat pr")));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ handled: "error" });
+    expect(sentBodies()[0].text).toBe("couldn't answer that: something went wrong, try again in a bit");
+  });
+
+  it("checks for a share before treating text as a question", async () => {
+    await POST(update(msg("Push Day\nSet 1: 185 lb × 5")));
+    expect(answer).not.toHaveBeenCalled();
+    expect(ingest).toHaveBeenCalledOnce();
+  });
+
+  it("asks nothing for chats outside the allowlist", async () => {
+    await POST(update(msg("squat pr", 1000)));
+    expect(answer).not.toHaveBeenCalled();
   });
 
   it("ingests a workout share and replies with the multi-line breakdown", async () => {
