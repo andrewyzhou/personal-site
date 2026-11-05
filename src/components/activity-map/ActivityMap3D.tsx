@@ -402,17 +402,18 @@ export default function ActivityMap3D({
     map.setPaintProperty("am-ends", "circle-stroke-color", ["match", ["get", "kind"], "start", o.markerRing, o.marker]);
   }, [map, theme]);
 
-  // hover marker follows hoverT (from the map, the charts or the replay)
+  // hover marker follows hoverT (from the map or the charts). while the replay
+  // runs its avatar is the marker, so the hover dot stays hidden
   useEffect(() => {
     const marker = markerRef.current;
     if (!map || !marker) return;
-    if (hoverT === null || !view || view.n === 0) {
+    if (replayOn || hoverT === null || !view || view.n === 0) {
       marker.remove();
       return;
     }
     const i = indexAtTime(view, hoverT);
     marker.setLngLat([view.lng[i], view.lat[i]]).addTo(map);
-  }, [map, view, hoverT]);
+  }, [map, view, hoverT, replayOn]);
 
   const recenter = useCallback(
     (pitch: number) => {
@@ -442,10 +443,9 @@ export default function ActivityMap3D({
   };
 
   const toggleReplay = () => {
-    setReplayOn((on) => {
-      if (on) onHoverRef.current?.(null);
-      return !on;
-    });
+    // the parent's hover state is set outside the updater (no setState in render)
+    if (replayOn) onHoverRef.current?.(null);
+    setReplayOn(!replayOn);
   };
 
   const onReplayTime = useCallback((t: number | null) => onHoverRef.current?.(t), []);
@@ -456,7 +456,7 @@ export default function ActivityMap3D({
   const domain = values ? metricDomain(values, metric) : null;
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ position: "relative", aspectRatio: "16/10", minHeight: 260 }}>
+    <div className="rounded-lg overflow-hidden" style={{ position: "relative", width: "100%", aspectRatio: "16/10", minHeight: replayOn ? 400 : 260 }}>
       {!shown && <MapSkeleton polyline={polyline} />}
       <div
         ref={containerRef}
@@ -472,7 +472,7 @@ export default function ActivityMap3D({
         <>
           {/* top-left: metric picker + legend */}
           {view && domain && (
-            <div style={{ position: "absolute", top: 8, left: 8, display: "flex", flexDirection: "column", gap: 6, pointerEvents: "none" }}>
+            <div style={{ position: "absolute", top: 8, left: 8, maxWidth: "calc(55% - 12px)", display: "flex", flexDirection: "column", gap: 6, pointerEvents: "none" }}>
               {metrics.length > 1 && (
                 <div role="radiogroup" aria-label="route color" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {metrics.map((mt) => (
@@ -496,7 +496,7 @@ export default function ActivityMap3D({
               )}
               <div
                 className="font-sans"
-                style={{ ...btn, cursor: "default", pointerEvents: "none", display: "flex", alignItems: "center", gap: 6, width: "fit-content" }}
+                style={{ ...btn, cursor: "default", pointerEvents: "none", display: "flex", alignItems: "center", gap: 6, width: "max-content", whiteSpace: "nowrap" }}
               >
                 <span>{formatMetric(domain[0], metric)}</span>
                 <span aria-hidden style={{ width: 56, height: 6, borderRadius: 3, background: legendGradient() }} />
@@ -506,7 +506,19 @@ export default function ActivityMap3D({
           )}
 
           {/* top-right: 2d/3d, recenter, replay */}
-          <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4, pointerEvents: "none" }}>
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              maxWidth: "calc(45% - 12px)",
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
+              gap: 4,
+              pointerEvents: "none",
+            }}
+          >
             <button type="button" className="font-sans" style={btn} onClick={toggle3d} aria-label={is3d ? "switch to 2d" : "switch to 3d"}>
               {is3d ? "2d" : "3d"}
             </button>
@@ -522,7 +534,14 @@ export default function ActivityMap3D({
 
           {replayOn && replay && (
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
-              <ReplayPlayer map={map} replay={replay} photos={photos} sportType={sportType} onTime={onReplayTime} />
+              <ReplayPlayer
+                map={map}
+                replay={replay}
+                photos={photos}
+                sportType={sportType}
+                onTime={onReplayTime}
+                onClose={() => setReplayOn(false)}
+              />
             </div>
           )}
         </>
