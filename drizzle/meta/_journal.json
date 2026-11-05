@@ -64,6 +64,13 @@
       "when": 1793844475305,
       "tag": "0008_activity_replays",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793848417939,
+      "tag": "0009_lift_programs",
+      "breakpoints": true
     }
   ]
 }
