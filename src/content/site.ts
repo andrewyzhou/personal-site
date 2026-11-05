@@ -1,5 +1,5 @@
 import { loadYaml } from "@/lib/yaml";
-import type { SiteContent } from "./site-types";
+import { BEST_EFFORT_KEYS, type SiteContent } from "./site-types";
 
 export * from "./site-types";
 
@@ -77,6 +77,68 @@ const REQUIRED_STRINGS = [
   "pages.photos.metaDescription",
   "pages.photos.intro",
   "pages.photos.empty",
+  "pages.activity.metrics.headline.movingTime",
+  "pages.activity.metrics.headline.elapsedTime",
+  "pages.activity.metrics.headline.gradeAdjustedPace",
+  "pages.activity.metrics.headline.effort",
+  "pages.activity.metrics.splits.title",
+  "pages.activity.metrics.splits.unitToggle",
+  "pages.activity.metrics.splits.units.mi",
+  "pages.activity.metrics.splits.units.km",
+  "pages.activity.metrics.splits.pace",
+  "pages.activity.metrics.splits.speed",
+  "pages.activity.metrics.splits.relative",
+  "pages.activity.metrics.splits.adjPace",
+  "pages.activity.metrics.splits.adjPaceTitle",
+  "pages.activity.metrics.splits.elev",
+  "pages.activity.metrics.splits.hr",
+  "pages.activity.metrics.splits.partial",
+  "pages.activity.metrics.splits.partialTitle",
+  "pages.activity.metrics.splits.stopped",
+  "pages.activity.metrics.bestEfforts.title",
+  "pages.activity.metrics.bestEfforts.distance",
+  "pages.activity.metrics.bestEfforts.time",
+  "pages.activity.metrics.bestEfforts.pace",
+  "pages.activity.metrics.curves.power",
+  "pages.activity.metrics.curves.powerNoun",
+  "pages.activity.metrics.curves.speed",
+  "pages.activity.metrics.curves.speedNoun",
+  "pages.activity.metrics.curves.aria",
+  "pages.activity.metrics.climbs.title",
+  "pages.activity.metrics.climbs.climb",
+  "pages.activity.metrics.climbs.distance",
+  "pages.activity.metrics.climbs.gain",
+  "pages.activity.metrics.climbs.grade",
+  "pages.activity.metrics.climbs.category",
+  "pages.activity.metrics.climbs.hc",
+  "pages.activity.metrics.zones.title",
+  "pages.activity.metrics.zones.heartRate",
+  "pages.activity.metrics.zones.pace",
+  "pages.activity.metrics.zones.zone",
+  "pages.records.title",
+  "pages.records.section",
+  "pages.records.link",
+  "pages.records.intro",
+  "pages.records.empty",
+  "pages.records.bestEfforts",
+  "pages.records.bestSpeed",
+  "pages.records.bestPower",
+  "pages.records.fitness",
+  "pages.records.gear",
+  "pages.records.columns.distance",
+  "pages.records.columns.best",
+  "pages.records.columns.pace",
+  "pages.records.columns.activity",
+  "pages.records.columns.nextBest",
+  "pages.records.columns.for",
+  "pages.records.columns.gear",
+  "pages.records.columns.activities",
+  "pages.records.columns.lastUsed",
+  "pages.records.unnamedActivity",
+  "pages.records.gearAlert",
+  "pages.records.fitnessAria",
+  "pages.records.fitnessCaption",
+  "pages.records.fitnessNote",
 ] as const;
 
 function get(obj: unknown, dotted: string): unknown {
@@ -87,6 +149,12 @@ export function validateSite(raw: unknown): string[] {
   const errors: string[] = [];
   for (const key of REQUIRED_STRINGS) {
     if (typeof get(raw, key) !== "string") errors.push(`${key} must be a string`);
+  }
+  // best effort labels are a map keyed by effort key: every key needs a label
+  for (const k of BEST_EFFORT_KEYS) {
+    const labels = get(raw, "pages.activity.metrics.bestEfforts.labels");
+    const v = labels && typeof labels === "object" ? (labels as Record<string, unknown>)[k] : undefined;
+    if (typeof v !== "string") errors.push(`pages.activity.metrics.bestEfforts.labels.${k} must be a string`);
   }
   const aff = get(raw, "hero.affiliation");
   if (!Array.isArray(aff) || !aff.every((s) => typeof s === "string")) errors.push("hero.affiliation must be a list of strings");

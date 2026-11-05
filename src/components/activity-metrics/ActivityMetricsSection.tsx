@@ -3,6 +3,8 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ActivityMetrics, Split } from "@/lib/metrics/types";
 import { PACE_TYPES } from "@/lib/activity-format";
+import { useSite } from "@/content/SiteProvider";
+import { fill } from "@/content/site-types";
 import {
   barFractions,
   bestEffortLabel,
@@ -63,16 +65,17 @@ function Bar({ fraction }: { fraction: number }) {
 // totals are never shown: moving / elapsed come from the page's published
 // totals, and only grade-adjusted pace and effort come from metrics.
 function Headline({ m, foot, movingS, elapsedS }: { m: ActivityMetrics | null; foot: boolean; movingS: number; elapsedS: number }) {
+  const copy = useSite().pages.activity.metrics.headline;
   const items: { label: string; value: string }[] = [];
   // moving vs elapsed only when they differ (the stats grid already shows time)
   if (movingS > 0 && elapsedS - movingS >= 60) {
-    items.push({ label: "moving time", value: clock(movingS) });
-    items.push({ label: "elapsed time", value: clock(elapsedS) });
+    items.push({ label: copy.movingTime, value: clock(movingS) });
+    items.push({ label: copy.elapsedTime, value: clock(elapsedS) });
   }
   if (!m) return items.length ? <HeadlineGrid items={items} /> : null;
   const gap = foot ? formatPaceSPerKm(m.gapSPerKm) : null;
-  if (gap) items.push({ label: "grade-adjusted pace", value: gap });
-  if (m.effort !== null && Number.isFinite(m.effort)) items.push({ label: "effort", value: String(Math.round(m.effort)) });
+  if (gap) items.push({ label: copy.gradeAdjustedPace, value: gap });
+  if (m.effort !== null && Number.isFinite(m.effort)) items.push({ label: copy.effort, value: String(Math.round(m.effort)) });
   if (items.length === 0) return null;
   return <HeadlineGrid items={items} />;
 }
@@ -95,8 +98,9 @@ function HeadlineGrid({ items }: { items: { label: string; value: string }[] }) 
 // ---------------------------------------------------------------- splits
 
 function UnitToggle({ unit, onChange }: { unit: DistUnit; onChange: (u: DistUnit) => void }) {
+  const copy = useSite().pages.activity.metrics.splits;
   return (
-    <div role="group" aria-label="split unit" className="flex font-sans text-xs" style={{ gap: "0.25rem" }}>
+    <div role="group" aria-label={copy.unitToggle} className="flex font-sans text-xs" style={{ gap: "0.25rem" }}>
       {(["mi", "km"] as const).map((u) => (
         <button
           key={u}
@@ -112,20 +116,21 @@ function UnitToggle({ unit, onChange }: { unit: DistUnit; onChange: (u: DistUnit
             cursor: "pointer",
           }}
         >
-          {u}
+          {copy.units[u]}
         </button>
       ))}
     </div>
   );
 }
 
-function splitRate(s: Split, foot: boolean, unit: DistUnit): string {
+function splitRate(s: Split, foot: boolean, unit: DistUnit, stopped: string): string {
   const v = foot ? formatPaceSPerKm(s.paceSPerKm, unit) : formatSpeedMs(splitSpeedMs(s), unit);
   if (v) return v;
-  return s.movingS <= 0 ? "stopped" : "—";
+  return s.movingS <= 0 ? stopped : "—";
 }
 
 function Splits({ m, foot }: { m: ActivityMetrics; foot: boolean }) {
+  const copy = useSite().pages.activity.metrics.splits;
   const [unit, setUnit] = useState<DistUnit>("mi");
   const splits = unit === "mi" ? m.splitsMi : m.splitsKm;
   if (m.splitsMi.length === 0 && m.splitsKm.length === 0) return null;
@@ -133,52 +138,52 @@ function Splits({ m, foot }: { m: ActivityMetrics; foot: boolean }) {
   const showElev = splits.some((s) => s.elevGainM !== null || s.elevLossM !== null);
   const showHr = splits.some((s) => s.avgHr !== null);
   const bars = barFractions(splits.map(splitSpeedMs));
-  const rateLabel = foot ? "pace" : "speed";
+  const rateLabel = foot ? copy.pace : copy.speed;
 
   return (
-    <Block title="splits" aside={<UnitToggle unit={unit} onChange={setUnit} />}>
+    <Block title={copy.title} aside={<UnitToggle unit={unit} onChange={setUnit} />}>
       <div style={{ overflowX: "auto" }}>
         <table className="font-sans text-sm" style={{ ...NUM, width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr className="text-gray text-xs">
               <th scope="col" style={CELL}>
-                {unit}
+                {copy.units[unit]}
               </th>
               <th scope="col" style={CELL}>
                 {rateLabel}
               </th>
               <th scope="col" className="hidden sm:table-cell" style={{ ...CELL, width: "30%" }}>
-                <span className="sr-only">relative {rateLabel}</span>
+                <span className="sr-only">{fill(copy.relative, { rate: rateLabel })}</span>
               </th>
               {showGap && (
                 <th scope="col" style={CELL}>
-                  <abbr title="grade-adjusted pace" style={{ textDecoration: "none" }}>
-                    adj. pace
+                  <abbr title={copy.adjPaceTitle} style={{ textDecoration: "none" }}>
+                    {copy.adjPace}
                   </abbr>
                 </th>
               )}
               {showElev && (
                 <th scope="col" style={CELL}>
-                  elev
+                  {copy.elev}
                 </th>
               )}
               {showHr && (
                 <th scope="col" style={{ ...CELL, paddingRight: 0 }}>
-                  hr
+                  {copy.hr}
                 </th>
               )}
             </tr>
           </thead>
           <tbody>
             {splits.map((s, i) => (
-              <tr key={s.index} style={ROW} title={s.partial ? "includes a fogged stretch" : undefined}>
+              <tr key={s.index} style={ROW} title={s.partial ? copy.partialTitle : undefined}>
                 <th scope="row" className="text-off-white" style={CELL}>
                   {s.index}
                   {isShortSplit(s, unit) && <span className="text-gray text-xs"> · {formatDist(s.distM, unit)}</span>}
-                  {s.partial && <span className="text-gray text-xs"> · partial</span>}
+                  {s.partial && <span className="text-gray text-xs"> · {copy.partial}</span>}
                 </th>
                 <td className="text-off-white" style={CELL}>
-                  {splitRate(s, foot, unit)}
+                  {splitRate(s, foot, unit, copy.stopped)}
                   <div className="sm:hidden" style={{ marginTop: 3, minWidth: 56 }}>
                     <Bar fraction={bars[i]} />
                   </div>
@@ -213,20 +218,21 @@ function Splits({ m, foot }: { m: ActivityMetrics; foot: boolean }) {
 // ---------------------------------------------------------------- best efforts
 
 function BestEfforts({ m }: { m: ActivityMetrics }) {
+  const copy = useSite().pages.activity.metrics.bestEfforts;
   if (m.bestEfforts.length === 0) return null;
   return (
-    <Block title="best efforts">
+    <Block title={copy.title}>
       <table className="font-sans text-sm" style={{ ...NUM, width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr className="text-gray text-xs">
             <th scope="col" style={CELL}>
-              distance
+              {copy.distance}
             </th>
             <th scope="col" style={CELL}>
-              time
+              {copy.time}
             </th>
             <th scope="col" style={{ ...CELL, paddingRight: 0 }}>
-              pace
+              {copy.pace}
             </th>
           </tr>
         </thead>
@@ -234,7 +240,7 @@ function BestEfforts({ m }: { m: ActivityMetrics }) {
           {m.bestEfforts.map((e) => (
             <tr key={e.key} style={ROW}>
               <th scope="row" className="text-off-white" style={CELL}>
-                {bestEffortLabel(e.key, e.distM)}
+                {bestEffortLabel(e.key, e.distM, copy.labels)}
               </th>
               <td className="text-off-white" style={CELL}>
                 {clock(e.timeS)}
@@ -256,10 +262,11 @@ const CURVE_W = 600;
 const CURVE_H = 96;
 
 function Curve({ title, curve, format, noun }: { title: string; curve: { durS: number; value: number }[]; format: (v: number) => string; noun: string }) {
+  const copy = useSite().pages.activity.metrics.curves;
   const g = curveGeometry(curve, CURVE_W, CURVE_H);
   if (!g) return null;
   const readout = CURVE_TICKS_S.map((t) => ({ t, v: curveValueAt(curve, t) })).filter((r) => r.v !== null);
-  const aria = `${title}: best average ${noun} for each duration, ${readout.map((r) => `${durationLabel(r.t)} ${format(r.v as number)}`).join(", ")}`;
+  const aria = fill(copy.aria, { title, noun, readout: readout.map((r) => `${durationLabel(r.t)} ${format(r.v as number)}`).join(", ") });
   return (
     <Block title={title}>
       <p className="font-sans text-gray text-xs" style={{ ...NUM, marginBottom: 6 }}>
@@ -306,30 +313,31 @@ function Curve({ title, curve, format, noun }: { title: string; curve: { durS: n
 // ---------------------------------------------------------------- climbs
 
 function Climbs({ m }: { m: ActivityMetrics }) {
+  const copy = useSite().pages.activity.metrics.climbs;
   if (m.climbs.length === 0) return null;
   return (
-    <Block title="climbs">
+    <Block title={copy.title}>
       <div style={{ overflowX: "auto" }}>
         <table className="font-sans text-sm" style={{ ...NUM, width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr className="text-gray text-xs">
               <th scope="col" style={CELL}>
-                climb
+                {copy.climb}
               </th>
               <th scope="col" style={CELL}>
-                distance
+                {copy.distance}
               </th>
               <th scope="col" style={CELL}>
-                gain
+                {copy.gain}
               </th>
               <th scope="col" style={{ ...CELL, paddingRight: 0 }}>
-                grade avg / max
+                {copy.grade}
               </th>
             </tr>
           </thead>
           <tbody>
             {m.climbs.map((c, i) => {
-              const cat = climbCategoryLabel(c.category);
+              const cat = climbCategoryLabel(c.category, copy);
               return (
                 <tr key={`${c.startD}-${i}`} style={ROW}>
                   <th scope="row" className="text-off-white" style={CELL}>
@@ -358,7 +366,8 @@ function Climbs({ m }: { m: ActivityMetrics }) {
 // ---------------------------------------------------------------- zones
 
 function Zones({ title, zonesS }: { title: string; zonesS: number[] | null }) {
-  const slices = zoneSlices(zonesS);
+  const copy = useSite().pages.activity.metrics.zones;
+  const slices = zoneSlices(zonesS, copy.zone);
   if (!slices) return null;
   const aria = `${title}: ${slices.map((z) => `${z.label} ${z.minutes} min`).join(", ")}`;
   return (
@@ -397,10 +406,11 @@ function Zones({ title, zonesS }: { title: string; zonesS: number[] | null }) {
 // per-activity metrics for the public page. everything comes from the public
 // serializer (hide hr already applied); each block renders only with data.
 export default function ActivityMetricsSection({ metrics, hrZonesS, movingS, elapsedS }: Props) {
+  const copy = useSite().pages.activity.metrics;
   const m = metrics;
   const foot = m ? PACE_TYPES.has(m.sportType) || m.movingPaceSPerKm !== null : false;
-  const hasHrZones = zoneSlices(hrZonesS) !== null;
-  const hasPaceZones = foot && zoneSlices(m?.paceZonesS) !== null;
+  const hasHrZones = zoneSlices(hrZonesS, copy.zones.zone) !== null;
+  const hasPaceZones = foot && zoneSlices(m?.paceZonesS, copy.zones.zone) !== null;
   if (!m && !hasHrZones) return null;
 
   return (
@@ -408,13 +418,13 @@ export default function ActivityMetricsSection({ metrics, hrZonesS, movingS, ela
       <Headline m={m} foot={foot} movingS={movingS} elapsedS={elapsedS} />
       {m && <Splits m={m} foot={foot} />}
       {m && foot && <BestEfforts m={m} />}
-      {m?.powerCurve && <Curve title="power curve" noun="power" curve={m.powerCurve} format={(v) => `${Math.round(v)} w`} />}
-      {m?.speedCurve && <Curve title="speed curve" noun="speed" curve={m.speedCurve} format={(v) => formatSpeedMs(v) ?? "—"} />}
+      {m?.powerCurve && <Curve title={copy.curves.power} noun={copy.curves.powerNoun} curve={m.powerCurve} format={(v) => `${Math.round(v)} w`} />}
+      {m?.speedCurve && <Curve title={copy.curves.speed} noun={copy.curves.speedNoun} curve={m.speedCurve} format={(v) => formatSpeedMs(v) ?? "—"} />}
       {m && <Climbs m={m} />}
       {(hasHrZones || hasPaceZones) && (
-        <Block title="zones">
-          {hasHrZones && <Zones title="heart rate" zonesS={hrZonesS} />}
-          {hasPaceZones && <Zones title="pace" zonesS={m?.paceZonesS ?? null} />}
+        <Block title={copy.zones.title}>
+          {hasHrZones && <Zones title={copy.zones.heartRate} zonesS={hrZonesS} />}
+          {hasPaceZones && <Zones title={copy.zones.pace} zonesS={m?.paceZonesS ?? null} />}
         </Block>
       )}
     </div>
