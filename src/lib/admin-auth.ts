@@ -28,8 +28,9 @@ export async function isAdminRequest(request: Request): Promise<boolean> {
 
 function isAllowedOrigin(origin: string): boolean {
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const apex = site.replace("://www.", "://");
   const allowed = new Set(
-    [site, site.replace("://www.", "://"), "http://localhost:3000"].filter(Boolean)
+    [apex, apex.replace("://", "://www."), "http://localhost:3000"].filter((o) => o && o !== "://www.")
   );
   return allowed.has(origin);
 }
