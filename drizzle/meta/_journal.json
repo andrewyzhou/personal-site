@@ -57,6 +57,13 @@
       "when": 1793819847129,
       "tag": "0007_activity_cleaning",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793844475305,
+      "tag": "0008_activity_replays",
+      "breakpoints": true
     }
   ]
 }
