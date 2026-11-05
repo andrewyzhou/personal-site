@@ -25,7 +25,8 @@ vi.mock("lift-core", async (orig) => {
   };
 });
 
-import { pickEditTarget, planShareIngest, type EditCandidate, type EditLookup } from "@/lib/lift/plan";
+import { isImportedSource, pickEditTarget, planShareIngest, type EditCandidate, type EditLookup } from "@/lib/lift/plan";
+import { isImportedWorkoutId } from "lift-core";
 import { customExerciseId, guessEquipment, guessTracking, sha256Hex } from "@/lib/lift/rows";
 
 const LB = 2.2046226218;
@@ -403,6 +404,22 @@ describe("planShareIngest edit options", () => {
       [null, 12, true],
       [25, 8, true],
     ]);
+  });
+});
+
+describe("imported workouts", () => {
+  it("knows share and csv sources from app ones", () => {
+    expect(isImportedSource("share-text")).toBe(true);
+    expect(isImportedSource("workout-csv")).toBe(true);
+    expect(isImportedSource("app")).toBe(false);
+    expect(isImportedSource("share")).toBe(false);
+  });
+
+  it("knows share and csv ids from phone uuids", () => {
+    expect(isImportedWorkoutId("share-caterxeu")).toBe(true);
+    expect(isImportedWorkoutId("workout-csv-0123456789abcdef")).toBe(true);
+    expect(isImportedWorkoutId("3f2b8c1e-0000-4000-8000-000000000000")).toBe(false);
+    expect(isImportedWorkoutId("w-app")).toBe(false);
   });
 });
 

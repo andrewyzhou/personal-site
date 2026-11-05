@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import {
@@ -16,6 +16,7 @@ import { log } from "@/lib/log";
 import { getWorkoutLinks, linkWorkout } from "./link";
 import { revalidateLiftPublic } from "./revalidate";
 import {
+  IMPORTED_SOURCES,
   pickEditTarget,
   planShareIngest,
   type EditCandidate,
@@ -276,7 +277,7 @@ export function editCandidatesWhere(plannedId: string, slug: string | null, star
   const t = liftWorkouts;
   const conds: (SQL | undefined)[] = [eq(t.id, plannedId)];
   if (slug) conds.push(eq(t.shareSlug, slug));
-  if (startedLocal) conds.push(and(eq(t.startedLocal, startedLocal), like(t.source, "share%"), isNull(t.deletedAt)));
+  if (startedLocal) conds.push(and(eq(t.startedLocal, startedLocal), inArray(t.source, IMPORTED_SOURCES), isNull(t.deletedAt)));
   return or(...conds)!;
 }
 

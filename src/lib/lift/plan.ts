@@ -31,6 +31,13 @@ import { liftTimezone, localToUtc, utcToLocal } from "./time";
 
 export type IngestSource = "shortcut" | "telegram" | "api" | "workout-csv";
 
+/** lift_workouts.source values for workouts that came in as text (share or csv), not from the phone */
+export const IMPORTED_SOURCES = ["share-text", "workout-csv"] as const;
+
+export function isImportedSource(source: string): boolean {
+  return (IMPORTED_SOURCES as readonly string[]).includes(source);
+}
+
 export interface PlanOptions {
   source: IngestSource;
   /** used only when the share has no parseable date line */
@@ -411,7 +418,7 @@ export function pickEditTarget(share: EditLookup, candidates: readonly EditCandi
   const matches = candidates.filter(
     (c) =>
       c.startedLocal === share.startedLocal &&
-      c.source.startsWith("share") &&
+      isImportedSource(c.source) &&
       !c.deletedAt &&
       (nameKey(c.title) === title || exerciseOverlap(c.exerciseNames, share.exerciseNames) >= EDIT_OVERLAP)
   );
