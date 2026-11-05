@@ -64,19 +64,16 @@ export function splitSpeedMs(split: Pick<Split, "distM" | "movingS" | "paceSPerK
   return null;
 }
 
-// relative bar widths (0..1) from speeds: faster = longer. the slowest gets
-// MIN_BAR so it stays visible; all-equal → full width; null → 0.
+// relative bar widths (0..1) from speeds: proportional to speed against the
+// fastest split, so a split 7% slower is a bar 7% shorter (a min–max stretch
+// made small differences look huge). at least MIN_BAR so it stays visible;
+// null → 0.
 export const MIN_BAR = 0.2;
 export function barFractions(speeds: (number | null)[]): number[] {
   const vs = speeds.filter(valid).filter((v) => v > 0);
   if (vs.length === 0) return speeds.map(() => 0);
-  const lo = Math.min(...vs);
   const hi = Math.max(...vs);
-  return speeds.map((v) => {
-    if (!valid(v) || v <= 0) return 0;
-    if (hi - lo < 1e-9) return 1;
-    return MIN_BAR + (1 - MIN_BAR) * ((v - lo) / (hi - lo));
-  });
+  return speeds.map((v) => (!valid(v) || v <= 0 ? 0 : Math.max(MIN_BAR, v / hi)));
 }
 
 export const BEST_EFFORT_LABELS: Record<string, string> = {

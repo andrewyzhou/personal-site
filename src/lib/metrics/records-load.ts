@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, activities, activityMetrics } from "../db";
 import { publicMetrics } from "../public-activity";
 import { log } from "../log";
+import { liveReplayEnabled } from "../replay/live";
 import {
   bestEffortRecords,
   curveRecords,
@@ -61,7 +62,8 @@ export async function loadPublicRecords(today: string): Promise<PublicRecords> {
       return m ? [{ activityId: r.id, date: r.date, name: r.name, metrics: m }] : [];
     });
   } catch (error) {
-    log.error("metrics:records", "metrics read failed", error);
+    // dev against a db without the table: expected, not worth an error overlay
+    if (!liveReplayEnabled()) log.error("metrics:records", "metrics read failed", error);
     return { ...EMPTY_RECORDS, gear };
   }
 

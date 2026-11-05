@@ -70,11 +70,12 @@ describe("splits", () => {
   });
 
   it("bar widths: faster is longer, slowest keeps a minimum, null is empty", () => {
-    const f = barFractions([3, 4, null, 5]);
-    expect(f[0]).toBeCloseTo(MIN_BAR);
-    expect(f[1]).toBeCloseTo(MIN_BAR + (1 - MIN_BAR) / 2);
+    const f = barFractions([3, 4, null, 5, 0.5]);
+    expect(f[0]).toBeCloseTo(0.6); // proportional to the fastest
+    expect(f[1]).toBeCloseTo(0.8);
     expect(f[2]).toBe(0);
     expect(f[3]).toBe(1);
+    expect(f[4]).toBe(MIN_BAR); // floor keeps it visible
     expect(barFractions([4, 4])).toEqual([1, 1]);
     expect(barFractions([null, null])).toEqual([0, 0]);
   });
