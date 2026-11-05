@@ -9,6 +9,7 @@ export const MAX_PROGRAM_WEEKS = 52;
 export const MAX_PROGRAM_DAYS_PER_WEEK = 14;
 /** serialized size cap; well past any real program, well under a push's body cap */
 export const MAX_PROGRAM_DATA_LENGTH = 100_000;
+const MAX_SKIPPED = 10_000;
 
 export interface ProgramDay {
   /** template to run; null = rest day, skipped by progress */
@@ -24,9 +25,9 @@ export interface ProgramData {
   weeks: ProgramWeek[];
   /** template_exercises id -> rule */
   rules: Record<string, ProgressionRule>;
-  /** epoch ms; workouts before this don't count. null = since the start of history */
+  /** epoch ms; workouts before this don't count. null = not started yet, so nothing counts */
   startedAt: number | null;
-  /** days skipped by hand from the start, so "skip" doesn't need a fake workout */
+  /** position at startedAt: days done or skipped before it, so "skip" doesn't need a fake workout */
   skipped: number;
   /** start over after the last week instead of finishing */
   repeat: boolean;
@@ -66,15 +67,33 @@ export function checkProgramData(v: unknown): string | null {
   for (const [k, r] of Object.entries(v.rules)) {
     if (k.length < 1 || k.length > 128) return "rules keys must be ids";
     if (!parseRule(r)) return `rules.${k} is not a valid rule`;
+    const unit = (r as Record<string, unknown>).unit;
+    if (unit !== undefined && unit !== "lb" && unit !== "kg") return `rules.${k}.unit must be lb or kg`;
   }
   if (v.startedAt !== null && (typeof v.startedAt !== "number" || !Number.isSafeInteger(v.startedAt) || v.startedAt < 0)) {
     return "startedAt must be epoch ms or null";
   }
-  if (typeof v.skipped !== "number" || !Number.isInteger(v.skipped) || v.skipped < 0 || v.skipped > 10_000) {
+  if (typeof v.skipped !== "number" || !Number.isInteger(v.skipped) || v.skipped < 0 || v.skipped > MAX_SKIPPED) {
     return "skipped must be a non-negative integer";
   }
   if (typeof v.repeat !== "boolean") return "repeat must be a boolean";
   return null;
+}
+
+/**
+ * why stored program text isn't valid, or null. the server validator and the
+ * phone's save both call this, so a program the phone keeps always syncs.
+ */
+export function checkProgramText(v: unknown): string | null {
+  if (typeof v !== "string") return "must be a json string";
+  if (v.length > MAX_PROGRAM_DATA_LENGTH) return `length must be at most ${MAX_PROGRAM_DATA_LENGTH}`;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(v);
+  } catch {
+    return "is not valid json";
+  }
+  return checkProgramData(parsed);
 }
 
 /** tolerant parse of stored program json: bad parts fall back, never throws */
@@ -101,7 +120,7 @@ export function parseProgramData(json: string | null | undefined): ProgramData {
     }
   }
   if (typeof raw.startedAt === "number" && Number.isSafeInteger(raw.startedAt) && raw.startedAt >= 0) out.startedAt = raw.startedAt;
-  if (typeof raw.skipped === "number" && Number.isInteger(raw.skipped) && raw.skipped >= 0) out.skipped = Math.min(raw.skipped, 10_000);
+  if (typeof raw.skipped === "number" && Number.isInteger(raw.skipped) && raw.skipped >= 0) out.skipped = Math.min(raw.skipped, MAX_SKIPPED);
   out.repeat = raw.repeat === true;
   return out;
 }
@@ -167,26 +186,33 @@ export function programSlots(p: Pick<ProgramData, "weeks">): ProgramSlot[] {
 }
 
 /**
- * where the program stands. workouts count in time order from startedAt, each
- * one only when it ran the next expected template, so an off-program session
- * (or a template done twice) doesn't move it forward.
+ * training days done or skipped, across passes. workouts count in time order
+ * from startedAt, each one only when it ran the next expected template, so an
+ * off-program session (or a template done twice) doesn't move it forward.
  */
+function programPosition(program: ProgramData, slots: readonly ProgramSlot[], completedWorkouts: readonly CompletedWorkout[]): number {
+  const total = slots.length;
+  let pos = program.skipped;
+  // not started: no workout counts yet, only skips
+  if (program.startedAt == null || !total) return pos;
+  const since = program.startedAt;
+  const ordered = completedWorkouts
+    .filter((w) => w.templateId && w.startedAt >= since)
+    .sort((a, b) => a.startedAt - b.startedAt);
+  for (const w of ordered) {
+    if (!program.repeat && pos >= total) break;
+    if (slots[pos % total]!.templateId === w.templateId) pos++;
+  }
+  return pos;
+}
+
+/** where the program stands */
 export function programProgress(program: ProgramData, completedWorkouts: readonly CompletedWorkout[]): ProgramProgress {
   const slots = programSlots(program);
   const total = slots.length;
   if (!total) return { next: null, week: 0, day: 0, completed: 0, total: 0, fraction: 0, done: true, cycles: 0 };
-  const since = program.startedAt ?? -Infinity;
-  const ordered = completedWorkouts
-    .filter((w) => w.templateId && w.startedAt >= since)
-    .sort((a, b) => a.startedAt - b.startedAt);
-
-  let pos = program.skipped;
-  const finished = () => !program.repeat && pos >= total;
-  for (const w of ordered) {
-    if (finished()) break;
-    if (slots[pos % total]!.templateId === w.templateId) pos++;
-  }
-  if (finished()) {
+  const pos = programPosition(program, slots, completedWorkouts);
+  if (!program.repeat && pos >= total) {
     const last = slots[total - 1]!;
     return { next: null, week: last.week, day: last.day, completed: total, total, fraction: 1, done: true, cycles: 1 };
   }
@@ -203,6 +229,23 @@ export function programProgress(program: ProgramData, completedWorkouts: readonl
     done: false,
     cycles,
   };
+}
+
+/**
+ * the program after skipping its next day. a started program is rebased: the
+ * position so far becomes `skipped` and counting restarts at `now`, so the
+ * workouts already matched aren't replayed against a shifted schedule.
+ */
+export function skipNextDay(program: ProgramData, completedWorkouts: readonly CompletedWorkout[], now: number): ProgramData {
+  const slots = programSlots(program);
+  const total = slots.length;
+  if (!total) return program;
+  const pos = programPosition(program, slots, completedWorkouts);
+  if (!program.repeat && pos >= total) return program;
+  let skipped = pos + 1;
+  // a long-running repeat keeps its place in the pass; only the lap count is dropped
+  if (skipped > MAX_SKIPPED) skipped %= total;
+  return program.startedAt == null ? { ...program, skipped } : { ...program, startedAt: now, skipped };
 }
 
 /** "week 2 · day 1" */

@@ -2,8 +2,11 @@
 // the per-exercise hint. no expo imports so it runs under vitest.
 
 import {
+  checkProgramData,
+  emptyProgram,
   formatTarget,
   nextTarget,
+  type DoubleRule,
   type NextTarget,
   type ProgramData,
   type ProgressionRule,
@@ -65,6 +68,30 @@ export function setRule(p: ProgramData, templateExerciseId: string, rule: Progre
   if (rule) rules[templateExerciseId] = rule;
   else delete rules[templateExerciseId];
   return { ...p, rules };
+}
+
+export const MAX_RULE_SETS = 50;
+export const MAX_RULE_REPS = 100;
+export const MAX_RULE_INCREMENT = 1000;
+
+/** a whole number in 1..max; a blank or zero field keeps the last good value */
+export function ruleInt(v: number | null, fallback: number, max: number): number {
+  return v != null && v >= 1 ? Math.min(max, Math.round(v)) : fallback;
+}
+
+/** rep range edits that keep lo <= hi: raising the bottom past the top drags the top along */
+export function withRepRange(rule: DoubleRule, lo: number | null, hi: number | null): DoubleRule {
+  const repsLo = ruleInt(lo, rule.repsLo, MAX_RULE_REPS);
+  const repsHi = Math.max(repsLo, ruleInt(hi, rule.repsHi, MAX_RULE_REPS));
+  return { ...rule, repsLo, repsHi };
+}
+
+/** why the server would refuse this rule, or null: the same check sync runs */
+export function ruleProblem(rule: ProgressionRule): string | null {
+  const why = checkProgramData({ ...emptyProgram(0), rules: { rule } });
+  if (!why) return null;
+  const msg = why.replace(/^rules\.rule\.?\s?/, "");
+  return msg.startsWith("is not") ? "this rule won't save: check its numbers" : msg;
 }
 
 /** drops rules for template exercises that no longer exist */

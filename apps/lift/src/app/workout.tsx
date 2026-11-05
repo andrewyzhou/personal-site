@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import type { SessionSet } from "lift-core";
+import type { ProgramData, SessionSet } from "lift-core";
 import { getPreferredUnit } from "../db/bodyweight";
 import { getExerciseLookup } from "../db/exercises";
 import { programForTemplate, recentSessions, templateExerciseRefs } from "../db/programs";
@@ -41,15 +41,20 @@ function prFlagsOf(detail: Detail): Record<string, SetPrKind[]> {
   return out;
 }
 
-/** workout exercise id -> "next: 190 lb × 5", for exercises the active program has a rule for */
+/** workout exercise id -> "next: 190 lb × 5", for exercises the workout's program has a rule for */
 function useProgressionHints(detail: Detail | undefined, exerciseKey: string, version: number): Record<string, string> {
   const workoutId = detail?.workout.id;
   const templateId = detail?.workout.templateId ?? null;
+  // re-read per write, but compared as text so a set edit doesn't rebuild the setup
+  const rulesJson = useMemo(() => {
+    const rules = programForTemplate(templateId, workoutId ?? null)?.data.rules;
+    return rules && Object.keys(rules).length ? JSON.stringify(rules) : "";
+  }, [templateId, workoutId, version]);
   const setup = useMemo(() => {
-    const program = programForTemplate(templateId);
-    if (!program || !templateId || !Object.keys(program.data.rules).length) return null;
-    return { rules: program.data.rules, refs: templateExerciseRefs(templateId), unit: getPreferredUnit() };
-  }, [templateId, version]);
+    if (!rulesJson || !templateId) return null;
+    const rules = JSON.parse(rulesJson) as ProgramData["rules"];
+    return { rules, refs: templateExerciseRefs(templateId), unit: getPreferredUnit() };
+  }, [templateId, rulesJson]);
   // history only changes when the exercise list does, not per keystroke
   const histories = useMemo(() => {
     const out: Record<string, SessionSet[][]> = {};

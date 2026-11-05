@@ -20,6 +20,7 @@ import { Chip } from "../../components/library/Chip";
 import { startProgramDay } from "../../components/library/startProgramDay";
 import { RuleEditor } from "../../components/program/RuleEditor";
 import { useColors } from "../../components/theme";
+import { useDbVersion } from "../../components/useDbVersion";
 import { addWeek, daysPerWeek, MAX_DAYS, progressLabel, pruneRules, removeWeek, setDay, setDayCount, setRule } from "../../lib/programs";
 
 interface Draft {
@@ -55,7 +56,9 @@ export default function ProgramEditor() {
     () => used.map((tid) => ({ tid, detail: getTemplateDetail(tid) })),
     [used.join("|")]
   );
-  const progress = useMemo(() => (draft ? getProgramProgress(draft) : null), [draft?.data]);
+  // re-read on any write too, so a workout finished elsewhere moves the progress line
+  const version = useDbVersion();
+  const progress = useMemo(() => (draft ? getProgramProgress(draft) : null), [draft?.data, version]);
 
   if (missing || !draft || !progress || !id) {
     return (
