@@ -99,6 +99,33 @@ export default function SettingsPanel({ onSaved }: { onSaved(): void }) {
           />
         ))}
       </div>
+      <label className="font-sans text-gray text-sm flex items-center" style={{ gap: "8px" }}>
+        resting hr
+        <input
+          type="number"
+          min={30}
+          max={110}
+          placeholder="60"
+          value={form.hrRestBpm}
+          onChange={(e) => setForm({ ...form, hrRestBpm: e.target.value })}
+          className="font-sans text-off-white text-sm"
+          style={inputStyle}
+        />
+        bpm (effort score)
+      </label>
+      <label className="font-sans text-gray text-sm flex items-center" style={{ gap: "8px" }}>
+        threshold pace
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="7:30"
+          value={form.thresholdPacePerMi}
+          onChange={(e) => setForm({ ...form, thresholdPacePerMi: e.target.value })}
+          className="font-sans text-off-white text-sm"
+          style={inputStyle}
+        />
+        /mi (pace zones; blank = off)
+      </label>
       {bpm.length === 4 && bpm.every(Number.isFinite) && (
         <p className="font-sans text-gray text-xs">
           z1 &lt; {bpm[0]} · z2 {bpm[0]}–{bpm[1]} · z3 {bpm[1]}–{bpm[2]} · z4 {bpm[2]}–{bpm[3]} · z5 ≥ {bpm[3]} bpm

@@ -283,12 +283,25 @@ describe("stats", () => {
 });
 
 describe("settings form", () => {
-  const settings = { autoApply: { enabled: true, minConfidence: 0.9 }, hrMaxBpm: 190, hrZonePcts: [0.6, 0.7, 0.8, 0.9] };
+  const settings = { autoApply: { enabled: true, minConfidence: 0.9 }, hrMaxBpm: 190, hrZonePcts: [0.6, 0.7, 0.8, 0.9], hrRestBpm: null, thresholdPaceSPerKm: null };
 
   it("round-trips", () => {
     const f = settingsToForm(settings);
-    expect(f).toEqual({ enabled: true, minConfidencePct: "90", hrMaxBpm: "190", zonePcts: ["60", "70", "80", "90"] });
+    expect(f).toEqual({
+      enabled: true, minConfidencePct: "90", hrMaxBpm: "190", zonePcts: ["60", "70", "80", "90"], hrRestBpm: "", thresholdPacePerMi: "",
+    });
     expect(formToSettings(f)).toEqual({ ok: true, settings });
+  });
+
+  it("resting hr and threshold pace (per mile in the form, per km stored)", () => {
+    const f = { ...settingsToForm(settings), hrRestBpm: "52", thresholdPacePerMi: "7:30" };
+    const r = formToSettings(f);
+    expect(r.ok && r.settings.hrRestBpm).toBe(52);
+    expect(r.ok && r.settings.thresholdPaceSPerKm).toBeCloseTo(450 / 1.609344, 1);
+    expect(r.ok && settingsToForm(r.settings).thresholdPacePerMi).toBe("7:30");
+    expect(formToSettings({ ...f, hrRestBpm: "5" }).ok).toBe(false);
+    expect(formToSettings({ ...f, thresholdPacePerMi: "7.5" }).ok).toBe(false);
+    expect(formToSettings({ ...f, thresholdPacePerMi: "1:00" }).ok).toBe(false);
   });
 
   it("rejects out-of-range and non-increasing values", () => {
