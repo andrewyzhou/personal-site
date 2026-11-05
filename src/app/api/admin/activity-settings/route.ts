@@ -1,7 +1,7 @@
 // GET  /api/admin/activity-settings
 //   200 { ok: true, settings: { autoApply: { enabled, minConfidence }, hrMaxBpm, hrZonePcts },
 //         history: [{ id, settings, createdAt }] (newest first, ≤ 20) }
-// POST /api/admin/activity-settings { autoApply?: { enabled?, minConfidence? }, hrMaxBpm?, hrZonePcts? }
+// POST /api/admin/activity-settings { autoApply?: { enabled?, minConfidence? }, hrMaxBpm?, hrZonePcts?, hrRestBpm?, thresholdPaceSPerKm? }
 //   posted fields merge onto the current settings and a new normalized row is
 //   inserted (insert-only, newest wins). a value normalization would change is
 //   rejected. hr zone changes mark every activity stale (hr_zones_s changes).
@@ -41,7 +41,14 @@ function merge(current: ActivitySettings, body: Record<string, unknown>): Activi
     autoApply: { ...current.autoApply, ...a },
     hrMaxBpm: body.hrMaxBpm ?? current.hrMaxBpm,
     hrZonePcts: body.hrZonePcts ?? current.hrZonePcts,
+    // null clears; absent keeps
+    hrRestBpm: body.hrRestBpm !== undefined ? body.hrRestBpm : current.hrRestBpm,
+    thresholdPaceSPerKm: body.thresholdPaceSPerKm !== undefined ? body.thresholdPaceSPerKm : current.thresholdPaceSPerKm,
   });
+  if (body.hrRestBpm !== undefined && body.hrRestBpm !== null && body.hrRestBpm !== out.hrRestBpm) return "hrRestBpm must be 30–110";
+  if (body.thresholdPaceSPerKm !== undefined && body.thresholdPaceSPerKm !== null && body.thresholdPaceSPerKm !== out.thresholdPaceSPerKm) {
+    return "thresholdPaceSPerKm must be 150–900";
+  }
   if (a.enabled !== undefined && a.enabled !== out.autoApply.enabled) return "autoApply.enabled must be a boolean";
   if (a.minConfidence !== undefined && a.minConfidence !== out.autoApply.minConfidence) return "autoApply.minConfidence must be 0.5–1";
   if (body.hrMaxBpm !== undefined && body.hrMaxBpm !== out.hrMaxBpm) return "hrMaxBpm must be 120–230";
@@ -63,7 +70,12 @@ export async function POST(request: Request) {
     if (stableStringify(next) === stableStringify(current)) {
       return NextResponse.json({ ok: true, settings: current, unchanged: true, marked: 0 });
     }
-    const zonesChanged = next.hrMaxBpm !== current.hrMaxBpm || stableStringify(next.hrZonePcts) !== stableStringify(current.hrZonePcts);
+    // hr zones, effort (resting hr) and pace zones (threshold) are published per activity
+    const zonesChanged =
+      next.hrMaxBpm !== current.hrMaxBpm ||
+      stableStringify(next.hrZonePcts) !== stableStringify(current.hrZonePcts) ||
+      (next.hrRestBpm ?? null) !== (current.hrRestBpm ?? null) ||
+      (next.thresholdPaceSPerKm ?? null) !== (current.thresholdPaceSPerKm ?? null);
     // marked before the insert too: a failure after it never leaves new zones
     // live with nothing flagged
     if (zonesChanged) await markAllStale();

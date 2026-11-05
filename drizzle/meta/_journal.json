@@ -78,6 +78,13 @@
       "when": 1793850145636,
       "tag": "0010_listening",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793868607423,
+      "tag": "0011_activity_metrics",
+      "breakpoints": true
     }
   ]
 }

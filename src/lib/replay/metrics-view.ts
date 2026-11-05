@@ -277,6 +277,22 @@ export function chartX(view: ReplayView): number[] {
   return view.totalDist > 10 ? view.dist : view.t;
 }
 
+// where the fog gaps fall on the chart's x axis: [x0, x1] in chart units.
+// by distance a gap has no width (hidden distance is never counted), so
+// x0 === x1 and the chart draws a marker line; by time it is a band.
+export function fogMarks(view: ReplayView, gaps: { after: number; kind: string }[]): [number, number][] {
+  const xs = chartX(view);
+  const out: [number, number][] = [];
+  for (const g of gaps) {
+    if (g.kind !== "fog") continue;
+    const endPrev = view.segStart[g.after + 1] - 1;
+    const startNext = view.segStart[g.after + 1];
+    if (endPrev < 0 || startNext >= view.n) continue;
+    out.push([xs[endPrev], xs[startNext]]);
+  }
+  return out;
+}
+
 export function linearScale(domain: [number, number], range: [number, number]) {
   const span = domain[1] - domain[0] || 1;
   return (v: number) => range[0] + ((v - domain[0]) / span) * (range[1] - range[0]);
@@ -391,7 +407,8 @@ export function formatMetric(v: number | null, metric: MapMetric): string {
   if (v === null || !Number.isFinite(v)) return "—";
   switch (metric) {
     case "pace":
-      return v > 0.3 ? formatPace(v) : "—";
+      // below a crawl there is no meaningful pace: say so rather than a dash
+      return v > 0.3 ? formatPace(v) : "stopped";
     case "speed":
       return `${(v * 2.23694).toFixed(1)} mph`;
     case "hr":

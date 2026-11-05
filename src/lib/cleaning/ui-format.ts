@@ -454,6 +454,8 @@ export interface ActivitySettingsShape {
   autoApply: { enabled: boolean; minConfidence: number };
   hrMaxBpm: number;
   hrZonePcts: number[];
+  hrRestBpm?: number | null;
+  thresholdPaceSPerKm?: number | null;
 }
 
 export interface SettingsForm {
@@ -461,6 +463,24 @@ export interface SettingsForm {
   minConfidencePct: string;
   hrMaxBpm: string;
   zonePcts: string[]; // percent of max, e.g. "60"
+  hrRestBpm: string; // "" = not set
+  thresholdPacePerMi: string; // "m:ss" per mile, "" = not set
+}
+
+const MILE_KM = 1.609344;
+
+// "7:30" (per mile) → seconds per km; null for blank, NaN when unreadable
+export function parsePacePerMi(v: string): number | null {
+  const s = v.trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2}):([0-5]\d)$/);
+  if (!m) return NaN;
+  return (Number(m[1]) * 60 + Number(m[2])) / MILE_KM;
+}
+
+export function formatPacePerMi(sPerKm: number): string {
+  const s = Math.round(sPerKm * MILE_KM);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 export function settingsToForm(s: ActivitySettingsShape): SettingsForm {
@@ -469,6 +489,8 @@ export function settingsToForm(s: ActivitySettingsShape): SettingsForm {
     minConfidencePct: String(Math.round(s.autoApply.minConfidence * 100)),
     hrMaxBpm: String(s.hrMaxBpm),
     zonePcts: s.hrZonePcts.map((p) => String(Math.round(p * 100))),
+    hrRestBpm: s.hrRestBpm != null ? String(s.hrRestBpm) : "",
+    thresholdPacePerMi: s.thresholdPaceSPerKm != null ? formatPacePerMi(s.thresholdPaceSPerKm) : "",
   };
 }
 
@@ -484,9 +506,22 @@ export function formToSettings(f: SettingsForm): { ok: true; settings: ActivityS
     if (!Number.isFinite(pcts[i]) || pcts[i] <= 30 || pcts[i] >= 100) return { ok: false, error: "zone bounds must be between 30% and 100%" };
     if (i > 0 && pcts[i] <= pcts[i - 1]) return { ok: false, error: "zone bounds must increase" };
   }
+  const restRaw = (f.hrRestBpm ?? "").trim();
+  const rest = restRaw ? Number(restRaw) : null;
+  if (rest !== null && (!Number.isInteger(rest) || rest < 30 || rest > 110)) return { ok: false, error: "resting hr must be 30–110 bpm" };
+  const pace = parsePacePerMi(f.thresholdPacePerMi ?? "");
+  if (pace !== null && (!Number.isFinite(pace) || pace < 150 || pace > 900)) {
+    return { ok: false, error: "threshold pace must be m:ss per mile, 4:02–24:08" };
+  }
   return {
     ok: true,
-    settings: { autoApply: { enabled: f.enabled, minConfidence: conf / 100 }, hrMaxBpm: hr, hrZonePcts: pcts.map((p) => p / 100) },
+    settings: {
+      autoApply: { enabled: f.enabled, minConfidence: conf / 100 },
+      hrMaxBpm: hr,
+      hrZonePcts: pcts.map((p) => p / 100),
+      hrRestBpm: rest,
+      thresholdPaceSPerKm: pace === null ? null : Math.round(pace * 10) / 10,
+    },
   };
 }
 

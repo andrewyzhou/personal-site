@@ -829,6 +829,15 @@ describe("activity settings", () => {
     expect(settingsDb.inserted).toHaveLength(1);
   });
 
+  it("resting hr / threshold pace changes mark everything stale; bad values are rejected", async () => {
+    const j = await (await postSettings(req({ hrRestBpm: 52, thresholdPaceSPerKm: 280 }))).json();
+    expect(j).toMatchObject({ ok: true, unchanged: false, settings: { hrRestBpm: 52, thresholdPaceSPerKm: 280 } });
+    expect(stale.markAllStale).toHaveBeenCalledTimes(2);
+    for (const body of [{ hrRestBpm: 5 }, { hrRestBpm: "52" }, { thresholdPaceSPerKm: 60 }]) {
+      expect((await postSettings(req(body))).status).toBe(400);
+    }
+  });
+
   it("auto-apply changes insert without marking", async () => {
     const j = await (await postSettings(req({ autoApply: { enabled: true } }))).json();
     expect(j).toMatchObject({ ok: true, marked: 0, settings: { autoApply: { enabled: true, minConfidence: 0.9 } } });
