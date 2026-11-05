@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p packages/lift-core",
     "images": "bash scripts/convert-images.sh",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "lift:import-csv": "tsx --env-file=.env.local scripts/lift-import-strong-csv.ts"
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.208.0",
