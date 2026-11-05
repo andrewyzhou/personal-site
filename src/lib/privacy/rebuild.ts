@@ -12,7 +12,8 @@ import { countPending, pendingWhere } from "./stale";
 // no new republish starts after this; the function limit is 60 s, so one slow
 // republish still fits
 export const DEFAULT_REBUILD_BUDGET_MS = 30_000;
-export const DEFAULT_REBUILD_LIMIT = 50;
+export const DEFAULT_REBUILD_LIMIT = 100;
+export const REBUILD_CONCURRENCY = 6;
 const MAX_EXCLUDE = 1000;
 
 export interface RebuildDeps {
@@ -29,6 +30,8 @@ export interface RebuildOptions {
   timeBudgetMs?: number;
   // ids to skip (e.g. ones that already failed in this rebuild run)
   excludeIds?: number[];
+  // republishes in flight at once (default REBUILD_CONCURRENCY)
+  concurrency?: number;
   // next/cache revalidatePath, only when called from a route
   revalidate?: (path: string) => void;
   deps?: Partial<RebuildDeps>;
@@ -98,27 +101,37 @@ export async function republishPending(opts: RebuildOptions = {}): Promise<Rebui
   };
 
   const ids = await deps.selectPending(limit, exclude);
-  const results: RebuildItem[] = [];
+  const slots: (RebuildItem | undefined)[] = new Array(ids.length);
   let timedOut = false;
-  for (const id of ids) {
-    if (deps.now() - started >= budget) {
-      timedOut = true;
-      break;
+  let next = 0;
+  // a few republishes in flight at once (each is mostly network waits); no new
+  // one starts after the budget, so results stay a prefix of the queue
+  const worker = async () => {
+    while (next < ids.length) {
+      if (deps.now() - started >= budget) {
+        timedOut = true;
+        return;
+      }
+      const index = next++;
+      const id = ids[index];
+      let item: RebuildItem;
+      try {
+        await deps.markAttempted(id);
+        const r = await deps.republish(id);
+        item = { id, status: r.status };
+      } catch (error) {
+        log.error("privacy:rebuild", `republish ${id} failed`, error);
+        item = { id, status: "error", error: (error as Error).message };
+      }
+      slots[index] = item;
+      // caches and the page go fresh as soon as each row is written: a batch cut
+      // off by the function limit still leaves every rewritten page current
+      if (WROTE.has(item.status)) await afterWrite(id);
     }
-    let item: RebuildItem;
-    try {
-      await deps.markAttempted(id);
-      const r = await deps.republish(id);
-      item = { id, status: r.status };
-    } catch (error) {
-      log.error("privacy:rebuild", `republish ${id} failed`, error);
-      item = { id, status: "error", error: (error as Error).message };
-    }
-    results.push(item);
-    // caches and the page go fresh as soon as each row is written: a batch cut
-    // off by the function limit still leaves every rewritten page current
-    if (WROTE.has(item.status)) await afterWrite(id);
-  }
+  };
+  const concurrency = Math.max(1, Math.min(Math.floor(opts.concurrency ?? REBUILD_CONCURRENCY), ids.length));
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  const results = slots.filter((r): r is RebuildItem => r !== undefined);
 
   return {
     results,

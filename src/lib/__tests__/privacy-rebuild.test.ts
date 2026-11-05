@@ -60,7 +60,7 @@ describe("republishPending", () => {
       d.flagged.delete(id);
       return { status: "published", id };
     });
-    const r = await republishPending({ deps: d, timeBudgetMs: 40_000 });
+    const r = await republishPending({ deps: d, timeBudgetMs: 40_000, concurrency: 1 });
     expect(r.results.map((x) => x.id)).toEqual([5, 4, 3]);
     expect(r.timedOut).toBe(true);
     expect(r.remaining).toBe(2);
@@ -83,7 +83,7 @@ describe("republishPending", () => {
       order.push(`republish ${id}`);
       return inner(id);
     });
-    await republishPending({ deps: d, limit: 3, revalidate: (p) => order.push(`revalidate ${p}`) });
+    await republishPending({ deps: d, limit: 3, concurrency: 1, revalidate: (p) => order.push(`revalidate ${p}`) });
     expect(order).toEqual(["republish 5", "revalidate /activities/5", "republish 4", "republish 3", "revalidate /activities/3"]);
   });
 
@@ -104,7 +104,7 @@ describe("republishPending", () => {
       d.tick(10_000);
       return { status: "published", id };
     });
-    const r = await republishPending({ deps: d });
+    const r = await republishPending({ deps: d, concurrency: 1 });
     expect(DEFAULT_REBUILD_BUDGET_MS).toBeLessThanOrEqual(30_000);
     expect(r.results).toHaveLength(3);
     expect(r.timedOut).toBe(true);
@@ -114,5 +114,21 @@ describe("republishPending", () => {
     const d = deps();
     const r = await republishPending({ deps: d, revalidate: () => { throw new Error("outside a request"); } });
     expect(r.results).toHaveLength(5);
+  });
+
+  it("runs several republishes at once and keeps queue order in results", async () => {
+    const d = deps();
+    let inFlight = 0, peak = 0;
+    (d.republish as ReturnType<typeof vi.fn>).mockImplementation(async (id: number) => {
+      inFlight++; peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      d.flagged.delete(id);
+      return { status: "published", id };
+    });
+    const r = await republishPending({ deps: d, concurrency: 3 });
+    expect(peak).toBe(3);
+    expect(r.results.map((x) => x.id)).toEqual([5, 4, 3, 2, 1]);
+    expect(r.remaining).toBe(0);
   });
 });
