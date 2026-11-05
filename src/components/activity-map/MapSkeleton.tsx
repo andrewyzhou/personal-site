@@ -29,7 +29,7 @@ export default function MapSkeleton({ polyline }: { polyline?: string | null }) 
 // the map's box (also used before the map code has loaded)
 export function MapFrame({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="rounded-lg overflow-hidden" style={{ position: "relative", aspectRatio: "16/10", minHeight: 260 }}>
+    <div className="rounded-lg overflow-hidden" style={{ position: "relative", width: "100%", aspectRatio: "16/10", minHeight: 260 }}>
       {children}
     </div>
   );

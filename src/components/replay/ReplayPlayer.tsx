@@ -55,6 +55,8 @@ const LAYERS = [`${P}fog-0`, `${P}fog-1`, `${P}trail-casing`, `${P}trail`, `${P}
 // the static map's own endpoint markers, hidden while the replay draws its own
 const STATIC_END_LAYERS = ["am-ends", "route-start", "route-end"]; // the 3d map's start/end layer (am-ends), plus legacy ids
 const TICK_MS = 100; // ui, trail and onTime refresh
+const MAX_FRAME_S = 0.25; // longer frames are clamped (a hidden tab pauses instead)
+const NO_PADDING = { top: 0, right: 0, bottom: 0, left: 0 };
 const FOG_PERIOD_S = 7;
 const SCRUB_STEP_S = 2; // wall seconds per arrow press
 const PHOTO_PX = 64;
@@ -378,7 +380,7 @@ export default function ReplayPlayer({
 
     function frame(now: number) {
       raf = requestAnimationFrame(frame);
-      const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+      const dt = last ? Math.min(MAX_FRAME_S, (now - last) / 1000) : 0;
       last = now;
       const pmNow = pmRef.current;
 
@@ -424,7 +426,8 @@ export default function ReplayPlayer({
           Math.abs(step.state.heading - chaseState.heading) > 0.02 ||
           Math.abs(step.state.zoom - chaseState.zoom) > 0.002;
         chaseState = step.state;
-        if (changed) map.jumpTo(step.camera);
+        // pad the bottom so the avatar sits in the part of the map the controls don't cover
+        if (changed) map.jumpTo({ ...step.camera, padding: { ...NO_PADDING, bottom: rootRef.current?.offsetHeight ?? 0 } });
       } else if (!chaseRef.current) {
         chaseState = null;
         // keep the avatar in view without taking over the camera
@@ -517,7 +520,7 @@ export default function ReplayPlayer({
     const cam = cameraRef.current;
     if (cam) {
       try {
-        map.easeTo({ ...cam, duration: reducedMotion() ? 0 : 700 });
+        map.easeTo({ ...cam, padding: NO_PADDING, duration: reducedMotion() ? 0 : 700 });
       } catch {
         // map gone
       }
@@ -540,8 +543,19 @@ export default function ReplayPlayer({
   }, [open]);
   useEffect(
     () => () => {
-      if (openRef.current) onTimeRef.current?.(null);
+      if (!openRef.current) return;
+      // unmounted by the parent while open: give the camera back too
+      const cam = cameraRef.current;
+      if (cam) {
+        try {
+          map.easeTo({ ...cam, padding: NO_PADDING, duration: reducedMotion() ? 0 : 700 });
+        } catch {
+          // map gone
+        }
+      }
+      onTimeRef.current?.(null);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
