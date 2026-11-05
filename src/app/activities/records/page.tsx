@@ -11,10 +11,15 @@ import {
   formatSpeedMs,
   M_PER_MI,
 } from "@/components/activity-metrics/format";
+import { fill, getSite, pageTitle, type RecordsPageContent } from "@/content/site";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = { title: "records · activities · andrew zhou" };
+const site = getSite();
+const copy = site.pages.records;
+const effortLabels = site.pages.activity.metrics.bestEfforts.labels;
+
+export const metadata: Metadata = { title: pageTitle(site, copy.title, copy.section) };
 
 const th = "font-sans text-gray text-xs font-normal text-left";
 const td = "font-sans text-off-white text-sm";
@@ -25,7 +30,7 @@ function today(): string {
 }
 
 // fitness (42-day) and fatigue (7-day) load as two lines, last 180 days
-function FitnessChart({ days }: { days: { date: string; fitness: number; fatigue: number }[] }) {
+function FitnessChart({ days, copy }: { days: { date: string; fitness: number; fatigue: number }[]; copy: RecordsPageContent }) {
   const W = 680;
   const H = 120;
   const max = Math.max(1, ...days.map((d) => Math.max(d.fitness, d.fatigue)));
@@ -41,7 +46,7 @@ function FitnessChart({ days }: { days: { date: string; fitness: number; fatigue
         height={H}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`fitness ${Math.round(last.fitness)}, fatigue ${Math.round(last.fatigue)} on ${last.date}`}
+        aria-label={fill(copy.fitnessAria, { fitness: Math.round(last.fitness), fatigue: Math.round(last.fatigue), date: last.date })}
         style={{ display: "block" }}
       >
         <line x1={0} x2={W} y1={H - 4} y2={H - 4} stroke="var(--theme-divider)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
@@ -49,8 +54,13 @@ function FitnessChart({ days }: { days: { date: string; fitness: number; fatigue
         <path d={line("fatigue")} fill="none" stroke="var(--theme-text-muted)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
       </svg>
       <figcaption className="font-sans text-gray text-xs" style={{ marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
-        {days[0].date} – {last.date} · fitness {Math.round(last.fitness)} (solid) · fatigue {Math.round(last.fatigue)} (dashed) · form{" "}
-        {Math.round(last.fitness - last.fatigue)}
+        {fill(copy.fitnessCaption, {
+          from: days[0].date,
+          to: last.date,
+          fitness: Math.round(last.fitness),
+          fatigue: Math.round(last.fatigue),
+          form: Math.round(last.fitness - last.fatigue),
+        })}
       </figcaption>
     </figure>
   );
@@ -65,31 +75,31 @@ export default async function RecordsPage() {
     <main className="site-container">
       <section className="py-8">
         <Link href="/" className="font-sans text-gray text-base link-highlight">
-          ← home
+          ← {site.nav.home}
         </Link>
       </section>
 
       <article className="py-8" style={{ maxWidth: "720px" }}>
         <h1 className="font-sans font-bold text-off-white text-4xl" style={{ letterSpacing: "-0.01em", marginBottom: "0.5rem" }}>
-          records
+          {copy.title}
         </h1>
-        <p className="font-sans text-gray text-lg">all-time bests, fitness and gear, from public activities</p>
+        <p className="font-sans text-gray text-lg">{copy.intro}</p>
         <hr style={{ border: "none", borderTop: "1px solid var(--theme-divider)", margin: "1.5rem 0" }} />
 
-        {empty && <p className="font-sans text-gray text-base">nothing here yet.</p>}
+        {empty && <p className="font-sans text-gray text-base">{copy.empty}</p>}
 
         {efforts.length > 0 && (
           <section style={{ margin: "2rem 0" }}>
-            <h2 className="font-sans text-off-white text-lg font-medium" style={{ marginBottom: "0.75rem" }}>best efforts</h2>
+            <h2 className="font-sans text-off-white text-lg font-medium" style={{ marginBottom: "0.75rem" }}>{copy.bestEfforts}</h2>
             <div style={{ overflowX: "auto" }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
-                    <th className={th} style={num}>distance</th>
-                    <th className={th} style={num}>best</th>
-                    <th className={th} style={num}>pace</th>
-                    <th className={th} style={num}>activity</th>
-                    <th className={th} style={num}>next best</th>
+                    <th className={th} style={num}>{copy.columns.distance}</th>
+                    <th className={th} style={num}>{copy.columns.best}</th>
+                    <th className={th} style={num}>{copy.columns.pace}</th>
+                    <th className={th} style={num}>{copy.columns.activity}</th>
+                    <th className={th} style={num}>{copy.columns.nextBest}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -97,11 +107,11 @@ export default async function RecordsPage() {
                     const [best, ...rest] = d.rows;
                     return (
                       <tr key={d.key} style={{ borderTop: "1px solid var(--theme-divider)" }}>
-                        <td className={td} style={num}>{bestEffortLabel(d.key, d.distM)}</td>
+                        <td className={td} style={num}>{bestEffortLabel(d.key, d.distM, effortLabels)}</td>
                         <td className={td} style={num}>{clock(best.timeS)}</td>
                         <td className="font-sans text-gray text-sm" style={num}>{formatPaceSPerKm(effortPaceSPerKm(best.distM, best.timeS))}</td>
                         <td className="font-sans text-sm" style={{ ...num, whiteSpace: "normal" }}>
-                          <Link href={`/activities/${best.activityId}`} className="text-secondary link-highlight">{best.name || "activity"}</Link>
+                          <Link href={`/activities/${best.activityId}`} className="text-secondary link-highlight">{best.name || copy.unnamedActivity}</Link>
                           <span className="text-gray"> · {best.date}</span>
                         </td>
                         <td className="font-sans text-gray text-sm" style={num}>{rest.map((x) => clock(x.timeS)).join(" · ")}</td>
@@ -115,8 +125,8 @@ export default async function RecordsPage() {
         )}
 
         {[
-          { title: "best average speed", rows: r.speedCurve, fmt: (v: number) => formatSpeedMs(v) ?? "" },
-          { title: "best average power", rows: r.powerCurve, fmt: (v: number) => `${Math.round(v)} w` },
+          { title: copy.bestSpeed, rows: r.speedCurve, fmt: (v: number) => formatSpeedMs(v) ?? "" },
+          { title: copy.bestPower, rows: r.powerCurve, fmt: (v: number) => `${Math.round(v)} w` },
         ]
           .filter((c) => c.rows.length > 0)
           .map((c) => (
@@ -126,9 +136,9 @@ export default async function RecordsPage() {
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                   <thead>
                     <tr>
-                      <th className={th} style={num}>for</th>
-                      <th className={th} style={num}>best</th>
-                      <th className={th} style={num}>activity</th>
+                      <th className={th} style={num}>{copy.columns.for}</th>
+                      <th className={th} style={num}>{copy.columns.best}</th>
+                      <th className={th} style={num}>{copy.columns.activity}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -137,7 +147,7 @@ export default async function RecordsPage() {
                         <td className={td} style={num}>{durationLabel(p.durS)}</td>
                         <td className={td} style={num}>{c.fmt(p.value)}</td>
                         <td className="font-sans text-sm" style={{ ...num, whiteSpace: "normal" }}>
-                          <Link href={`/activities/${p.activityId}`} className="text-secondary link-highlight">{p.name || "activity"}</Link>
+                          <Link href={`/activities/${p.activityId}`} className="text-secondary link-highlight">{p.name || copy.unnamedActivity}</Link>
                           <span className="text-gray"> · {p.date}</span>
                         </td>
                       </tr>
@@ -150,25 +160,25 @@ export default async function RecordsPage() {
 
         {r.fitness.length > 1 && (
           <section style={{ margin: "2rem 0" }}>
-            <h2 className="font-sans text-off-white text-lg font-medium" style={{ marginBottom: "0.75rem" }}>fitness</h2>
-            <FitnessChart days={r.fitness} />
+            <h2 className="font-sans text-off-white text-lg font-medium" style={{ marginBottom: "0.75rem" }}>{copy.fitness}</h2>
+            <FitnessChart days={r.fitness} copy={copy} />
             <p className="font-sans text-gray text-xs" style={{ marginTop: 6 }}>
-              training load from heart rate: fitness is the 42-day average, fatigue the 7-day one.
+              {copy.fitnessNote}
             </p>
           </section>
         )}
 
         {r.gear.length > 0 && (
           <section style={{ margin: "2rem 0" }}>
-            <h2 className="font-sans text-off-white text-lg font-medium" style={{ marginBottom: "0.75rem" }}>gear</h2>
+            <h2 className="font-sans text-off-white text-lg font-medium" style={{ marginBottom: "0.75rem" }}>{copy.gear}</h2>
             <div style={{ overflowX: "auto" }}>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
-                    <th className={th} style={num}>gear</th>
-                    <th className={th} style={num}>distance</th>
-                    <th className={th} style={num}>activities</th>
-                    <th className={th} style={num}>last used</th>
+                    <th className={th} style={num}>{copy.columns.gear}</th>
+                    <th className={th} style={num}>{copy.columns.distance}</th>
+                    <th className={th} style={num}>{copy.columns.activities}</th>
+                    <th className={th} style={num}>{copy.columns.lastUsed}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -176,7 +186,7 @@ export default async function RecordsPage() {
                     <tr key={g.gear} style={{ borderTop: "1px solid var(--theme-divider)" }}>
                       <td className={td} style={{ ...num, whiteSpace: "normal" }}>
                         {g.gear}
-                        {g.alert && <span className="text-gray"> · past 400 mi</span>}
+                        {g.alert && <span className="text-gray"> · {copy.gearAlert}</span>}
                       </td>
                       <td className={td} style={num}>{(g.distanceM / M_PER_MI).toFixed(1)} mi</td>
                       <td className="font-sans text-gray text-sm" style={num}>{g.activities}</td>

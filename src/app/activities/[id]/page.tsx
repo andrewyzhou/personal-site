@@ -11,6 +11,7 @@ import LiftWorkoutCard from "@/components/lift/LiftWorkoutCard";
 import { loadActivityLiftWorkouts } from "@/lib/lift/public";
 import ActivityMetricsSection from "@/components/activity-metrics/ActivityMetricsSection";
 import { loadPublicMetrics } from "@/lib/metrics/load";
+import { getSite } from "@/content/site";
 import { isPublic, publicActivityDetail } from "@/lib/public-activity";
 import {
   DURATION_ONLY_TYPES,
@@ -113,7 +114,7 @@ export default async function ActivityPage({ params }: { params: Promise<{ id: s
         </Link>
         <span className="font-sans text-gray text-base"> · </span>
         <Link href="/activities/records" className="font-sans text-gray text-base link-highlight">
-          records
+          {getSite().pages.records.link}
         </Link>
       </section>
 

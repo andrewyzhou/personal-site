@@ -3,6 +3,7 @@
 // speed in m/s and distances in metres; the site shows imperial by default.
 
 import type { Climb, Split } from "@/lib/metrics/types";
+import { fill } from "@/content/site-types";
 
 export type DistUnit = "mi" | "km";
 
@@ -76,24 +77,10 @@ export function barFractions(speeds: (number | null)[]): number[] {
   return speeds.map((v) => (!valid(v) || v <= 0 ? 0 : Math.max(MIN_BAR, v / hi)));
 }
 
-export const BEST_EFFORT_LABELS: Record<string, string> = {
-  "400m": "400 m",
-  "half-mile": "1/2 mile",
-  "1k": "1 km",
-  "1mi": "1 mile",
-  "2mi": "2 mile",
-  "5k": "5 km",
-  "10k": "10 km",
-  "15k": "15 km",
-  "10mi": "10 mile",
-  "20k": "20 km",
-  half: "half marathon",
-  "30k": "30 km",
-  marathon: "marathon",
-};
-
-export function bestEffortLabel(key: string, distM: number): string {
-  return BEST_EFFORT_LABELS[key] ?? (distM >= 1000 ? `${+(distM / 1000).toFixed(1)} km` : `${Math.round(distM)} m`);
+// labels come from site.yaml (pages.activity.metrics.bestEfforts.labels),
+// keyed by effort key; an unknown key falls back to its distance
+export function bestEffortLabel(key: string, distM: number, labels: Readonly<Partial<Record<string, string>>>): string {
+  return labels[key] ?? (distM >= 1000 ? `${+(distM / 1000).toFixed(1)} km` : `${Math.round(distM)} m`);
 }
 
 // pace for an effort covering distM in timeS
@@ -101,9 +88,10 @@ export function effortPaceSPerKm(distM: number, timeS: number): number | null {
   return distM > 0 && timeS > 0 ? (timeS / distM) * 1000 : null;
 }
 
-export function climbCategoryLabel(category: Climb["category"]): string | null {
+// labels.category is a template, "cat {category}"; labels.hc is used as is
+export function climbCategoryLabel(category: Climb["category"], labels: { category: string; hc: string }): string | null {
   if (category === null) return null;
-  return category === "hc" ? "hc" : `cat ${category}`;
+  return category === "hc" ? labels.hc : fill(labels.category, { category });
 }
 
 export function formatGrade(pct: number): string {
@@ -119,13 +107,14 @@ export interface ZoneSlice {
   minutes: number; // whole minutes, rounded
 }
 
-// zones with any time; null when there is nothing to show
-export function zoneSlices(zonesS: number[] | null | undefined): ZoneSlice[] | null {
+// zones with any time; null when there is nothing to show. zoneLabel is a
+// template with the 1-based zone number, "z{n}"
+export function zoneSlices(zonesS: number[] | null | undefined, zoneLabel: string): ZoneSlice[] | null {
   if (!zonesS || zonesS.length === 0) return null;
   const secs = zonesS.map((s) => (valid(s) && s > 0 ? s : 0));
   const total = secs.reduce((a, b) => a + b, 0);
   if (total <= 0) return null;
-  return secs.map((s, i) => ({ label: `z${i + 1}`, seconds: s, fraction: s / total, minutes: Math.round(s / 60) }));
+  return secs.map((s, i) => ({ label: fill(zoneLabel, { n: i + 1 }), seconds: s, fraction: s / total, minutes: Math.round(s / 60) }));
 }
 
 // zone shading: z1 lightest .. z5 darkest, as an opacity of the text colour

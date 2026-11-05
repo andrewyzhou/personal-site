@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  BEST_EFFORT_LABELS,
   MIN_BAR,
   barFractions,
   bestEffortLabel,
@@ -23,6 +22,28 @@ import {
   zoneSlices,
 } from "@/components/activity-metrics/format";
 import { BEST_EFFORT_DISTANCES } from "@/lib/metrics/compute";
+import { BEST_EFFORT_KEYS, type ActivityMetricsContent } from "@/content/site-types";
+
+// copy fixture: the helpers take their labels from site.yaml, these stand in
+const LABELS: Pick<ActivityMetricsContent["bestEfforts"], "labels"> & Pick<ActivityMetricsContent, "climbs" | "zones"> = {
+  labels: {
+    "400m": "400 m",
+    "half-mile": "1/2 mile",
+    "1k": "1 km",
+    "1mi": "1 mile",
+    "2mi": "2 mile",
+    "5k": "5 km",
+    "10k": "10 km",
+    "15k": "15 km",
+    "10mi": "10 mile",
+    "20k": "20 km",
+    half: "half marathon",
+    "30k": "30 km",
+    marathon: "marathon",
+  },
+  climbs: { title: "climbs", climb: "climb", distance: "distance", gain: "gain", grade: "grade avg / max", category: "cat {category}", hc: "hc" },
+  zones: { title: "zones", heartRate: "heart rate", pace: "pace", zone: "z{n}" },
+};
 
 describe("unit conversion", () => {
   it("formats s/km pace as /mi by default and /km on request", () => {
@@ -83,14 +104,17 @@ describe("splits", () => {
 
 describe("labels", () => {
   it("has a human label for every best effort distance", () => {
+    // site.yaml validation requires a label for every BEST_EFFORT_KEYS entry
+    expect(BEST_EFFORT_DISTANCES.map((d) => d.key)).toEqual([...BEST_EFFORT_KEYS]);
+    const labels: Record<string, string> = LABELS.labels;
     for (const { key, distM } of BEST_EFFORT_DISTANCES) {
-      expect(key in BEST_EFFORT_LABELS).toBe(true);
-      expect(bestEffortLabel(key, distM)).toBe(BEST_EFFORT_LABELS[key]);
+      expect(key in labels).toBe(true);
+      expect(bestEffortLabel(key, distM, labels)).toBe(labels[key]);
     }
-    expect(bestEffortLabel("half-mile", 805)).toBe("1/2 mile");
-    expect(bestEffortLabel("half", 21097.5)).toBe("half marathon");
-    expect(bestEffortLabel("unknown", 2500)).toBe("2.5 km");
-    expect(bestEffortLabel("unknown", 600)).toBe("600 m");
+    expect(bestEffortLabel("half-mile", 805, labels)).toBe("1/2 mile");
+    expect(bestEffortLabel("half", 21097.5, labels)).toBe("half marathon");
+    expect(bestEffortLabel("unknown", 2500, labels)).toBe("2.5 km");
+    expect(bestEffortLabel("unknown", 600, labels)).toBe("600 m");
   });
 
   it("effort pace", () => {
@@ -99,9 +123,9 @@ describe("labels", () => {
   });
 
   it("climb categories", () => {
-    expect(climbCategoryLabel("4")).toBe("cat 4");
-    expect(climbCategoryLabel("hc")).toBe("hc");
-    expect(climbCategoryLabel(null)).toBeNull();
+    expect(climbCategoryLabel("4", LABELS.climbs)).toBe("cat 4");
+    expect(climbCategoryLabel("hc", LABELS.climbs)).toBe("hc");
+    expect(climbCategoryLabel(null, LABELS.climbs)).toBeNull();
   });
 
   it("duration labels", () => {
@@ -115,7 +139,7 @@ describe("labels", () => {
 
 describe("zones", () => {
   it("slices by fraction with whole minutes", () => {
-    const z = zoneSlices([60, 180, 0, 360, 600]);
+    const z = zoneSlices([60, 180, 0, 360, 600], LABELS.zones.zone);
     expect(z?.map((s) => s.label)).toEqual(["z1", "z2", "z3", "z4", "z5"]);
     expect(z?.[0].fraction).toBeCloseTo(0.05);
     expect(z?.[4].minutes).toBe(10);
@@ -123,10 +147,10 @@ describe("zones", () => {
   });
 
   it("nothing to show → null", () => {
-    expect(zoneSlices(null)).toBeNull();
-    expect(zoneSlices([])).toBeNull();
-    expect(zoneSlices([0, 0, 0, 0, 0])).toBeNull();
-    expect(zoneSlices([-5, Number.NaN, 0, 0, 0])).toBeNull();
+    expect(zoneSlices(null, LABELS.zones.zone)).toBeNull();
+    expect(zoneSlices([], LABELS.zones.zone)).toBeNull();
+    expect(zoneSlices([0, 0, 0, 0, 0], LABELS.zones.zone)).toBeNull();
+    expect(zoneSlices([-5, Number.NaN, 0, 0, 0], LABELS.zones.zone)).toBeNull();
   });
 
   it("shading increases from z1 to z5", () => {
