@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { archiveZone, normalizeName, normalizePolygon, updateZone, type ZonePatch } from "@/lib/privacy/zones";
+import { archiveZone, purgeZone, normalizeName, normalizePolygon, updateZone, type ZonePatch } from "@/lib/privacy/zones";
 import { countPending, markStaleForZones } from "@/lib/privacy/stale";
 import { bad, failure, parseId, readJson } from "../../http";
 
@@ -45,12 +45,21 @@ export async function PATCH(request: Request, { params }: Ctx) {
   }
 }
 
-// DELETE: archive (restorable from history), never a real delete
+// DELETE: archive (restorable from history). DELETE ?purge=1 on an archived
+// zone removes it and its whole version history for good
 export async function DELETE(request: Request, { params }: Ctx) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return bad("bad id");
+  if (new URL(request.url).searchParams.get("purge") === "1") {
+    try {
+      const { deletedIds } = await purgeZone(id);
+      return NextResponse.json({ ok: true, deletedIds, pending: await countPending() });
+    } catch (error) {
+      return failure("admin:privacy:zones", error);
+    }
+  }
   try {
     const { zone, touched } = await archiveZone(id, { markStale: markStaleForZones });
     // marked before the write (inside the zone lib) and again after it

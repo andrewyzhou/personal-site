@@ -41,6 +41,7 @@ import {
   normalizeName,
   normalizePolygon,
   planRestore,
+  planPurge,
   planUpdate,
   restoreZone,
   ringSelfIntersects,
@@ -287,5 +288,18 @@ describe("io ordering", () => {
     expect(ops[1].values).toMatchObject({ archivedAt: null });
     expect(ops[2].values).toMatchObject({ archivedAt: expect.any(Date) });
     expect(r.touched).toEqual([sq(), sq(0.05)]);
+  });
+});
+
+describe("planPurge", () => {
+  const row = (id: number, replacesId: number | null, archived: boolean) => ({ id, replacesId, archivedAt: archived ? new Date() : null });
+  it("returns every version of a fully archived zone", () => {
+    expect(planPurge([row(1, null, true), row(2, 1, true), row(3, null, false)], 2).sort()).toEqual([1, 2]);
+  });
+  it("refuses while any version is active", () => {
+    expect(() => planPurge([row(1, null, true), row(2, 1, false)], 1)).toThrow(/archive/);
+  });
+  it("404s an unknown id", () => {
+    expect(() => planPurge([row(1, null, true)], 9)).toThrow(/not found/);
   });
 });

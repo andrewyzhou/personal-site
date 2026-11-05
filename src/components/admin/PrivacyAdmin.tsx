@@ -239,6 +239,18 @@ export default function PrivacyAdmin({ coarsenOptions }: { coarsenOptions: numbe
           {archivedGroups.map((g) => (
             <div key={g.rootId} className="card-bg rounded-lg" style={{ padding: "10px 12px" }}>
               <History versions={g.versions} busy={busy} mutate={mutate} />
+              <div className="flex justify-end" style={{ marginTop: "6px" }}>
+                <button
+                  className={smallBtn}
+                  disabled={busy}
+                  onClick={() => {
+                    if (!confirm("delete this zone and all its versions for good? this can't be undone.")) return;
+                    mutate(() => call(`/api/admin/privacy/zones/${g.rootId}?purge=1`, "DELETE"), "zone deleted");
+                  }}
+                >
+                  delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
