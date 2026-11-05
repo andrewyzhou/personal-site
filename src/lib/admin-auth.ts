@@ -12,7 +12,7 @@ export async function isAdminRequest(request: Request): Promise<boolean> {
       // originate from our own site (requests without an origin header — curl,
       // server-side — are fine, they can't ride a victim's cookies)
       const origin = request.headers.get("origin");
-      if (origin && !isAllowedOrigin(origin)) {
+      if (origin && !isAllowedOrigin(origin, request)) {
         return false;
       }
       return true;
@@ -26,12 +26,19 @@ export async function isAdminRequest(request: Request): Promise<boolean> {
   return request.headers.get("x-admin-secret") === secret;
 }
 
-function isAllowedOrigin(origin: string): boolean {
+const CANONICAL_ORIGINS = ["https://www.andrewzhou.org", "https://andrewzhou.org"];
+
+// same-origin check that doesn't depend on NEXT_PUBLIC_SITE_URL alone (that one
+// feeds oauth redirect uris and may point at a loopback address)
+function isAllowedOrigin(origin: string, request: Request): boolean {
+  const allowed = new Set<string>([...CANONICAL_ORIGINS, "http://localhost:3000", "http://127.0.0.1:3000"]);
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
-  const apex = site.replace("://www.", "://");
-  const allowed = new Set(
-    [apex, apex.replace("://", "://www."), "http://localhost:3000"].filter((o) => o && o !== "://www.")
-  );
+  if (site) allowed.add(site);
+  try {
+    allowed.add(new URL(request.url).origin);
+  } catch {
+    // unparsable request url: rely on the fixed list
+  }
   return allowed.has(origin);
 }
 
