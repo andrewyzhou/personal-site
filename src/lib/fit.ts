@@ -7,12 +7,17 @@ import { gunzipSync, unzipSync } from "fflate";
 import { DOMParser } from "@xmldom/xmldom";
 import { gpx as gpxToGeojson, tcx as tcxToGeojson } from "@tmcw/togeojson";
 import { cumulativeDistances, type ComputedStats, type TrackRecord } from "./geo";
+import { fitSportType, freeTextSportType } from "./sport-map";
+import { isSportType, sportFamily, sportNoun, sportTypeLabel } from "./sport-types";
 
 export type TrackFileType = "fit" | "gpx" | "tcx";
 
 export interface ParsedTrackFile {
   fileType: TrackFileType;
-  sportType: string; // strava-style key, matches ACTIVITY_ICONS in ActivityCalendar
+  sportType: string; // a site sport type (src/lib/sport-types.ts)
+  // fit only: the session's sport / sub_sport as decoded (the type's ground truth)
+  fitSport?: string | null;
+  fitSubSport?: string | null;
   startDateUtc: Date;
   utcOffsetMin: number; // 0 when the file carries no local-time info
   hasLocalTime: boolean;
@@ -93,54 +98,19 @@ export function unwrapTrackFile(bytes: Uint8Array, filename: string): UnwrappedT
 }
 
 // ---------------------------------------------------------------------------
-// sport mapping (fit sport/subSport → strava-style keys the calendar already handles)
+// sport mapping (fit sport/subSport → the site's sport types; see sport-map.ts)
 
-export function mapSport(sport?: string, subSport?: string): string {
-  const s = (sport || "").toLowerCase();
-  const ss = (subSport || "").toLowerCase();
-  switch (s) {
-    case "running":
-      if (ss === "trail") return "TrailRun";
-      if (ss === "virtual_activity") return "VirtualRun";
-      return "Run";
-    case "cycling":
-      if (ss === "virtual_activity") return "VirtualRide";
-      if (ss === "mountain") return "MountainBikeRide";
-      if (ss === "gravel_cycling") return "GravelRide";
-      return "Ride";
-    case "swimming":
-      return "Swim";
-    case "walking":
-      return "Walk";
-    case "hiking":
-      return "Hike";
-    case "training":
-      return ss === "strength_training" ? "WeightTraining" : "Workout";
-    case "fitness_equipment":
-      return "Workout";
-    case "yoga":
-      return "Yoga";
-    case "tennis":
-      return "Tennis";
-    case "soccer":
-      return "Soccer";
-    case "rock_climbing":
-      return "RockClimbing";
-    default:
-      return "Workout";
-  }
+export function mapSport(sport?: string | number | null, subSport?: string | number | null): string {
+  return fitSportType(sport, subSport);
 }
 
-const NAME_NOUNS: Record<string, string> = {
-  Run: "run", TrailRun: "trail run", VirtualRun: "run",
-  Ride: "ride", VirtualRide: "ride", MountainBikeRide: "mountain bike ride", GravelRide: "gravel ride",
-  Swim: "swim", Walk: "walk", Hike: "hike",
-  WeightTraining: "lift", Workout: "workout", Yoga: "yoga",
-  Tennis: "tennis", Soccer: "soccer", RockClimbing: "climb",
-};
-
 export function suggestedName(sportType: string, localHour: number): string {
-  const noun = NAME_NOUNS[sportType] ?? "workout";
+  // rides read as "morning ride" / "afternoon gravel ride", not "bike ride"
+  const noun = !isSportType(sportType)
+    ? "workout"
+    : sportFamily(sportType) === "ride"
+      ? sportTypeLabel(sportType)
+      : sportNoun(sportType);
   const bucket =
     localHour < 4 ? "night" : localHour < 12 ? "morning" : localHour < 17 ? "afternoon" : localHour < 21 ? "evening" : "night";
   return `${bucket} ${noun}`;
@@ -199,7 +169,7 @@ function decodeFit(bytes: Uint8Array): ParsedTrackFile {
   // real files) sports are strings and timestamps are Dates
   const session = (messages.sessionMesgs?.[0] ?? {}) as unknown as FitSessionMesg;
   const recordMesgs = (messages.recordMesgs ?? []) as unknown as FitRecordMesg[];
-  const sportType = mapSport(session.sport, session.subSport);
+  const sportType = fitSportType(session.sport, session.subSport);
 
   const withTs = recordMesgs.filter((r): r is FitRecordMesg & { timestamp: Date } => r.timestamp instanceof Date);
   const t0 = withTs.length > 0 ? withTs[0].timestamp.getTime() : session.startTime?.getTime();
@@ -272,6 +242,8 @@ function decodeFit(bytes: Uint8Array): ParsedTrackFile {
   return {
     fileType: "fit",
     sportType,
+    fitSport: session.sport === undefined ? null : String(session.sport),
+    fitSubSport: session.subSport === undefined ? null : String(session.subSport),
     startDateUtc,
     utcOffsetMin,
     hasLocalTime,
@@ -344,8 +316,8 @@ function decodeXml(bytes: Uint8Array, fileType: "gpx" | "tcx"): ParsedTrackFile 
     throw new Error(`could not extract a timed track from the ${fileType} file`);
   }
 
-  // gpx <type> is free text; map a few common strava values
-  const sportType = mapGpxType(sportRaw);
+  // gpx/tcx <type> is free text (some exporters write numeric codes)
+  const sportType = freeTextSportType(sportRaw);
   const startDateUtc = new Date(t0);
   const cumDist = cumulativeDistances(records);
 
@@ -361,19 +333,6 @@ function decodeXml(bytes: Uint8Array, fileType: "gpx" | "tcx"): ParsedTrackFile 
     kilojoules: null,
     suggestedName: suggestedName(sportType, startDateUtc.getUTCHours()),
   };
-}
-
-function mapGpxType(raw: string): string {
-  const t = raw.toLowerCase();
-  if (t.includes("run")) return "Run";
-  if (t.includes("rid") || t.includes("bike") || t.includes("cycl")) return "Ride";
-  if (t.includes("swim")) return "Swim";
-  if (t.includes("hik")) return "Hike";
-  if (t.includes("walk")) return "Walk";
-  // strava gpx exports use numeric codes for some types; "9" is run, "1" ride
-  if (t === "9") return "Run";
-  if (t === "1") return "Ride";
-  return "Workout";
 }
 
 // ---------------------------------------------------------------------------

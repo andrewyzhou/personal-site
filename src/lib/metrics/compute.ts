@@ -3,6 +3,7 @@
 // effort, curve window, climb) bridges a fog or cut gap between segments.
 
 import { sportLimits } from "../cleaning/sport";
+import { typesInFamily } from "../sport-types";
 import type {
   ActivityMetrics,
   BestEffort,
@@ -20,8 +21,9 @@ const ELEV_HYSTERESIS_M = 2; // ignore wiggles smaller than this
 const GRADE_HALF_WINDOW_M = 20; // grade over ~40 m of smoothed elevation
 const GRADE_CLAMP = 0.45;
 
-const FOOT_SPORTS: ReadonlySet<string> = new Set(["Run", "TrailRun", "VirtualRun", "Walk", "Hike"]);
-const RIDE_SPORTS: ReadonlySet<string> = new Set(["Ride", "VirtualRide", "MountainBikeRide", "GravelRide", "EBikeRide"]);
+// by sport family: every run/walk/hike variant is foot, every ride variant a ride
+const FOOT_SPORTS: ReadonlySet<string> = new Set(typesInFamily("run", "walk", "hike"));
+const RIDE_SPORTS: ReadonlySet<string> = new Set(typesInFamily("ride"));
 
 export const KM_M = 1000;
 export const MILE_M = 1609.344;

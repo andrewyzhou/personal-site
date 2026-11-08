@@ -8,6 +8,7 @@
 import { haversineM } from "../geo";
 import type { CanonicalTrack } from "../canonical-track";
 import { SNOW_SPORTS, isKnownSport, sportLimits, type SportLimits } from "./sport";
+import { typesInFamily } from "../sport-types";
 import type { Suggestion } from "./types";
 
 const GAP_S = 10; // longer steps are recording gaps (auto-pause, lost signal)
@@ -46,15 +47,16 @@ const DRIFT_MAX_P90 = 1.4; // m/s, 90th percentile of 10 s displacement speed
 const UNKNOWN_SPORT_MAX_CONF = 0.89;
 
 // running sports: walking isn't the activity (forgot-to-stop tails walk home)
-const WALK_MAX: Record<string, number> = { Run: 1.9, TrailRun: 1.9, VirtualRun: 1.9 };
-const CYCLING = new Set(["Ride", "VirtualRide", "MountainBikeRide", "GravelRide", "EBikeRide"]);
-const VIRTUAL = new Set(["VirtualRun", "VirtualRide"]);
+const WALK_MAX: Record<string, number> = Object.fromEntries(typesInFamily("run").map((k) => [k, 1.9]));
+const CYCLING: ReadonlySet<string> = new Set(typesInFamily("ride"));
+// indoor machines and virtual worlds: no real vehicle stretches
+const VIRTUAL: ReadonlySet<string> = new Set(["VirtualRun", "VirtualRide", "TreadmillRun", "IndoorRide", "VirtualRow", "VirtualSki"]);
 // no meaningful movement: motion detectors stay quiet
-const STATIONARY = new Set([
-  "WeightTraining", "Workout", "Yoga", "Pilates", "Crossfit", "HighIntensityIntervalTraining",
-  "Elliptical", "StairStepper",
+const STATIONARY: ReadonlySet<string> = new Set([
+  ...typesInFamily("strength", "cardio", "mind"),
+  "IndoorClimbing", "Bouldering",
 ]);
-const INDOOR = new Set([...STATIONARY, "VirtualRun", "VirtualRide"]);
+const INDOOR: ReadonlySet<string> = new Set([...STATIONARY, ...VIRTUAL]);
 
 // step classes
 const STOP = 0;
@@ -84,7 +86,7 @@ const formatDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `
 const kmh = (ms: number) => `${Math.round(ms * 3.6)} km/h`;
 
 function noun(sportType: string): string {
-  if (sportType === "Run" || sportType === "TrailRun" || sportType === "VirtualRun") return "run";
+  if (WALK_MAX[sportType] !== undefined) return "run";
   if (CYCLING.has(sportType)) return "ride";
   if (sportType === "Walk") return "walk";
   if (sportType === "Hike") return "hike";
