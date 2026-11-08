@@ -24,3 +24,4 @@ full license texts live next to the vendored copies.
 - source: https://github.com/yuhonas/free-exercise-db
 - license: Unlicense (public domain dedication)
 - license text: `packages/lift-core/vendor/free-exercise-db/LICENSE.md`
+
