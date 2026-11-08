@@ -2,7 +2,7 @@
   "name": "lift-core",
   "version": "0.1.0",
   "private": true,
-  "description": "pure typescript core for the lift app: workout share-text parser, exercise catalog, search, e1rm/volume and muscle-load math",
+  "description": "pure typescript core for lifting: workout share-text and csv parsers, exercise catalog, search, linking, e1rm/volume and muscle-load math",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "sideEffects": false,

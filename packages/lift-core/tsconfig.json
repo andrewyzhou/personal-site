@@ -1,5 +1,5 @@
 {
-  // lift-core must stay runtime-agnostic (expo, next, node scripts): no dom or
+  // lift-core must stay runtime-agnostic (next, node scripts): no dom or
   // node types are visible to the library sources. tests run under vitest from
   // the repo root and are typechecked by the root tsconfig instead.
   "compilerOptions": {

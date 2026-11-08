@@ -18,8 +18,6 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
-      // the expo app lints/typechecks with its own config
-      "apps/**",
     ],
   },
 ];

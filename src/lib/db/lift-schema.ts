@@ -12,12 +12,11 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import { isNotNull } from "drizzle-orm";
-import type { ProgramData } from "lift-core";
 import { activities } from "./schema";
 
 // lifting tracker. text primary keys everywhere: ids are derived from content
 // (share link slug, sha of the raw share) so an ingest is a single db.batch
-// with no id round-trips, and the phone app can later push its own uuids.
+// with no id round-trips.
 
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow();
@@ -30,15 +29,6 @@ export interface LiftWarning {
   text: string;
 }
 
-export interface PlannedSet {
-  kind?: string;
-  weight?: number | null;
-  unit?: string | null;
-  reps?: number | null;
-  durationS?: number | null;
-  distanceM?: number | null;
-}
-
 export const exercises = pgTable("exercises", {
   // lift-core catalog slug, or "custom-<hash of normalized name>"
   id: text("id").primaryKey(),
@@ -48,7 +38,6 @@ export const exercises = pgTable("exercises", {
   tracking: text("tracking").notNull().default("weight_reps"),
   source: text("source").notNull(), // 'catalog' | 'import' | 'app'
   isCustom: boolean("is_custom").notNull().default(false),
-  archived: boolean("archived").notNull().default(false),
   freeDbId: text("free_db_id"),
   // set when a custom exercise is folded into another one; rows keep pointing here
   mergedInto: text("merged_into"),
@@ -81,48 +70,6 @@ export const exerciseMuscles = pgTable(
     role: text("role").notNull(), // 'primary' | 'secondary'
   },
   (t) => [primaryKey({ columns: [t.exerciseId, t.region] })]
-);
-
-export const liftTemplateFolders = pgTable("lift_template_folders", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  position: integer("position").notNull().default(0),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
-
-export const liftTemplates = pgTable("lift_templates", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  // legacy free-text folder; the app uses folder_id
-  folder: text("folder"),
-  folderId: text("folder_id").references(() => liftTemplateFolders.id, { onDelete: "set null" }),
-  notes: text("notes"),
-  position: integer("position").notNull().default(0),
-  archived: boolean("archived").notNull().default(false),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
-
-export const liftTemplateExercises = pgTable(
-  "lift_template_exercises",
-  {
-    id: text("id").primaryKey(),
-    templateId: text("template_id")
-      .notNull()
-      .references(() => liftTemplates.id, { onDelete: "cascade" }),
-    exerciseId: text("exercise_id")
-      .notNull()
-      .references(() => exercises.id),
-    position: integer("position").notNull().default(0),
-    plannedSets: jsonb("planned_sets").$type<PlannedSet[]>().notNull().default([]),
-    notes: text("notes"),
-    supersetGroup: integer("superset_group"),
-    restS: integer("rest_s"),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [index("lift_template_exercises_template_idx").on(t.templateId, t.position)]
 );
 
 export const liftIngests = pgTable(
@@ -161,8 +108,6 @@ export const liftWorkouts = pgTable(
     notes: text("notes"),
     source: text("source").notNull(), // 'share-text' | 'workout-csv' | 'app'
     status: text("status").notNull().default("finished"), // 'active' | 'finished' | 'discarded'
-    // soft pointer: templates can be deleted without touching history
-    templateId: text("template_id"),
     latestIngestId: text("latest_ingest_id"),
     shareSlug: text("share_slug"),
     workingSets: integer("working_sets").notNull().default(0),
@@ -194,7 +139,6 @@ export const liftWorkoutExercises = pgTable(
     notes: text("notes"),
     supersetGroup: integer("superset_group"),
     restS: integer("rest_s"),
-    // phone pushes are last-write-wins on updated_at
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -252,58 +196,12 @@ export const liftWorkoutActivities = pgTable(
   ]
 );
 
-export const liftBodyweights = pgTable(
-  "lift_bodyweights",
-  {
-    id: text("id").primaryKey(),
-    measuredAt: timestamp("measured_at", { withTimezone: true, mode: "date" }).notNull(),
-    weight: doublePrecision("weight").notNull(),
-    unit: text("unit").notNull(), // 'lb' | 'kg'
-    note: text("note"),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [index("lift_bodyweights_measured_at_idx").on(t.measuredAt)]
-);
-
-// training programs from the phone. data is lift-core's ProgramData; the
-// template ids inside it aren't foreign keys, so deleting a template never
-// blocks or cascades into a program
-export const liftPrograms = pgTable("lift_programs", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  data: jsonb("data").$type<ProgramData>().notNull(),
-  active: boolean("active").notNull().default(false),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
-
-// one row per phone outbox entry seen, so a retried push is a no-op
-export const liftSyncLog = pgTable(
-  "lift_sync_log",
-  {
-    deviceId: text("device_id").notNull(),
-    seq: bigint("seq", { mode: "number" }).notNull(),
-    entity: text("entity").notNull(),
-    entityId: text("entity_id").notNull(),
-    op: text("op").notNull(),
-    appliedAt: timestamp("applied_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-    // reason when the server refused the mutation
-    rejected: text("rejected"),
-  },
-  (t) => [primaryKey({ columns: [t.deviceId, t.seq] })]
-);
-
-export type ExerciseRow =typeof exercises.$inferSelect;
+export type ExerciseRow = typeof exercises.$inferSelect;
 export type NewExerciseRow = typeof exercises.$inferInsert;
 export type ExerciseAliasRow = typeof exerciseAliases.$inferSelect;
 export type NewExerciseAliasRow = typeof exerciseAliases.$inferInsert;
 export type ExerciseMuscleRow = typeof exerciseMuscles.$inferSelect;
 export type NewExerciseMuscleRow = typeof exerciseMuscles.$inferInsert;
-export type LiftTemplateRow = typeof liftTemplates.$inferSelect;
-export type NewLiftTemplateRow = typeof liftTemplates.$inferInsert;
-export type LiftTemplateExerciseRow = typeof liftTemplateExercises.$inferSelect;
-export type NewLiftTemplateExerciseRow = typeof liftTemplateExercises.$inferInsert;
 export type LiftIngestRow = typeof liftIngests.$inferSelect;
 export type NewLiftIngestRow = typeof liftIngests.$inferInsert;
 export type LiftWorkoutRow = typeof liftWorkouts.$inferSelect;
@@ -314,11 +212,3 @@ export type LiftSetRow = typeof liftSets.$inferSelect;
 export type NewLiftSetRow = typeof liftSets.$inferInsert;
 export type LiftWorkoutActivityRow = typeof liftWorkoutActivities.$inferSelect;
 export type NewLiftWorkoutActivityRow = typeof liftWorkoutActivities.$inferInsert;
-export type LiftTemplateFolderRow = typeof liftTemplateFolders.$inferSelect;
-export type NewLiftTemplateFolderRow = typeof liftTemplateFolders.$inferInsert;
-export type LiftBodyweightRow = typeof liftBodyweights.$inferSelect;
-export type NewLiftBodyweightRow = typeof liftBodyweights.$inferInsert;
-export type LiftSyncLogRow = typeof liftSyncLog.$inferSelect;
-export type NewLiftSyncLogRow = typeof liftSyncLog.$inferInsert;
-export type LiftProgramRow = typeof liftPrograms.$inferSelect;
-export type NewLiftProgramRow = typeof liftPrograms.$inferInsert;

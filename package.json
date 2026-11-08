@@ -3,8 +3,7 @@
   "version": "3.0.0",
   "private": true,
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "packages/*"
   ],
   "scripts": {
     "dev": "next dev --turbopack",
@@ -60,7 +59,6 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "csv-parse": "^7.0.1",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "15.1.7",

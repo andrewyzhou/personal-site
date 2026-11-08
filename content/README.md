@@ -19,7 +19,7 @@ appears on the site, it comes from one of the sources below.
 | library entries | `library/*.mdx` (drafts in `library/wip/`) | cms | `src/lib/library.ts` |
 | photo sets and essays | `photos/*.yaml` + images in `public/photos/` or r2 | cms / admin | `src/lib/photos.ts` |
 | activities, activity photos | postgres `activities`, `activity_photos` | sync + admin | `src/lib/public-activity.ts`, `/api/activities*` |
-| lift workouts | postgres `lift_*` tables | lift app sync | `src/lib/lift/public.ts` |
+| lift workouts | postgres `lift_*` tables | share-text ingest, telegram bot, csv import | `src/lib/lift/public.ts` |
 | live "currently" data | spotify, literal, github, leetcode APIs (redis-cached) | — | `/api/spotify`, `/api/literal`, `/api/github`, `/api/github/leetcode` |
 
 ## rules

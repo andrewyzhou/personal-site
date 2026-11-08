@@ -12,7 +12,7 @@ import {
   type WorkoutCsvResult,
   type WeightUnit,
 } from "lift-core";
-import { partitionCsvWorkouts, planCsvWorkouts, type ExistingWorkoutKey, type PresentReason } from "./sync/workout-csv";
+import { partitionCsvWorkouts, planCsvWorkouts, type ExistingWorkoutKey, type PresentReason } from "./workout-csv";
 import { addDays } from "./time";
 
 // pure half of the workout csv backfill report (scripts/lift-import-workout-csv.ts).

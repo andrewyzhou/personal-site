@@ -1,6 +1,6 @@
 import { nameKey, sha256Hex, type ParsedWorkout } from "lift-core";
 import type { LiftWarning, NewLiftIngestRow } from "@/lib/db/lift-schema";
-import { EDIT_OVERLAP, MAX_EXERCISES, MAX_SETS, planParsedWorkout, type IngestSummary, type WorkoutPlan } from "../plan";
+import { EDIT_OVERLAP, MAX_EXERCISES, MAX_SETS, planParsedWorkout, type IngestSummary, type WorkoutPlan } from "./plan";
 
 // pure half of the one-time workout csv import (scripts/lift-import-workout-csv.ts).
 // a csv workout is "already present" when a stored workout starts the same

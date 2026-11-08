@@ -27,7 +27,6 @@ function wRow(p: Partial<WorkoutRowIn> & Pick<WorkoutRowIn, "id" | "title" | "st
     notes: null,
     source: "share-text",
     status: "finished",
-    templateId: null,
     workingSets: 0,
     volumeKg: 0,
     ...p,

@@ -16,7 +16,7 @@ import { exercises, getDb, liftSets, liftWorkoutExercises, liftWorkouts } from "
 //   workouts: [{
 //     id, title,
 //     startedLocal: 'YYYY-MM-DDTHH:MM' wall clock, startedAt/endedAt: iso or null,
-//     durationS, notes, source, status ('active' | 'finished' | 'discarded'), templateId,
+//     durationS, notes, source, status ('active' | 'finished' | 'discarded'),
 //     workingSets, volumeKg,
 //     exercises: [{
 //       exerciseId, name (canonical), nameRaw (as logged), position, notes, supersetGroup, restS,
@@ -68,7 +68,6 @@ export interface ExportWorkout {
   notes: string | null;
   source: string;
   status: string;
-  templateId: string | null;
   workingSets: number;
   volumeKg: number;
   exercises: ExportExercise[];
@@ -318,7 +317,6 @@ export async function loadExportWorkouts(): Promise<ExportWorkout[]> {
         notes: liftWorkouts.notes,
         source: liftWorkouts.source,
         status: liftWorkouts.status,
-        templateId: liftWorkouts.templateId,
         workingSets: liftWorkouts.workingSets,
         volumeKg: liftWorkouts.volumeKg,
       })
