@@ -17,7 +17,7 @@ import {
   dedupeKey,
   partitionCsvWorkouts,
   planCsvWorkouts,
-} from "@/lib/lift/sync/workout-csv";
+} from "@/lib/lift/workout-csv";
 
 // what parseWorkoutCsv returns for a tiny export (the parser itself is tested in lift-core)
 const CSV = `Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE

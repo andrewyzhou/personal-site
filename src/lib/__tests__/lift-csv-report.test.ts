@@ -17,7 +17,7 @@ import {
   simulateLinks,
   type ActivityRow,
 } from "@/lib/lift/csv-report";
-import { partitionCsvWorkouts } from "@/lib/lift/sync/workout-csv";
+import { partitionCsvWorkouts } from "@/lib/lift/workout-csv";
 
 const dir = join(__dirname, "fixtures", "workout-export");
 const MAIN = readFileSync(join(dir, "workouts.csv"), "utf8");

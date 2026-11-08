@@ -1,11 +1,8 @@
-// engagement plumbing: target validation, ip hashing, redis fixed-window rate
-// limiting, and the comment filter chain (word blocklist, link cap, lengths,
-// honeypot, dedupe). simple filtering by design — no llm, no approval queue.
+// engagement plumbing for claps and views: target validation, ip hashing and
+// redis fixed-window rate limiting.
 
 import { createHash } from "crypto";
 import { Redis } from "@upstash/redis";
-import { and, eq, gte } from "drizzle-orm";
-import { getDb, comments } from "./db";
 import { log } from "./log";
 
 const redis = new Redis({
@@ -46,50 +43,6 @@ export async function rateLimit(bucket: string, key: string, limit: number, wind
     log.warn("engagement", "rate limiter unavailable, allowing", error);
     return true;
   }
-}
-
-// small blocklist for obvious junk; post-hoc moderation handles the rest
-const BLOCKED_WORDS = [
-  "viagra", "cialis", "casino", "porn", "xxx", "crypto giveaway", "airdrop",
-  "onlyfans", "escort", "loan approval", "work from home", "earn $$",
-];
-
-const MAX_BODY = 2000;
-const MIN_BODY = 2;
-const MAX_NAME = 40;
-const MAX_LINKS = 1;
-
-export interface CommentInput {
-  body: string;
-  authorName: string;
-  honeypot: string; // must be empty — bots fill every field
-}
-
-export function filterComment(input: CommentInput): string | null {
-  if (input.honeypot.trim() !== "") return "rejected"; // silent bot trap
-  const body = input.body.trim();
-  if (body.length < MIN_BODY) return "comment is too short";
-  if (body.length > MAX_BODY) return `comment is too long (max ${MAX_BODY} characters)`;
-  if (input.authorName.trim().length > MAX_NAME) return "name is too long";
-  const lower = body.toLowerCase();
-  if (BLOCKED_WORDS.some((w) => lower.includes(w))) return "comment contains blocked words";
-  const links = (body.match(/https?:\/\//g) ?? []).length;
-  if (links > MAX_LINKS) return `max ${MAX_LINKS} link per comment`;
-  return null;
-}
-
-// same body on the same target within 10 minutes = double-post / spam
-export async function isDuplicateComment(
-  targetType: string,
-  targetSlug: string,
-  body: string
-): Promise<boolean> {
-  const since = new Date(Date.now() - 10 * 60 * 1000);
-  const recent = await getDb()
-    .select({ body: comments.body })
-    .from(comments)
-    .where(and(eq(comments.targetType, targetType), eq(comments.targetSlug, targetSlug), gte(comments.createdAt, since)));
-  return recent.some((r) => r.body === body);
 }
 
 export const CLAPS_PER_IP_PER_DAY = 100;

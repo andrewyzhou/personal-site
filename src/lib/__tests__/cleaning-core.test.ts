@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { applyCleaning, hasCleaning, mergeTargets, validateCleaningEdit } from "../cleaning/edits";
 import { cleanedStats, hrZoneSeconds, rawStatsOf, smoothedElevationGain } from "../cleaning/stats";
-import { DEFAULT_ACTIVITY_SETTINGS, normalizeActivitySettings } from "../cleaning/settings";
+import { DEFAULT_ACTIVITY_SETTINGS } from "../cleaning/settings";
 import { CANONICAL_FORMAT_VERSION, canonicalToParsed, type CanonicalTrack } from "../canonical-track";
 import { decodeMultiPolyline } from "../polyline";
 import { DEFAULT_PRIVACY_SETTINGS } from "../privacy/settings";
@@ -156,17 +156,6 @@ describe("cleaned stats", () => {
     const p = canonicalToParsed(t);
     expect(rawStatsOf(t.session, p.records, p.cumDist).movingTimeS).toBe(599);
     expect(rawStatsOf(null, p.records, p.cumDist).distanceM).toBeCloseTo(t.columns.dist[599], 6);
-  });
-
-  it("settings normalize", () => {
-    expect(normalizeActivitySettings(null)).toEqual(DEFAULT_ACTIVITY_SETTINGS);
-    expect(normalizeActivitySettings({ hrMaxBpm: 300, hrZonePcts: [0.9, 0.8, 0.7, 0.6], autoApply: { enabled: true, minConfidence: 0.95 } })).toEqual({
-      ...DEFAULT_ACTIVITY_SETTINGS,
-      autoApply: { enabled: true, minConfidence: 0.95 },
-    });
-    // metrics inputs: kept when sane, null otherwise
-    expect(normalizeActivitySettings({ hrRestBpm: 52, thresholdPaceSPerKm: 270 })).toMatchObject({ hrRestBpm: 52, thresholdPaceSPerKm: 270 });
-    expect(normalizeActivitySettings({ hrRestBpm: 5, thresholdPaceSPerKm: "fast" })).toMatchObject({ hrRestBpm: null, thresholdPaceSPerKm: null });
   });
 });
 

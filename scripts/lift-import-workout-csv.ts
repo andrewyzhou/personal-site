@@ -20,7 +20,7 @@ import {
 } from "../src/lib/lift/csv-report";
 import { buildWorkoutWrites, loadMergeRedirects } from "../src/lib/lift/ingest";
 import { linkWorkout } from "../src/lib/lift/link";
-import { csvIngestRow, planCsvWorkouts, type ExistingWorkoutKey } from "../src/lib/lift/sync/workout-csv";
+import { csvIngestRow, planCsvWorkouts, type ExistingWorkoutKey } from "../src/lib/lift/workout-csv";
 
 const WORKOUTS_PER_BATCH = 10;
 // keeps each IN (...) list well under postgres' parameter cap

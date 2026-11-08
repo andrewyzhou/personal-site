@@ -1,7 +1,7 @@
 // every request the clean page makes, in one place so field names are easy to
 // adjust against the server
 
-import type { ActivitySettingsShape, Bounds, EditRow, SuggestionRow } from "@/lib/cleaning/ui-format";
+import type { Bounds, EditRow, SuggestionRow } from "@/lib/cleaning/ui-format";
 
 export interface CleaningTrack {
   t: number[];
@@ -128,14 +128,4 @@ export async function splitActivity(id: number, atS: number): Promise<number> {
 export async function mergeActivity(id: number, otherId: number): Promise<number> {
   const j = await call(`${base(id)}/merge`, "POST", { otherId });
   return j.targetId;
-}
-
-export async function getActivitySettings(): Promise<ActivitySettingsShape> {
-  const j = await call("/api/admin/activity-settings", "GET");
-  return j.settings;
-}
-
-export async function saveActivitySettings(settings: ActivitySettingsShape): Promise<ActivitySettingsShape> {
-  const j = await call("/api/admin/activity-settings", "POST", settings);
-  return j.settings;
 }

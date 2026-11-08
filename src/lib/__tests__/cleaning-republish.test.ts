@@ -77,7 +77,7 @@ function deps(over: Partial<RepublishDeps> = {}): RepublishDeps {
       writes.push({ id, values });
       Object.assign(rows.get(id)!, values);
     },
-    loadActivitySettings: async () => ({ ...DEFAULT_ACTIVITY_SETTINGS, autoApply: { enabled: true, minConfidence: 0.9 } }),
+    activitySettingsOverride: async () => ({ ...DEFAULT_ACTIVITY_SETTINGS, autoApply: { enabled: true, minConfidence: 0.9 } }),
     recordSuggestions: async (id, suggestions, min) => {
       recorded.push({ id, suggestions, min });
       return autoApplyResult;

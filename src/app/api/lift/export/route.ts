@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { bearerMatches } from "@/lib/lift/auth";
+import { requireAdmin } from "@/lib/admin-auth";
 import { ExportTooLargeError, chunkStream, exportJsonChunks, loadExportWorkouts, workoutCsvLines } from "@/lib/lift/export";
 import { liftTimezone, utcToLocal } from "@/lib/lift/time";
 import { log } from "@/lib/log";
@@ -7,12 +7,12 @@ import { log } from "@/lib/log";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET /api/lift/export?format=csv|json (default csv). owner only: the app token.
-// not the ingest token: that one lives in a shortcut and only needs to write.
+// GET /api/lift/export?format=csv|json (default csv). owner only: the admin
+// session or the admin secret header. never the ingest token: that one lives in
+// a shortcut and only needs to write.
 export async function GET(request: Request) {
-  if (!bearerMatches(request.headers.get("authorization"), process.env.LIFT_APP_TOKEN)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   const format = (new URL(request.url).searchParams.get("format") ?? "csv").toLowerCase();
   if (format !== "csv" && format !== "json") {
     return NextResponse.json({ ok: false, error: "format must be csv or json" }, { status: 400 });

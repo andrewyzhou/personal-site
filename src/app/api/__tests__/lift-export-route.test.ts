@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { load } = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/lib/db", () => ({}));
+// no google session in tests: only the admin secret header can get in
+vi.mock("@/lib/auth", () => ({ getSessionUser: async () => null }));
 vi.mock("@/lib/lift/export", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/lift/export")>();
   return { ...actual, loadExportWorkouts: () => load() };
@@ -20,7 +22,6 @@ const WORKOUT: ExportWorkout = {
   notes: "private note",
   source: "share-text",
   status: "finished",
-  templateId: null,
   workingSets: 1,
   volumeKg: 419.6,
   exercises: [
@@ -53,9 +54,10 @@ const WORKOUT: ExportWorkout = {
   ],
 };
 
-function req(query: string, token: string | null = "app-token") {
+function req(query: string, secret: string | null = "admin-secret", bearer?: string) {
   const headers: Record<string, string> = {};
-  if (token) headers.authorization = `Bearer ${token}`;
+  if (secret !== null) headers["x-admin-secret"] = secret;
+  if (bearer) headers.authorization = `Bearer ${bearer}`;
   return new Request(`http://localhost/api/lift/export${query}`, { headers });
 }
 
@@ -64,25 +66,25 @@ describe("GET /api/lift/export", () => {
     vi.clearAllMocks();
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-05T03:00:00Z"));
-    process.env.LIFT_APP_TOKEN = "app-token";
+    process.env.ADMIN_API_SECRET = "admin-secret";
     process.env.LIFT_INGEST_TOKEN = "ingest-token";
     process.env.LIFT_TIMEZONE = "America/Los_Angeles";
     load.mockResolvedValue([WORKOUT]);
   });
 
-  it("401s without a valid token and never loads", async () => {
+  it("401s without the admin secret and never loads", async () => {
     expect((await GET(req("?format=csv", null))).status).toBe(401);
     expect((await GET(req("?format=csv", "nope"))).status).toBe(401);
-    delete process.env.LIFT_APP_TOKEN;
-    expect((await GET(req("?format=csv", "app-token"))).status).toBe(401);
-    // an unset app token never matches an empty bearer
+    delete process.env.ADMIN_API_SECRET;
+    expect((await GET(req("?format=csv", "admin-secret"))).status).toBe(401);
+    // an unset secret never matches an empty header
     expect((await GET(req("?format=csv", ""))).status).toBe(401);
     expect(load).not.toHaveBeenCalled();
   });
 
-  it("accepts only the app token, not the ingest token", async () => {
-    expect((await GET(req("?format=csv", "app-token"))).status).toBe(200);
-    expect((await GET(req("?format=csv", "ingest-token"))).status).toBe(401);
+  it("accepts only the admin secret, not the ingest token", async () => {
+    expect((await GET(req("?format=csv"))).status).toBe(200);
+    expect((await GET(req("?format=csv", null, "ingest-token"))).status).toBe(401);
     expect((await GET(req("?format=json", "ingest-token"))).status).toBe(401);
     expect(load).toHaveBeenCalledTimes(1);
   });

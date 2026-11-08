@@ -69,7 +69,7 @@ export async function loadPublishContext(
   const [allZones, settings, activity] = await Promise.all([
     deps.loadZones(),
     deps.loadSettings ? deps.loadSettings() : Promise.resolve(DEFAULT_PRIVACY_SETTINGS),
-    deps.loadActivitySettings ? deps.loadActivitySettings() : Promise.resolve(DEFAULT_ACTIVITY_SETTINGS),
+    deps.activitySettingsOverride ? deps.activitySettingsOverride() : Promise.resolve(DEFAULT_ACTIVITY_SETTINGS),
   ]);
   const merged: MergedPart[] = [];
   for (const otherId of mergeTargets(edits)) {

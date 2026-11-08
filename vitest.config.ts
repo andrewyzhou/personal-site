@@ -7,7 +7,6 @@ export default defineConfig({
     include: [
       "src/**/__tests__/**/*.test.ts",
       "packages/*/src/**/__tests__/**/*.test.ts",
-      "apps/*/src/**/__tests__/**/*.test.ts",
     ],
   },
   resolve: {

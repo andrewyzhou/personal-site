@@ -56,7 +56,7 @@ import {
 import { CLEANING_EDIT_KINDS, applyCleaning, effectiveCropWindow, mergeTargets, type MergedPart } from "./cleaning/edits";
 import { isKnownSport } from "./cleaning/sport";
 import { cleanedStats, hrZoneSeconds, rawStatsOf } from "./cleaning/stats";
-import { DEFAULT_ACTIVITY_SETTINGS, loadActivitySettings } from "./cleaning/settings";
+import { DEFAULT_ACTIVITY_SETTINGS } from "./cleaning/settings";
 import { detectSuggestions } from "./cleaning/detect";
 import { DETECTOR_VERSION, type Suggestion } from "./cleaning/types";
 import { buildReplay, type ReplayData } from "./replay/build";
@@ -616,7 +616,8 @@ export interface RepublishDeps {
   loadSettings?(): Promise<PrivacySettings>;
   loadPhotos?(id: number): Promise<PhotoInput[]>;
   writePhotoPins?(id: number, pins: PhotoPin[]): Promise<void>;
-  loadActivitySettings?(): Promise<ActivitySettings>;
+  // test seam only: production has no override and runs on DEFAULT_ACTIVITY_SETTINGS
+  activitySettingsOverride?(): Promise<ActivitySettings>;
   // store detector output (insert-only per fingerprint); when autoApplyMin is
   // set, open suggestions at/above it become edits — returns those edits
   recordSuggestions?(
@@ -709,7 +710,7 @@ export async function republish(activityId: number, opts: RepublishOptions = {})
     edits = edits.map((e) => (e === synthesized ? { ...e, id } : e));
   }
 
-  const activity = deps.loadActivitySettings ? await deps.loadActivitySettings() : DEFAULT_ACTIVITY_SETTINGS;
+  const activity = deps.activitySettingsOverride ? await deps.activitySettingsOverride() : DEFAULT_ACTIVITY_SETTINGS;
   // activities merged into this one: their best track source is an input too
   const merges: { id: number; row: ActivityRow; ref: TrackRef; edits: EditInput[] }[] = [];
   for (const otherId of mergeTargets(edits)) {
@@ -948,7 +949,6 @@ export function defaultDeps(): RepublishDeps {
       }
       await db.update(activities).set(set).where(eq(activities.id, id));
     },
-    loadActivitySettings,
     async writeReplay(id, data) {
       await db
         .insert(activityReplays)

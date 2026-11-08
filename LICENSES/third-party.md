@@ -6,7 +6,7 @@ full license texts live next to the vendored copies.
 ## react-native-body-highlighter (body figure art)
 
 - used in: `packages/lift-core/src/body.ts` (`BODY_FIGURES`, the front/back
-  muscle figure on the site and in the lift app), converted from
+  muscle figure on the site), converted from
   `packages/lift-core/vendor/body-map/react-native-body-highlighter/`
 - source: https://github.com/HichamELBSI/react-native-body-highlighter, npm
   `react-native-body-highlighter@3.2.0`
