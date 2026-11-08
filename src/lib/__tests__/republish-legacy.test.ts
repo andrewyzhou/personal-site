@@ -44,7 +44,7 @@ function legacyRow(over: Partial<LegacyActivityRow> = {}): LegacyActivityRow {
   };
 }
 
-// a row exactly as the legacy pipeline (import-strava-archive / upload) wrote it
+// a row exactly as the legacy pipeline (the old archive import / upload) wrote it
 function legacyPublishedRow(trimStartM: number, trimEndM: number): LegacyActivityRow {
   const parsed = parseTrackFile(inner, "x.fit");
   const pub = computePublished(parsed, trimStartM, trimEndM);

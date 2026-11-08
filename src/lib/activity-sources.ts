@@ -1,4 +1,4 @@
-// helpers shared by every ingest path (upload, intervals.icu, archive imports,
+// helpers shared by every ingest path (upload, intervals.icu,
 // scripts): store raw inputs, link them to activities as sources, record edits.
 // all writes are insert-only and idempotent. server-only.
 
@@ -10,8 +10,8 @@ import { getRawStore, isRawStoreConfigured, sha256Hex, type RawKind } from "./ra
 import { r2Head, r2Put, r2PublicUrl } from "./r2";
 
 // stored provider/kind names. "strava" and the "strava-*" kinds are what the
-// archive imports and the retired api sync wrote; rows keep them, and only
-// the offline archive import scripts still write them.
+// archive imports and the retired api sync wrote; rows keep them and republish
+// still reads them.
 export type SourceProvider = "strava" | "intervals-icu" | "upload" | "manual";
 export type SourceKind =
   | "device-file"

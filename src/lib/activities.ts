@@ -1,6 +1,6 @@
 // shared activity pipeline: trim + stat recompute + polylines + row mapping +
-// idempotent insert. used by the parse/publish/edit routes, the archive import
-// script, and the future intervals.icu pull. server-only (node crypto).
+// idempotent insert. used by the parse/publish/edit routes and the
+// intervals.icu import. server-only (node crypto).
 
 import { createHash } from "crypto";
 import { and, eq, gte, lte } from "drizzle-orm";
