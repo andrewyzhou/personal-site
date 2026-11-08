@@ -39,7 +39,6 @@ import Scrubber, { type ScrubBand } from "./Scrubber";
 import StatsPanel from "./StatsPanel";
 import SuggestionsPanel from "./SuggestionsPanel";
 import EditHistory from "./EditHistory";
-import SettingsPanel from "./SettingsPanel";
 
 interface Props {
   id: number;
@@ -490,14 +489,6 @@ export default function CleanActivity({ id, name, sportType, utcOffsetMin }: Pro
         <EditHistory edits={edits} ctx={ctx} busy={busy || !!pending} onUndo={undo} />
       </section>
 
-      <details>
-        <summary className="font-sans text-gray text-sm" style={{ cursor: "pointer" }}>
-          activity settings (all activities)
-        </summary>
-        <div style={{ marginTop: "8px" }}>
-          <SettingsPanel onSaved={load} />
-        </div>
-      </details>
     </div>
   );
 }

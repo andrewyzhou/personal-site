@@ -68,7 +68,7 @@ const tables = new Set(
     await sql`
       select table_name from information_schema.tables
       where table_schema = 'public'
-        and table_name in ('activity_sources', 'activity_edits', 'privacy_zones', 'privacy_settings', 'raw_objects', 'activity_photos', 'activity_suggestions', 'activity_settings')`
+        and table_name in ('activity_sources', 'activity_edits', 'privacy_zones', 'privacy_settings', 'raw_objects', 'activity_photos', 'activity_suggestions')`
   ).map((r) => r.table_name as string)
 );
 const columnsOf = async (table: string) =>
@@ -90,7 +90,7 @@ const hasArchived = zoneCols.has("archived_at");
 const hasPhotoExif = ["taken_at", "gps_lat", "gps_lng"].every((c) => photoCols.has(c));
 const fullyMigrated =
   missingCols.length === 0 &&
-  ["activity_sources", "activity_edits", "privacy_zones", "privacy_settings", "raw_objects", "activity_suggestions", "activity_settings"].every((t) => tables.has(t)) &&
+  ["activity_sources", "activity_edits", "privacy_zones", "privacy_settings", "raw_objects", "activity_suggestions"].every((t) => tables.has(t)) &&
   hasArchived &&
   ["taken_at", "gps_lat", "gps_lng", "pin_lat", "pin_lng"].every((c) => photoCols.has(c));
 

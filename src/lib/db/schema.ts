@@ -42,7 +42,7 @@ export interface PrivacySettings {
   defaultTrimM: number;
 }
 
-// cleaning + metrics settings (activity_settings rows; latest wins)
+// cleaning + metrics settings (fixed defaults: DEFAULT_ACTIVITY_SETTINGS)
 export interface ActivitySettings {
   // accept detector suggestions at or above this confidence without asking
   autoApply: { enabled: boolean; minConfidence: number };
@@ -50,7 +50,7 @@ export interface ActivitySettings {
   hrMaxBpm: number;
   hrZonePcts: number[];
   // effort (training load) uses resting hr; pace zones need a threshold pace.
-  // optional: settings rows written before these existed read as null
+  // optional: null when not set
   hrRestBpm?: number | null;
   thresholdPaceSPerKm?: number | null;
 }
@@ -332,12 +332,6 @@ export const activityMetrics = pgTable("activity_metrics", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
-export const activitySettings = pgTable("activity_settings", {
-  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
-  settings: jsonb("settings").$type<ActivitySettings>().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-});
-
 export type ActivitySuggestionRow = typeof activitySuggestions.$inferSelect;
 
 // insert-only; the newest row is in effect (restore = insert an older value)
@@ -358,38 +352,8 @@ export type NewActivityRow = typeof activities.$inferInsert;
 export type ActivityPhotoRow = typeof activityPhotos.$inferSelect;
 
 // ---------------------------------------------------------------------------
-// engagement: comments, likes, and per-target counters (claps/views).
-// targets are (target_type, target_slug): blog:<slug>, photos:<slug>,
-// activity:<id>. moderation is post-hoc (hidden flag), never destructive.
-
-export const comments = pgTable(
-  "comments",
-  {
-    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
-    targetType: text("target_type").notNull(), // 'blog' | 'photos' | 'activity'
-    targetSlug: text("target_slug").notNull(),
-    authorName: text("author_name").notNull(),
-    authorEmail: text("author_email"), // null for guests
-    isGuest: boolean("is_guest").notNull().default(true),
-    body: text("body").notNull(),
-    ipHash: text("ip_hash"), // sha256(ip + salt); raw ips never stored
-    hidden: boolean("hidden").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  },
-  (t) => [index("comments_target_idx").on(t.targetType, t.targetSlug, t.createdAt)]
-);
-
-export const likes = pgTable(
-  "likes",
-  {
-    id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
-    targetType: text("target_type").notNull(),
-    targetSlug: text("target_slug").notNull(),
-    userEmail: text("user_email").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex("likes_unique_idx").on(t.targetType, t.targetSlug, t.userEmail)]
-);
+// engagement: per-target counters (claps/views). targets are
+// (target_type, target_slug): blog:<slug>, photos:<slug>, activity:<id>.
 
 // claps + views as counter rows (kind: 'clap' | 'view')
 export const counters = pgTable(
@@ -404,7 +368,6 @@ export const counters = pgTable(
   (t) => [uniqueIndex("counters_unique_idx").on(t.targetType, t.targetSlug, t.kind)]
 );
 
-export type CommentRow = typeof comments.$inferSelect;
 
 export * from "./lift-schema";
 export * from "./listening-schema";

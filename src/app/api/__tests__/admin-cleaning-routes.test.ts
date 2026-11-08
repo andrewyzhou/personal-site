@@ -3,7 +3,7 @@ import type { CanonicalTrack } from "@/lib/canonical-track";
 
 // in-memory stand-in for the cleaning io (src/lib/cleaning/load.ts): rows are
 // only ever inserted or stamped, like the real thing
-const { denied, db, republish, revalidate, invalidate, calls, settingsDb, stale } = vi.hoisted(() => {
+const { denied, db, republish, revalidate, invalidate, calls, stale } = vi.hoisted(() => {
   type Row = Record<string, unknown> & { id: number };
   const db = {
     activities: new Map<number, Row>(),
@@ -28,7 +28,6 @@ const { denied, db, republish, revalidate, invalidate, calls, settingsDb, stale 
     revalidate: vi.fn(),
     invalidate: vi.fn(),
     calls: [] as string[], // write/republish order
-    settingsDb: { rows: [] as unknown[], inserted: [] as unknown[] },
     stale: { markAllStale: vi.fn() },
   };
 });
@@ -131,27 +130,6 @@ vi.mock("@/lib/cleaning/load", async () => {
   };
 });
 
-vi.mock("@/lib/cleaning/settings", async (orig) => {
-  const actual = await orig<typeof import("@/lib/cleaning/settings")>();
-  return { ...actual, loadActivitySettings: async () => actual.normalizeActivitySettings(settingsDb.rows[settingsDb.rows.length - 1] ?? null) };
-});
-vi.mock("@/lib/db", async (orig) => {
-  const actual = await orig<typeof import("@/lib/db")>();
-  return {
-    ...actual,
-    getDb: () => ({
-      insert: () => ({
-        values: async (v: { settings: unknown }) => {
-          settingsDb.inserted.push(v);
-          settingsDb.rows.push(v.settings);
-          calls.push("settings:insert");
-        },
-      }),
-      select: () => ({ from: () => ({ orderBy: () => ({ limit: async () => [] }) }) }),
-    }),
-  };
-});
-
 import { GET as getCleaning } from "@/app/api/admin/activities/[id]/cleaning/route";
 import { POST as preview } from "@/app/api/admin/activities/[id]/cleaning/preview/route";
 import { POST as postEdit } from "@/app/api/admin/activities/[id]/edits/route";
@@ -159,7 +137,6 @@ import { POST as revert } from "@/app/api/admin/activities/[id]/edits/[editId]/r
 import { POST as decide } from "@/app/api/admin/activities/[id]/suggestions/[sid]/route";
 import { POST as split } from "@/app/api/admin/activities/[id]/split/route";
 import { POST as merge } from "@/app/api/admin/activities/[id]/merge/route";
-import { GET as getSettings, POST as postSettings } from "@/app/api/admin/activity-settings/route";
 import { splitDedupeKey } from "@/lib/cleaning/plan";
 
 // ---------------------------------------------------------------------------
@@ -224,8 +201,6 @@ beforeEach(() => {
   db.reset();
   calls.length = 0;
   denied.value = false;
-  settingsDb.rows.length = 0;
-  settingsDb.inserted.length = 0;
   republish.mockImplementation(async (id: number) => ({ status: "published", id }));
   stale.markAllStale.mockResolvedValue(4);
   addActivity(5);
@@ -244,10 +219,8 @@ describe("auth", () => {
       decide(req({ action: "accept" }), ctx({ id: "5", sid: "1" })),
       split(req({ atS: 100 }), id5),
       merge(req({ otherId: 6 }), id5),
-      getSettings(req()),
-      postSettings(req({ hrMaxBpm: 180 })),
     ]);
-    expect(res.map((r) => r.status)).toEqual(Array(9).fill(401));
+    expect(res.map((r) => r.status)).toEqual(Array(7).fill(401));
     expect(calls).toEqual([]);
     expect(republish).not.toHaveBeenCalled();
   });
@@ -813,44 +786,5 @@ describe("merge refusals", () => {
     db.tracks.set(6, "unavailable");
     expect((await doMerge(6)).status).toBe(503);
     expect(db.edits).toHaveLength(0);
-  });
-});
-
-describe("activity settings", () => {
-  it("GET returns the settings in effect", async () => {
-    const j = await (await getSettings(req())).json();
-    expect(j).toMatchObject({ ok: true, settings: { hrMaxBpm: 190, autoApply: { enabled: false } }, history: [] });
-  });
-
-  it("hr zone changes insert a row and mark everything stale (before and after)", async () => {
-    const j = await (await postSettings(req({ hrMaxBpm: 185 }))).json();
-    expect(j).toMatchObject({ ok: true, unchanged: false, marked: 4, settings: { hrMaxBpm: 185, hrZonePcts: [0.6, 0.7, 0.8, 0.9] } });
-    expect(stale.markAllStale).toHaveBeenCalledTimes(2);
-    expect(settingsDb.inserted).toHaveLength(1);
-  });
-
-  it("resting hr / threshold pace changes mark everything stale; bad values are rejected", async () => {
-    const j = await (await postSettings(req({ hrRestBpm: 52, thresholdPaceSPerKm: 280 }))).json();
-    expect(j).toMatchObject({ ok: true, unchanged: false, settings: { hrRestBpm: 52, thresholdPaceSPerKm: 280 } });
-    expect(stale.markAllStale).toHaveBeenCalledTimes(2);
-    for (const body of [{ hrRestBpm: 5 }, { hrRestBpm: "52" }, { thresholdPaceSPerKm: 60 }]) {
-      expect((await postSettings(req(body))).status).toBe(400);
-    }
-  });
-
-  it("auto-apply changes insert without marking", async () => {
-    const j = await (await postSettings(req({ autoApply: { enabled: true } }))).json();
-    expect(j).toMatchObject({ ok: true, marked: 0, settings: { autoApply: { enabled: true, minConfidence: 0.9 } } });
-    expect(stale.markAllStale).not.toHaveBeenCalled();
-    expect(settingsDb.inserted).toHaveLength(1);
-  });
-
-  it("rejects invalid values; no change inserts nothing", async () => {
-    for (const body of [{ hrMaxBpm: 300 }, { hrZonePcts: [0.9, 0.8, 0.7, 0.6] }, { hrZonePcts: [0.5] }, { autoApply: { minConfidence: 0.1 } }, { autoApply: { enabled: "yes" } }, { autoApply: 1 }, "x"]) {
-      expect((await postSettings(req(body))).status).toBe(400);
-    }
-    expect(await (await postSettings(req({ hrMaxBpm: 190 }))).json()).toMatchObject({ ok: true, unchanged: true });
-    expect(settingsDb.inserted).toHaveLength(0);
-    expect(stale.markAllStale).not.toHaveBeenCalled();
   });
 });

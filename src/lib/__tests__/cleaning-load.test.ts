@@ -106,7 +106,7 @@ describe("loadPublishContext", () => {
     if (res.status !== "ok") throw new Error("no track");
     const settings = { ...DEFAULT_PRIVACY_SETTINGS, coarsenStartMin: 15 };
     const activity = { ...DEFAULT_ACTIVITY_SETTINGS, hrMaxBpm: 200 };
-    const ctx = await loadPublishContext(rows.get(7)!, res.track, [], { ...deps, loadSettings: async () => settings, loadActivitySettings: async () => activity });
+    const ctx = await loadPublishContext(rows.get(7)!, res.track, [], { ...deps, loadSettings: async () => settings, activitySettingsOverride: async () => activity });
     expect(ctx).toMatchObject({ settings, activity, merged: [] });
   });
 });

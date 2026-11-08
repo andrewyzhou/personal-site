@@ -62,7 +62,7 @@ jobs:
           pg_dump --format=custom --no-owner --no-privileges --file="$file" "$BACKUP_DATABASE_URL"
           # the archive must be readable and contain the tables that matter
           pg_restore --list "$file" > "$RUNNER_TEMP/toc.txt"
-          for t in activities activity_photos comments; do
+          for t in activities activity_photos activity_sources; do
             grep -Eq "TABLE DATA public ${t}( |$)" "$RUNNER_TEMP/toc.txt" || { echo "::error::dump has no data for table ${t}"; exit 1; }
           done
           (cd "$RUNNER_TEMP" && sha256sum "${ts}.dump" > "${ts}.dump.sha256")

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseMdx, serializeMdx, serializeYamlFile, parseYamlFile } from "../admin/frontmatter";
 import { CONTENT_TYPES } from "../admin/content-registry";
-import { filterComment } from "../engagement";
 import { flattenBlocks, hasTextContent, IMAGE_STEP_MS, TEXT_STEP_MS } from "../essay-steps";
 import { courseHasDetail, semesterShortLabel } from "../coursework";
 import { slugFromUrl } from "../admin/leetcode-lookup";
@@ -68,25 +67,6 @@ describe("content validators", () => {
       ""
     );
     expect(errors).toEqual([]);
-  });
-});
-
-describe("comment filter", () => {
-  const base = { body: "nice post, love the route map!", authorName: "sam", honeypot: "" };
-
-  it("passes a normal comment", () => {
-    expect(filterComment(base)).toBeNull();
-  });
-
-  it("silently flags honeypot fills", () => {
-    expect(filterComment({ ...base, honeypot: "http://spam.example" })).toBe("rejected");
-  });
-
-  it("rejects blocked words, too many links, and bad lengths", () => {
-    expect(filterComment({ ...base, body: "buy viagra now" })).toContain("blocked");
-    expect(filterComment({ ...base, body: "https://a.com and https://b.com" })).toContain("link");
-    expect(filterComment({ ...base, body: "x" })).toContain("short");
-    expect(filterComment({ ...base, body: "y".repeat(3000) })).toContain("long");
   });
 });
 
