@@ -1,8 +1,9 @@
 // replay text: clocks, speeds and the chip labels shown above the timeline
 
 import type { DistanceUnit, ReplayEvent } from "./engine";
+import { typesInFamily } from "../sport-types";
 
-const FOOT = new Set(["Run", "TrailRun", "VirtualRun", "Walk", "Hike"]);
+const FOOT: ReadonlySet<string> = new Set(typesInFamily("run", "walk", "hike"));
 
 // 75 → "1:15", 3725 → "1:02:05"
 export function formatClock(seconds: number): string {

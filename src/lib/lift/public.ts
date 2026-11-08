@@ -39,7 +39,7 @@ import {
 } from "@/lib/db";
 import { isPublic } from "@/lib/public-activity";
 import { coarsenStart, loadPrivacySettings } from "@/lib/privacy/settings";
-import type { CalendarActivity } from "@/lib/strava";
+import type { CalendarActivity } from "@/lib/calendar-activity";
 import { log } from "@/lib/log";
 import { isPublicLiftId, publicLiftId, publicLiftIdsEnabled } from "./public-id";
 import { LIFT_PUBLIC_TAG } from "./revalidate";

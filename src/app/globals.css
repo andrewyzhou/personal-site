@@ -434,17 +434,17 @@ body {
 }
 
 /* ============================================
-   STRAVA CALENDAR
+   ACTIVITY CALENDAR
    ============================================ */
 
-.strava-calendar {
+.activity-calendar {
   min-width: 300px;
   max-width: 400px;
   overflow: hidden;
 }
 
 @media (min-width: 768px) {
-  .strava-calendar {
+  .activity-calendar {
     min-width: 300px;
     max-width: 400px;
   }

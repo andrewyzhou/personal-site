@@ -4,7 +4,7 @@ import { getDb, activities } from "@/lib/db";
 import { isPublic, publicStartUtc } from "@/lib/public-activity";
 import { getCachedData } from "@/lib/cache";
 import { log } from "@/lib/log";
-import { formatDistance, formatDuration, formatTimeAgo } from "@/lib/strava";
+import { formatDistanceShort, formatDurationWords, formatTimeAgo } from "@/lib/activity-format";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,8 @@ interface LatestActivity {
   startDate: string;
 }
 
-// shape-identical replacement for /api/strava (Currently's workout sentence);
-// the response passes isStravaActivity() in src/lib/validate.ts unchanged.
+// the latest public activity (Currently's workout sentence); the response
+// passes isLatestActivity() in src/lib/validate.ts.
 // startDate is the published (possibly coarsened) start, never the raw one.
 async function fetchLatest(): Promise<LatestActivity | null> {
   const rows = await getDb()
@@ -52,8 +52,8 @@ export async function GET() {
     return NextResponse.json({
       ...data,
       latestActivityId: data.id,
-      formattedDistance: formatDistance(data.distance),
-      formattedDuration: formatDuration(data.elapsedTime),
+      formattedDistance: formatDistanceShort(data.distance),
+      formattedDuration: formatDurationWords(data.elapsedTime),
       formattedTimeAgo: formatTimeAgo(data.startDate),
       fetchedAt,
       previousFetchedAt,

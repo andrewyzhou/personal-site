@@ -4,19 +4,29 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Image from "next/image";
 import { LeetCodeSubmission, StoredSubmissions, getDifficultyColor, getDifficultyLetter } from "@/lib/leetcode";
 import RouteThumb from "@/components/RouteThumb";
+import {
+  FAMILIES,
+  SPORT_TYPE_KEYS,
+  sportMetric,
+  sportNoun,
+  sportTypeIcon,
+  typesInFamily,
+  typesWithMetric,
+  type SportFamily,
+} from "@/lib/sport-types";
 
 // ============================================================================
 // SHARED TYPES & CONSTANTS
 // ============================================================================
 
-type CalendarMode = "strava" | "leetcode";
+type CalendarMode = "activities" | "leetcode";
 
 const MONTHS = ["january", "february", "march", "april", "may", "june",
                 "july", "august", "september", "october", "november", "december"];
 const DAYS = ["s", "m", "t", "w", "t", "f", "s"];
 
 // ============================================================================
-// STRAVA TYPES & HELPERS
+// ACTIVITY TYPES & HELPERS
 // ============================================================================
 
 interface CalendarActivity {
@@ -59,36 +69,18 @@ function withLifts(result: StoredActivities & { lifts?: CalendarActivity[] }): S
   return { ...result, activities: [...(result.activities ?? []), ...(result.lifts ?? [])] };
 }
 
-const ACTIVITY_ICONS: Record<string, string> = {
-  Run: "run", Ride: "ride", Swim: "swim", Yoga: "yoga",
-  WeightTraining: "weight", Workout: "workout", Hike: "hike",
-  Walk: "walk", Tennis: "tennis", Soccer: "soccer",
-  TrailRun: "trailrun", RockClimbing: "climb",
-  VirtualRide: "ride", VirtualRun: "run",
-  MountainBikeRide: "ride", GravelRide: "ride", Crossfit: "workout",
-};
-
-const DURATION_TYPES = ["WeightTraining", "Workout", "Yoga", "Crossfit", "Tennis", "Soccer", "RockClimbing"];
-
-const ACTIVITY_NAMES: Record<string, string> = {
-  Run: "run", Ride: "bike ride", Swim: "swim", Walk: "walk",
-  Hike: "hike", WeightTraining: "lift", Workout: "workout",
-  Tennis: "tennis", Soccer: "soccer", TrailRun: "trail run",
-  RockClimbing: "climb", Yoga: "yoga", Crossfit: "crossfit",
-  VirtualRun: "run", VirtualRide: "bike ride",
-  MountainBikeRide: "bike ride", GravelRide: "bike ride",
-};
-
-const PACE_TYPES = ["Run", "VirtualRun", "TrailRun"];
-const SPEED_TYPES = ["Ride", "VirtualRide", "MountainBikeRide", "GravelRide"];
-const DISTANCE_TYPES = ["Run", "VirtualRun", "TrailRun", "Ride", "VirtualRide", "MountainBikeRide", "GravelRide", "Swim", "Walk", "Hike"];
+// every type's icon, noun and stat style comes from the sport-type table
+const DURATION_TYPES: readonly string[] = typesWithMetric("duration");
+const PACE_TYPES: readonly string[] = typesInFamily("run");
+const SPEED_TYPES: readonly string[] = typesInFamily("ride");
+const DISTANCE_TYPES: readonly string[] = SPORT_TYPE_KEYS.filter((k) => sportMetric(k) !== "duration");
 
 function getIconForType(type: string): string {
-  return ACTIVITY_ICONS[type] || "workout";
+  return sportTypeIcon(type);
 }
 
 function getActivityName(type: string): string {
-  return ACTIVITY_NAMES[type] || type.toLowerCase();
+  return sportNoun(type);
 }
 
 function formatDistance(meters: number): string {
@@ -126,10 +118,10 @@ function formatTimeOfDay(time24: string): string {
 }
 
 // ============================================================================
-// STRAVA VIEW STATE
+// ACTIVITY VIEW STATE
 // ============================================================================
 
-type StravaViewState =
+type ActivityViewState =
   | { type: "calendar" }
   | { type: "selector"; date: string; activities: CalendarActivity[] }
   | { type: "detail"; activity: CalendarActivity };
@@ -144,10 +136,10 @@ type LeetCodeViewState =
   | { type: "detail"; submission: LeetCodeSubmission };
 
 // ============================================================================
-// STRAVA COMPONENTS
+// ACTIVITY COMPONENTS
 // ============================================================================
 
-function StravaDayCell({
+function ActivityDayCell({
   activities,
   dayNumber,
   onActivityClick
@@ -203,7 +195,7 @@ function StravaDayCell({
   );
 }
 
-function StravaActivitySelector({
+function ActivitySelector({
   activities,
   date,
   onSelect,
@@ -258,7 +250,7 @@ function StravaActivitySelector({
   );
 }
 
-function StravaActivityDetail({
+function ActivityDetail({
   activity,
   onBack
 }: {
@@ -547,7 +539,7 @@ function LeetCodeProblemDetail({
 // ============================================================================
 
 export default function ActivityCalendar() {
-  const [mode, setMode] = useState<CalendarMode>("strava");
+  const [mode, setMode] = useState<CalendarMode>("activities");
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -556,49 +548,49 @@ export default function ActivityCalendar() {
   const [lockedWidth, setLockedWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Strava state
-  const [stravaData, setStravaData] = useState<StoredActivities | null>(null);
-  const [stravaLoading, setStravaLoading] = useState(true);
-  const [stravaViewState, setStravaViewState] = useState<StravaViewState>({ type: "calendar" });
+  // activity state
+  const [activityData, setActivityData] = useState<StoredActivities | null>(null);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityViewState, setActivityViewState] = useState<ActivityViewState>({ type: "calendar" });
 
   // LeetCode state
   const [leetcodeData, setLeetcodeData] = useState<StoredSubmissions | null>(null);
   const [leetcodeLoading, setLeetcodeLoading] = useState(true);
   const [leetcodeViewState, setLeetcodeViewState] = useState<LeetCodeViewState>({ type: "calendar" });
 
-  // Fetch Strava data
+  // Fetch activity data
   useEffect(() => {
-    async function fetchStravaActivities() {
+    async function fetchActivities() {
       try {
         const response = await fetch("/api/activities");
         if (response.ok) {
           const result = await response.json();
-          setStravaData(withLifts(result));
+          setActivityData(withLifts(result));
         }
       } catch (error) {
-        console.error("Failed to fetch strava activities:", error);
+        console.error("Failed to fetch activities:", error);
       } finally {
-        setStravaLoading(false);
+        setActivityLoading(false);
       }
     }
-    fetchStravaActivities();
+    fetchActivities();
   }, []);
 
-  // Listen for Strava updates
+  // Listen for activity updates
   useEffect(() => {
     function handleLatestActivity(e: Event) {
       const { latestActivityId } = (e as CustomEvent).detail;
-      const cachedLatestId = stravaData?.activities?.[0]?.id;
+      const cachedLatestId = activityData?.activities?.[0]?.id;
       if (latestActivityId && latestActivityId !== cachedLatestId) {
         fetch("/api/activities")
           .then(res => res.ok ? res.json() : null)
-          .then(result => { if (result) setStravaData(withLifts(result)); })
-          .catch(err => console.error("Failed to refresh strava activities:", err));
+          .then(result => { if (result) setActivityData(withLifts(result)); })
+          .catch(err => console.error("Failed to refresh activities:", err));
       }
     }
-    window.addEventListener("strava-latest-activity", handleLatestActivity);
-    return () => window.removeEventListener("strava-latest-activity", handleLatestActivity);
-  }, [stravaData]);
+    window.addEventListener("latest-activity", handleLatestActivity);
+    return () => window.removeEventListener("latest-activity", handleLatestActivity);
+  }, [activityData]);
 
   // Fetch LeetCode data
   useEffect(() => {
@@ -618,11 +610,11 @@ export default function ActivityCalendar() {
     fetchLeetCodeSubmissions();
   }, []);
 
-  // Group Strava activities by date
-  const stravaByDate = useMemo(() => {
-    if (!stravaData?.activities) return new Map<string, CalendarActivity[]>();
+  // Group activity activities by date
+  const activitiesByDate = useMemo(() => {
+    if (!activityData?.activities) return new Map<string, CalendarActivity[]>();
     const map = new Map<string, CalendarActivity[]>();
-    for (const activity of stravaData.activities) {
+    for (const activity of activityData.activities) {
       const existing = map.get(activity.date) || [];
       existing.push(activity);
       map.set(activity.date, existing);
@@ -631,7 +623,7 @@ export default function ActivityCalendar() {
       acts.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
     return map;
-  }, [stravaData]);
+  }, [activityData]);
 
   // Group LeetCode submissions by date
   const leetcodeByDate = useMemo(() => {
@@ -645,22 +637,31 @@ export default function ActivityCalendar() {
     return map;
   }, [leetcodeData]);
 
-  // Strava stats - yearly totals by activity type
-  const stravaYearlyStats = useMemo(() => {
-    if (!stravaData?.activities) return [];
+  // activity stats - yearly totals by activity type
+  const activityYearlyStats = useMemo(() => {
+    if (!activityData?.activities) return [];
     const currentYear = new Date().getFullYear();
-    const yearActivities = stravaData.activities.filter(a => a.date.startsWith(String(currentYear)));
+    const yearActivities = activityData.activities.filter(a => a.date.startsWith(String(currentYear)));
 
+    const miles = (acts: CalendarActivity[]) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi`;
+    const minutes = (acts: CalendarActivity[]) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min`;
+    // one rotating stat per sport family (walks and hikes share one)
+    const stat = (families: SportFamily[], format: (acts: CalendarActivity[]) => string, icon = FAMILIES[families[0]].icon) =>
+      ({ types: typesInFamily(...families) as string[], icon, format });
     const statDefs: { types: string[]; icon: string; format: (acts: CalendarActivity[]) => string }[] = [
-      { types: ["Run", "VirtualRun", "TrailRun"], icon: "run", format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi` },
-      { types: ["Ride", "VirtualRide", "MountainBikeRide", "GravelRide"], icon: "ride", format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi` },
-      { types: ["Walk", "Hike"], icon: "walk", format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi` },
-      { types: ["WeightTraining", "Workout", "Crossfit"], icon: "weight", format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min` },
-      { types: ["Soccer"], icon: "soccer", format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min` },
-      { types: ["Yoga"], icon: "yoga", format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min` },
-      { types: ["Tennis"], icon: "tennis", format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min` },
-      { types: ["RockClimbing"], icon: "climb", format: (acts) => `${Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60)} min` },
-      { types: ["Swim"], icon: "swim", format: (acts) => `${(acts.reduce((s, a) => s + a.distance, 0) / 1609.344).toFixed(1)} mi` },
+      stat(["run"], miles),
+      stat(["ride"], miles),
+      stat(["walk", "hike"], miles, "walk"),
+      stat(["strength", "cardio"], minutes, "weight"),
+      stat(["team"], minutes),
+      stat(["mind"], minutes),
+      stat(["racket"], minutes),
+      stat(["climb"], minutes),
+      stat(["swim"], miles),
+      stat(["snow"], miles),
+      stat(["water"], miles),
+      stat(["skate"], miles),
+      stat(["golf"], minutes),
     ];
 
     return statDefs
@@ -670,26 +671,26 @@ export default function ActivityCalendar() {
         return { icon: def.icon, value: def.format(acts) };
       })
       .filter((s): s is { icon: string; value: string } => s !== null);
-  }, [stravaData]);
+  }, [activityData]);
 
-  const [stravaStatIndex, setStravaStatIndex] = useState(0);
-  const [stravaStatTransitioning, setStravaStatTransitioning] = useState(false);
+  const [activityStatIndex, setActivityStatIndex] = useState(0);
+  const [activityStatTransitioning, setActivityStatTransitioning] = useState(false);
 
   useEffect(() => {
-    if (stravaYearlyStats.length <= 1) return;
+    if (activityYearlyStats.length <= 1) return;
     const interval = setInterval(() => {
-      setStravaStatTransitioning(true);
+      setActivityStatTransitioning(true);
       setTimeout(() => {
-        setStravaStatIndex(prev => (prev + 1) % stravaYearlyStats.length);
-        setStravaStatTransitioning(false);
+        setActivityStatIndex(prev => (prev + 1) % activityYearlyStats.length);
+        setActivityStatTransitioning(false);
       }, 150);
     }, 2000);
     return () => clearInterval(interval);
-  }, [stravaYearlyStats.length]);
+  }, [activityYearlyStats.length]);
 
-  const stravaStreak = useMemo(() => {
-    if (!stravaData?.activities || stravaData.activities.length === 0) return 0;
-    const activityDates = [...new Set(stravaData.activities.map(a => a.date))].sort().reverse();
+  const activityStreak = useMemo(() => {
+    if (!activityData?.activities || activityData.activities.length === 0) return 0;
+    const activityDates = [...new Set(activityData.activities.map(a => a.date))].sort().reverse();
     if (activityDates.length === 0) return 0;
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
@@ -710,7 +711,7 @@ export default function ActivityCalendar() {
       }
     }
     return streak;
-  }, [stravaData]);
+  }, [activityData]);
 
   // LeetCode stats
   const leetcodeYearlySolved = useMemo(() => {
@@ -771,42 +772,42 @@ export default function ActivityCalendar() {
     return `${year}-${(month + 1).toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
   }, [currentMonth]);
 
-  // Strava handlers
-  const handleStravaActivityClick = useCallback((activities: CalendarActivity[], date: string) => {
+  // activity handlers
+  const handleDayActivityClick = useCallback((activities: CalendarActivity[], date: string) => {
     if (containerRef.current) {
       setLockedHeight(containerRef.current.offsetHeight);
       setLockedWidth(containerRef.current.offsetWidth);
     }
     if (activities.length === 1) {
-      setStravaViewState({ type: "detail", activity: activities[0] });
+      setActivityViewState({ type: "detail", activity: activities[0] });
     } else {
-      setStravaViewState({ type: "selector", date, activities });
+      setActivityViewState({ type: "selector", date, activities });
     }
   }, []);
 
-  const handleStravaBackToCalendar = useCallback(() => {
+  const handleActivityBackToCalendar = useCallback(() => {
     setLockedHeight(null);
     setLockedWidth(null);
-    setStravaViewState({ type: "calendar" });
+    setActivityViewState({ type: "calendar" });
   }, []);
 
-  const handleStravaSelectActivity = useCallback((activity: CalendarActivity) => {
-    setStravaViewState({ type: "detail", activity });
+  const handleSelectActivity = useCallback((activity: CalendarActivity) => {
+    setActivityViewState({ type: "detail", activity });
   }, []);
 
-  const handleStravaBackFromDetail = useCallback(() => {
-    if (stravaViewState.type === "detail") {
-      const activity = stravaViewState.activity;
-      const sameDay = (stravaData?.activities.filter(a => a.date === activity.date) || []).slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const handleActivityBackFromDetail = useCallback(() => {
+    if (activityViewState.type === "detail") {
+      const activity = activityViewState.activity;
+      const sameDay = (activityData?.activities.filter(a => a.date === activity.date) || []).slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
       if (sameDay.length > 1) {
-        setStravaViewState({ type: "selector", date: activity.date, activities: sameDay });
+        setActivityViewState({ type: "selector", date: activity.date, activities: sameDay });
       } else {
-        setStravaViewState({ type: "calendar" });
+        setActivityViewState({ type: "calendar" });
       }
     } else {
-      setStravaViewState({ type: "calendar" });
+      setActivityViewState({ type: "calendar" });
     }
-  }, [stravaViewState, stravaData]);
+  }, [activityViewState, activityData]);
 
   // LeetCode handlers
   const handleLeetCodeSubmissionClick = useCallback((submissions: LeetCodeSubmission[], date: string) => {
@@ -851,19 +852,19 @@ export default function ActivityCalendar() {
       setMode(newMode);
       setLockedHeight(null);
       setLockedWidth(null);
-      setStravaViewState({ type: "calendar" });
+      setActivityViewState({ type: "calendar" });
       setLeetcodeViewState({ type: "calendar" });
     }
   }, [mode]);
 
-  const loading = mode === "strava" ? stravaLoading : leetcodeLoading;
-  const hasData = mode === "strava"
-    ? stravaData && stravaData.activities.length > 0
+  const loading = mode === "activities" ? activityLoading : leetcodeLoading;
+  const hasData = mode === "activities"
+    ? activityData && activityData.activities.length > 0
     : leetcodeData && leetcodeData.submissions.length > 0;
 
   if (loading) {
     return (
-      <div className="strava-calendar">
+      <div className="activity-calendar">
         <div className="h-[300px] card-bg animate-pulse rounded-lg" />
       </div>
     );
@@ -878,8 +879,8 @@ export default function ActivityCalendar() {
           {/* Mode toggle */}
           <div className="flex items-center">
             <button
-              onClick={() => handleModeSwitch("strava")}
-              className={`flex items-center justify-center transition-opacity ${mode === "strava" ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
+              onClick={() => handleModeSwitch("activities")}
+              className={`flex items-center justify-center transition-opacity ${mode === "activities" ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
               aria-label="activities mode"
             >
               <Image src="/icons/activity.svg" alt="activities" width={16} height={16} />
@@ -896,7 +897,7 @@ export default function ActivityCalendar() {
 
           {/* refresh button removed: it fired the destructive full-refresh endpoint
               from the public page (one tap wiped the activity history once the
-              strava api died). syncs are admin-only now. */}
+              upstream api died). syncs are admin-only now. */}
         </div>
 
         {/* Month navigation */}
@@ -940,14 +941,14 @@ export default function ActivityCalendar() {
           }
           const dateKey = formatDateKey(day);
 
-          if (mode === "strava") {
-            const activities = stravaByDate.get(dateKey) || [];
+          if (mode === "activities") {
+            const activities = activitiesByDate.get(dateKey) || [];
             return (
               <div key={i} className="calendar-day">
-                <StravaDayCell
+                <ActivityDayCell
                   activities={activities}
                   dayNumber={day}
-                  onActivityClick={handleStravaActivityClick}
+                  onActivityClick={handleDayActivityClick}
                 />
               </div>
             );
@@ -968,21 +969,21 @@ export default function ActivityCalendar() {
 
       {/* Stats row */}
       <div className="flex items-center justify-between" style={{ marginTop: '12px' }}>
-        {mode === "strava" ? (
+        {mode === "activities" ? (
           <>
-            {stravaYearlyStats.length > 0 && (
+            {activityYearlyStats.length > 0 && (
               <span className="font-sans text-gray text-sm flex items-center gap-1">
-                <div className="flex items-center gap-1" style={{ opacity: stravaStatTransitioning ? 0 : 1, transition: 'opacity 0.3s ease' }}>
-                  <Image src={`/icons/activities/${stravaYearlyStats[stravaStatIndex % stravaYearlyStats.length].icon}.svg`} alt="" width={14} height={14} className="opacity-70" />
-                  <span className="font-bold">{stravaYearlyStats[stravaStatIndex % stravaYearlyStats.length].value}</span>
+                <div className="flex items-center gap-1" style={{ opacity: activityStatTransitioning ? 0 : 1, transition: 'opacity 0.3s ease' }}>
+                  <Image src={`/icons/activities/${activityYearlyStats[activityStatIndex % activityYearlyStats.length].icon}.svg`} alt="" width={14} height={14} className="opacity-70" />
+                  <span className="font-bold">{activityYearlyStats[activityStatIndex % activityYearlyStats.length].value}</span>
                 </div>
                  in {new Date().getFullYear()}
               </span>
             )}
-            {stravaStreak > 0 && (
+            {activityStreak > 0 && (
               <span className="font-sans text-gray text-sm flex items-center gap-1">
                 <Image src="/icons/fire.svg" alt="Streak" width={14} height={14} className="opacity-70" />
-                {stravaStreak}
+                {activityStreak}
               </span>
             )}
           </>
@@ -1005,22 +1006,22 @@ export default function ActivityCalendar() {
 
   // Render content based on mode and view state
   const renderContent = () => {
-    if (mode === "strava") {
-      if (stravaViewState.type === "selector") {
+    if (mode === "activities") {
+      if (activityViewState.type === "selector") {
         return (
-          <StravaActivitySelector
-            activities={stravaViewState.activities}
-            date={stravaViewState.date}
-            onSelect={handleStravaSelectActivity}
-            onBack={handleStravaBackToCalendar}
+          <ActivitySelector
+            activities={activityViewState.activities}
+            date={activityViewState.date}
+            onSelect={handleSelectActivity}
+            onBack={handleActivityBackToCalendar}
           />
         );
       }
-      if (stravaViewState.type === "detail") {
+      if (activityViewState.type === "detail") {
         return (
-          <StravaActivityDetail
-            activity={stravaViewState.activity}
-            onBack={handleStravaBackFromDetail}
+          <ActivityDetail
+            activity={activityViewState.activity}
+            onBack={handleActivityBackFromDetail}
           />
         );
       }
@@ -1054,7 +1055,7 @@ export default function ActivityCalendar() {
   };
 
   return (
-    <div className="strava-calendar">
+    <div className="activity-calendar">
       <div
         ref={containerRef}
         className="card-bg rounded-lg overflow-hidden flex flex-col !p-5"

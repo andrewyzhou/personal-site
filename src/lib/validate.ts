@@ -12,8 +12,8 @@ export function isSpotifyTrack(d: unknown): boolean {
   return isRecord(d) && typeof d.title === "string" && typeof d.artist === "string";
 }
 
-// strava: rendering requires id, type, startDate and both formatted metrics
-export function isStravaActivity(d: unknown): boolean {
+// latest activity: rendering requires id, type, startDate and both formatted metrics
+export function isLatestActivity(d: unknown): boolean {
   return (
     isRecord(d) &&
     typeof d.id === "number" &&

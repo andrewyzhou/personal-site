@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import RouteThumb from "@/components/RouteThumb";
+import { sportTypeIcon } from "@/lib/sport-types";
 import { routeThumbDataUri } from "@/lib/route-thumb-uri";
 import type { AdminCalendarEvent } from "@/lib/admin/calendar-events";
 
@@ -49,13 +50,7 @@ const BREAKOUT: React.CSSProperties = {
 
 function eventIcon(e: AdminCalendarEvent): string {
   if (e.kind === "activity") {
-    const icons: Record<string, string> = {
-      Run: "run", Ride: "ride", Swim: "swim", Yoga: "yoga", WeightTraining: "weight",
-      Workout: "workout", Hike: "hike", Walk: "walk", Tennis: "tennis", Soccer: "soccer",
-      TrailRun: "trailrun", RockClimbing: "climb",
-      VirtualRun: "run", VirtualRide: "ride", MountainBikeRide: "ride", GravelRide: "ride",
-    };
-    return `/icons/activities/${icons[e.type] ?? "workout"}.svg`;
+    return `/icons/activities/${sportTypeIcon(e.type)}.svg`;
   }
   return KIND_ICON[e.kind] ?? "/icons/github.svg";
 }

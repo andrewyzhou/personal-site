@@ -52,7 +52,7 @@ function row(id: number, startMs: number): ActivityRow {
     dedupeKey: `k${id}`, hidden: false, processingVersion: 0, publishedInputsHash: null, canonicalTrackKey: null,
     mapHidden: false, hrHidden: false, publishedLocalTime: null, publishedStartUtc: null, fogEvents: null, fogShapes: null,
     trackBbox: null, needsRepublish: false, staleMarkedAt: null, legacyRoute: null, rawStats: null, hrZonesS: null,
-    splitFromId: null, republishAttemptedAt: null, createdAt: new Date(), updatedAt: new Date(),
+    splitFromId: null, republishAttemptedAt: null, metaEditedAt: null, upstreamMeta: null, createdAt: new Date(), updatedAt: new Date(),
   };
 }
 

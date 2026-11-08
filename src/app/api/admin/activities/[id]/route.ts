@@ -11,6 +11,7 @@ import { visibilityColumns, type Visibility } from "@/lib/public-activity";
 import { staleMark } from "@/lib/privacy/stale";
 import { parsePhotoList, type PhotoInput } from "@/app/api/admin/photos/photo-input";
 import { log } from "@/lib/log";
+import { recordSiteEdits, type MetaValues } from "@/lib/metadata-merge";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -85,6 +86,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     // visibility is plain columns the public serializer applies; nothing to rebuild
     if (body.visibility !== undefined) Object.assign(updates, visibilityColumns(body.visibility as Visibility));
     if (typeof body.hrHidden === "boolean") updates.hrHidden = body.hrHidden;
+    // newest edit wins against upstream (garmin) edits: stamp each changed field
+    const editedAt = recordSiteEdits(
+      row.metaEditedAt,
+      { name: row.name, description: row.description, sportType: row.sportType, hidden: row.hidden },
+      updates as Partial<MetaValues>,
+      new Date()
+    );
+    if (JSON.stringify(editedAt) !== JSON.stringify(row.metaEditedAt ?? {})) updates.metaEditedAt = editedAt;
 
     // a trim change is a recorded edit; republish rebuilds the published columns
     // from the stored track. nothing to rebuild from → the edit is reverted.
@@ -236,7 +245,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       }
       log.info("admin:edit", `hard-deleted activity ${id} (${photos.length} photo blobs)`);
     } else {
-      await db.update(activities).set({ hidden: true, updatedAt: new Date() }).where(eq(activities.id, id));
+      const at = new Date();
+      const metaEditedAt = recordSiteEdits(
+        row.metaEditedAt,
+        { name: row.name, description: row.description, sportType: row.sportType, hidden: row.hidden },
+        { hidden: true },
+        at
+      );
+      await db.update(activities).set({ hidden: true, metaEditedAt, updatedAt: at }).where(eq(activities.id, id));
       log.info("admin:edit", `soft-hid activity ${id}`);
     }
 

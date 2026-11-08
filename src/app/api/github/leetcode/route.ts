@@ -17,7 +17,7 @@ export async function GET() {
   try {
     const stored = await redis.get<StoredSubmissions>(CACHE_KEY);
 
-    // Check if latest commit differs from cache (like Strava pattern)
+    // Check if latest commit differs from cache
     const latestSha = await getLatestCommitSha();
     const cachedLatestSha = stored?.submissions?.[0]?.sha ?? null;
 

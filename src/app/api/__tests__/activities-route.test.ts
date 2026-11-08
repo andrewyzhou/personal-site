@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isStravaActivity } from "@/lib/validate";
+import { isLatestActivity } from "@/lib/validate";
 
 const { getCachedData } = vi.hoisted(() => ({ getCachedData: vi.fn() }));
 
@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 describe("GET /api/activities/latest", () => {
-  it("produces a payload that passes isStravaActivity (the contract Currently depends on)", async () => {
+  it("produces a payload that passes isLatestActivity (the contract Currently depends on)", async () => {
     getCachedData.mockResolvedValue({
       data: {
         id: 42,
@@ -40,7 +40,7 @@ describe("GET /api/activities/latest", () => {
     const res = await getLatest();
     const body = await res.json();
 
-    expect(isStravaActivity(body)).toBe(true);
+    expect(isLatestActivity(body)).toBe(true);
     expect(body.latestActivityId).toBe(42);
     expect(body.formattedDistance).toBe("5.2 mi");
     expect(body.formattedDuration).toBe("42 min");

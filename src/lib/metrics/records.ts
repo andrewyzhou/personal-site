@@ -4,6 +4,7 @@
 // nothing here can surface a fogged stretch or hidden heart rate.
 
 import type { ActivityMetrics, BestEffort, CurvePoint } from "./types";
+import { typesInFamily } from "../sport-types";
 
 export interface RecordInput {
   activityId: number;
@@ -119,7 +120,7 @@ export interface GearTotal {
 
 // shoes wear out around 300–500 mi; flag at 400 mi by default
 export const SHOE_ALERT_M = 400 * 1609.344;
-const FOOT = new Set(["Run", "TrailRun", "VirtualRun", "Walk", "Hike"]);
+const FOOT: ReadonlySet<string> = new Set(typesInFamily("run", "walk", "hike"));
 
 export function gearTotals(
   rows: { gear: string | null; distanceM: number; sportType: string; date: string }[],

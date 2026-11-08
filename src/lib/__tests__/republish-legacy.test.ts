@@ -66,7 +66,7 @@ describe("legacy column list", () => {
   it("is the schema minus the v2 + privacy columns", () => {
     const all = getTableColumns(activities);
     const legacy = legacyActivityColumns();
-    expect(Object.keys(legacy)).toHaveLength(Object.keys(all).length - 17);
+    expect(Object.keys(legacy)).toHaveLength(Object.keys(all).length - 19);
     expect(legacy).not.toHaveProperty("processingVersion");
     expect(legacy).not.toHaveProperty("publishedInputsHash");
     expect(legacy).not.toHaveProperty("canonicalTrackKey");

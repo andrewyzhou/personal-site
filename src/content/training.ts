@@ -3,7 +3,8 @@ import { getDb, activities } from "@/lib/db";
 import { isPublic, publicCalendarActivity } from "@/lib/public-activity";
 import { liftCalendarEntries } from "@/lib/lift/public";
 import { formatClockDuration, formatMiles, sportIcon, sportLabel } from "@/lib/activity-format";
-import type { CalendarActivity } from "@/lib/strava";
+import type { CalendarActivity } from "@/lib/calendar-activity";
+import { sportFamily, type SportFamily } from "@/lib/sport-types";
 import { log } from "@/lib/log";
 
 // the training hub: recorded activities and lift-only sessions as one feed,
@@ -11,22 +12,18 @@ import { log } from "@/lib/log";
 
 export type SportGroup = "runs" | "rides" | "hikes" | "walks" | "lifts" | "other";
 
-const GROUP: Record<string, SportGroup> = {
-  Run: "runs",
-  TrailRun: "runs",
-  VirtualRun: "runs",
-  Ride: "rides",
-  VirtualRide: "rides",
-  MountainBikeRide: "rides",
-  GravelRide: "rides",
-  EBikeRide: "rides",
-  Hike: "hikes",
-  Walk: "walks",
-  WeightTraining: "lifts",
+// by sport family (src/lib/sport-types.ts): every run variant is a run, every
+// ride variant a ride, snowshoeing a hike…
+const GROUP: Partial<Record<SportFamily, SportGroup>> = {
+  run: "runs",
+  ride: "rides",
+  hike: "hikes",
+  walk: "walks",
+  strength: "lifts",
 };
 
 export function sportGroup(type: string): SportGroup {
-  return GROUP[type] ?? "other";
+  return GROUP[sportFamily(type)] ?? "other";
 }
 
 export interface TrainingItem {

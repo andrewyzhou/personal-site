@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { sync, pull, rebuild } = vi.hoisted(() => ({ sync: vi.fn(), pull: vi.fn(), rebuild: vi.fn() }));
+const { pull, rebuild } = vi.hoisted(() => ({ pull: vi.fn(), rebuild: vi.fn() }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/admin-auth", async () => {
   const { NextResponse } = await import("next/server");
   return { unauthorizedResponse: () => NextResponse.json({ error: "unauthorized" }, { status: 401 }) };
 });
-vi.mock("@/lib/strava", () => ({ isStravaApiEnabled: () => true }));
-vi.mock("@/lib/strava-sync", () => ({ syncStravaActivities: () => sync() }));
 vi.mock("@/lib/intervals", () => ({ isIntervalsConfigured: () => true, pullIntervalsActivities: () => pull() }));
 vi.mock("@/lib/privacy/rebuild", () => ({ DEFAULT_REBUILD_BUDGET_MS: 45_000, republishPending: (o: unknown) => rebuild(o) }));
 
@@ -19,7 +17,6 @@ const call = (auth = "Bearer s3cret") => GET(new Request("http://localhost/api/c
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.CRON_SECRET = "s3cret";
-  sync.mockResolvedValue({ imported: 1 });
   pull.mockResolvedValue({ imported: 2 });
   rebuild.mockResolvedValue({ results: [{ id: 1, status: "published" }], failedIds: [], remaining: 0, timedOut: false });
 });
@@ -28,12 +25,14 @@ describe("GET /api/cron/activities", () => {
   it("rejects without the cron secret", async () => {
     expect((await call("Bearer nope")).status).toBe(401);
     expect(rebuild).not.toHaveBeenCalled();
+    expect(pull).not.toHaveBeenCalled();
   });
 
-  it("imports, then rebuilds pending activities within the time left", async () => {
+  it("pulls from intervals.icu only, then rebuilds pending activities within the time left", async () => {
     const res = await call();
     const body = await res.json();
-    expect(body).toMatchObject({ ok: true, strava: { imported: 1 }, intervals: { imported: 2 }, rebuild: { processed: 1, failed: 0, remaining: 0 } });
+    expect(body).toMatchObject({ ok: true, intervals: { imported: 2 }, rebuild: { processed: 1, failed: 0, remaining: 0 } });
+    expect(Object.keys(body).sort()).toEqual(["intervals", "ok", "rebuild"]);
     const opts = rebuild.mock.calls[0][0];
     expect(opts.timeBudgetMs).toBeGreaterThan(5_000);
     // at most 30 s, even if the library default is larger
@@ -46,7 +45,7 @@ describe("GET /api/cron/activities", () => {
     const now = vi.spyOn(Date, "now");
     try {
       now.mockReturnValue(t0);
-      sync.mockImplementation(async () => {
+      pull.mockImplementation(async () => {
         now.mockReturnValue(t0 + 20_000);
         return { imported: 1 };
       });
@@ -55,7 +54,7 @@ describe("GET /api/cron/activities", () => {
 
       rebuild.mockClear();
       now.mockReturnValue(t0);
-      sync.mockImplementation(async () => {
+      pull.mockImplementation(async () => {
         now.mockReturnValue(t0 + 31_000);
         return { imported: 1 };
       });
@@ -71,12 +70,12 @@ describe("GET /api/cron/activities", () => {
     rebuild.mockRejectedValue(new Error("db down"));
     const res = await call();
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, strava: { imported: 1 }, rebuild: { error: "db down" } });
+    expect(await res.json()).toMatchObject({ ok: true, intervals: { imported: 2 }, rebuild: { error: "db down" } });
   });
 
-  it("still rebuilds when an import fails", async () => {
-    sync.mockRejectedValue(new Error("rate limited"));
+  it("still rebuilds when the pull fails", async () => {
+    pull.mockRejectedValue(new Error("rate limited"));
     const res = await call();
-    expect(await res.json()).toMatchObject({ ok: true, strava: { error: "rate limited" }, rebuild: { processed: 1 } });
+    expect(await res.json()).toMatchObject({ ok: true, intervals: { error: "rate limited" }, rebuild: { processed: 1 } });
   });
 });
