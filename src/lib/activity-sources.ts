@@ -1,4 +1,4 @@
-// helpers shared by every ingest path (upload, intervals.icu, strava sync,
+// helpers shared by every ingest path (upload, intervals.icu, archive imports,
 // scripts): store raw inputs, link them to activities as sources, record edits.
 // all writes are insert-only and idempotent. server-only.
 
@@ -9,6 +9,9 @@ import { unwrapTrackFile, type TrackFileType } from "./fit";
 import { getRawStore, isRawStoreConfigured, sha256Hex, type RawKind } from "./raw-store";
 import { r2Head, r2Put, r2PublicUrl } from "./r2";
 
+// stored provider/kind names. "strava" and the "strava-*" kinds are what the
+// archive imports and the retired api sync wrote; rows keep them, and only
+// the offline archive import scripts still write them.
 export type SourceProvider = "strava" | "intervals-icu" | "upload" | "manual";
 export type SourceKind =
   | "device-file"
@@ -58,6 +61,16 @@ export async function knownExternalIds(provider: SourceProvider, externalIds: st
     .from(activitySources)
     .where(and(eq(activitySources.provider, provider), inArray(activitySources.externalId, externalIds)));
   return new Set(rows.map((r) => r.externalId).filter((x): x is string => x !== null));
+}
+
+// whether a device file (fit/gpx/tcx original) is linked to the activity
+export async function hasDeviceFile(activityId: number): Promise<boolean> {
+  const rows = await getDb()
+    .select({ id: activitySources.id })
+    .from(activitySources)
+    .where(and(eq(activitySources.activityId, activityId), eq(activitySources.kind, "device-file")))
+    .limit(1);
+  return rows.length > 0;
 }
 
 export async function addActivityEdit(

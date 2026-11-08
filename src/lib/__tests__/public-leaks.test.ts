@@ -9,7 +9,7 @@ import {
   type PublicPhotoInput,
 } from "@/lib/public-activity";
 import { findPrivateKeys } from "@/lib/privacy/leak-audit";
-import { isStravaActivity } from "@/lib/validate";
+import { isLatestActivity } from "@/lib/validate";
 
 // thenable query-chain stub: every builder method returns the chain; awaiting
 // it resolves the next queued result. select() args are recorded so tests can
@@ -108,7 +108,7 @@ function row(over: Partial<ActivityRow> = {}): ActivityRow {
     fogShapes: [[[[-122.257, 37.873], [-122.255, 37.873], [-122.255, 37.875], [-122.257, 37.873]]]],
     trackBbox: { minLat: 37.0, minLng: -123, maxLat: 38, maxLng: -122 },
     needsRepublish: false,
-    republishAttemptedAt: null,
+    republishAttemptedAt: null, metaEditedAt: null, upstreamMeta: null,
     staleMarkedAt: null,
     legacyRoute: null, rawStats: null, hrZonesS: null, splitFromId: null,
     createdAt: new Date("2026-07-06T15:00:00Z"),
@@ -238,11 +238,11 @@ describe("GET /api/activities", () => {
 });
 
 describe("GET /api/activities/latest", () => {
-  it("serves the published (coarsened) start and passes isStravaActivity", async () => {
+  it("serves the published (coarsened) start and passes isLatestActivity", async () => {
     queue.push([row()]);
     const res = await getLatest();
     const body = await res.json();
-    expect(isStravaActivity(body)).toBe(true);
+    expect(isLatestActivity(body)).toBe(true);
     expect(body.startDate).toBe(PUBLISHED_START.toISOString());
     expect(body.latestActivityId).toBe(1);
     expectNoPrivate(body);

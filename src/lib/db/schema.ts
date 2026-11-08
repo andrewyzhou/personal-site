@@ -14,6 +14,7 @@ import {
 import { isNotNull } from "drizzle-orm";
 import type { ReplayData } from "../replay/build";
 import type { ActivityMetrics } from "../metrics/types";
+import type { SiteEditTimes, UpstreamSnapshot } from "../metadata-merge";
 
 export interface RouteBounds {
   minLat: number;
@@ -72,7 +73,7 @@ export const activities = pgTable(
   {
     id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
     name: text("name").notNull().default(""),
-    // strava-style keys: Run, Ride, WeightTraining… (matches ACTIVITY_ICONS in ActivityCalendar.tsx)
+    // a site sport type: Run, Ride, WeightTraining… (src/lib/sport-types.ts)
     sportType: text("sport_type").notNull(),
     startDateUtc: timestamp("start_date_utc", { withTimezone: true, mode: "date" }).notNull(),
     localDate: text("local_date").notNull(), // 'YYYY-MM-DD' (mirrors CalendarActivity.date)
@@ -92,7 +93,7 @@ export const activities = pgTable(
     maxWatts: doublePrecision("max_watts"),
     kilojoules: doublePrecision("kilojoules"),
     description: text("description"),
-    sufferScore: doublePrecision("suffer_score"), // imported strava "relative effort"; null for new uploads
+    sufferScore: doublePrecision("suffer_score"), // imported "relative effort" from the old archive; null for new uploads
     gear: text("gear"), // free text, e.g. 'pegasus 41'
     // published route (post-trim)
     polyline: text("polyline"), // google encoded polyline, precision 5, rdp ≤ 1500 pts (detail page)
@@ -106,7 +107,7 @@ export const activities = pgTable(
     fitSha256: text("fit_sha256"),
     fileType: text("file_type"), // 'fit' | 'gpx' | 'tcx' | null (csv-only manual imports)
     source: text("source").notNull().default("upload"), // 'upload' | 'strava-archive' | 'intervals-icu' | 'manual'
-    externalId: text("external_id"), // strava activity id or intervals.icu id, as text
+    externalId: text("external_id"), // upstream activity id (archive id or intervals.icu id), as text
     // sha256(`${startEpochSec}:${elapsedTimeS}`) over PRE-trim values so re-uploads
     // always collide regardless of trim settings; inserts are conflict-do-nothing
     dedupeKey: text("dedupe_key").notNull().unique(),
@@ -142,6 +143,11 @@ export const activities = pgTable(
     hrZonesS: jsonb("hr_zones_s").$type<number[]>(),
     // set on the second half of a split: the activity it was split from
     splitFromId: bigint("split_from_id", { mode: "number" }),
+    // newest edit wins (src/lib/metadata-merge.ts): when the site last edited
+    // name / description / sport type / hidden, and the upstream values the
+    // last sync saw. null = never edited / never synced
+    metaEditedAt: jsonb("meta_edited_at").$type<SiteEditTimes>(),
+    upstreamMeta: jsonb("upstream_meta").$type<UpstreamSnapshot>(),
     // last rebuild-job attempt: failing rows go to the back of the queue
     republishAttemptedAt: timestamp("republish_attempted_at", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),

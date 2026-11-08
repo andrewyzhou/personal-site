@@ -177,7 +177,7 @@ function fakeRow(over: Partial<ActivityRow> = {}): ActivityRow {
     fitBlobUrl: null, fitBlobPathname: null, fitSha256: null, fileType: "fit", source: "upload", externalId: null,
     dedupeKey: "k", hidden: false, processingVersion: 0, publishedInputsHash: null, canonicalTrackKey: null,
     mapHidden: false, hrHidden: false, publishedLocalTime: null, publishedStartUtc: null, fogEvents: null,
-    fogShapes: null, trackBbox: null, needsRepublish: false, republishAttemptedAt: null, staleMarkedAt: null, legacyRoute: null, rawStats: null, hrZonesS: null, splitFromId: null,
+    fogShapes: null, trackBbox: null, needsRepublish: false, republishAttemptedAt: null, metaEditedAt: null, upstreamMeta: null, staleMarkedAt: null, legacyRoute: null, rawStats: null, hrZonesS: null, splitFromId: null,
     createdAt: new Date(), updatedAt: new Date(), ...over,
   };
 }

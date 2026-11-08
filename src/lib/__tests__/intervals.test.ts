@@ -1,23 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// fake drizzle: select(...).from().where().limit() resolves to byIdRows;
-// update(...).set(v).where() records v
-const { byIdRows, updates, findSame, insert, sources, bySource, storeOriginal, storeRaw, republish } = vi.hoisted(() => ({
+// fake drizzle: a select naming metaEditedAt is the metadata row load
+// (metaRow); any other select is the own-row lookup by external id (byIdRows).
+// update(...).set(v).where() records v.
+const { byIdRows, metaRow, updates, findSame, insert, sources, bySource, hasFile, storeOriginal, storeRaw, republish, invalidate } = vi.hoisted(() => ({
   byIdRows: { value: [] as { id: number }[] },
+  metaRow: { value: null as Record<string, unknown> | null },
   updates: [] as Record<string, unknown>[],
   findSame: vi.fn(),
   insert: vi.fn(),
   sources: [] as Record<string, unknown>[],
   bySource: vi.fn(),
+  hasFile: vi.fn(),
   storeOriginal: vi.fn(),
   storeRaw: vi.fn(),
   republish: vi.fn(),
+  invalidate: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   activities: {},
   getDb: () => ({
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => byIdRows.value }) }) }),
+    select: (fields?: Record<string, unknown>) => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => (fields && "metaEditedAt" in fields ? (metaRow.value ? [metaRow.value] : []) : byIdRows.value),
+        }),
+      }),
+    }),
     update: () => ({ set: (v: Record<string, unknown>) => ({ where: async () => updates.push(v) }) }),
   }),
 }));
@@ -31,18 +41,20 @@ vi.mock("@/lib/activities", async (orig) => ({
 vi.mock("@/lib/activity-sources", () => ({
   addActivitySource: async (s: Record<string, unknown>) => void sources.push(s),
   findActivityIdBySource: (p: string, id: string) => bySource(p, id),
+  hasDeviceFile: (id: number) => hasFile(id),
   storeOriginal: (...a: unknown[]) => storeOriginal(...a),
   storeRawPayload: (...a: unknown[]) => storeRaw(...a),
 }));
 
 vi.mock("@/lib/republish", () => ({ republish: (id: number) => republish(id) }));
+vi.mock("@/lib/privacy/stale", () => ({ staleMark: () => ({ needsRepublish: true, staleMarkedAt: "now" }) }));
+vi.mock("@/lib/cache", () => ({ invalidateCache: (...a: unknown[]) => invalidate(...a) }));
 
-vi.mock("@/lib/cache", () => ({ invalidateCache: vi.fn() }));
-
+const parsedSport = vi.hoisted(() => ({ value: "Run" }));
 vi.mock("@/lib/fit", () => ({
   parseTrackFile: () => ({
     fileType: "fit",
-    sportType: "Run",
+    sportType: parsedSport.value,
     startDateUtc: new Date("2026-10-03T15:02:52Z"),
     utcOffsetMin: -420,
     hasLocalTime: true,
@@ -57,24 +69,32 @@ vi.mock("@/lib/fit", () => ({
   }),
 }));
 
-import { pullIntervalsActivities } from "@/lib/intervals";
+import {
+  applyIntervalsMetadata,
+  handleWebhookEvent,
+  parseWebhookEvents,
+  pullIntervalsActivities,
+} from "@/lib/intervals";
 
 const FILE_SHA = "f".repeat(64);
 const JSON_SHA = "a".repeat(64);
 const LEGACY = { pathname: "activities/fit/2026/abc.fit", url: "https://r2.test/activities/fit/2026/abc.fit", sha256: "b".repeat(64) };
 
+// recent, so the pull's 7-day import window includes it
+const START = new Date(Date.now() - 2 * 86400000);
 const activity = (over: Record<string, unknown> = {}) => ({
   id: "i100",
   name: "Berkeley Running",
   type: "Run",
   source: "GARMIN_CONNECT",
-  start_date: "2026-10-03T15:02:52Z",
-  start_date_local: "2026-10-03T08:02:52",
+  start_date: START.toISOString().replace(/\.\d+Z$/, "Z"),
+  start_date_local: new Date(START.getTime() - 7 * 3600000).toISOString().slice(0, 19),
   elapsed_time: 600,
   ...over,
 });
 
 let fetched: string[] = [];
+let detail: Record<string, unknown> | null = { id: "i100", icu_training_load: 42 };
 
 function mockApi(list: unknown[], file: Uint8Array | null = new Uint8Array([1, 2, 3])) {
   fetched = [];
@@ -83,18 +103,31 @@ function mockApi(list: unknown[], file: Uint8Array | null = new Uint8Array([1, 2
     if (url.includes("/activities?")) return new Response(JSON.stringify(list));
     if (url.endsWith("/fit-file")) throw new Error("re-encoded file must not be fetched");
     if (url.endsWith("/file")) return file ? new Response(new Blob([new Uint8Array(file)])) : new Response("", { status: 404 });
-    if (/\/activity\/i\d+$/.test(url)) return new Response('{"id":"i100","icu_training_load":42}');
+    if (/\/activity\/i\d+$/.test(url)) return detail ? new Response(JSON.stringify(detail)) : new Response("", { status: 404 });
     throw new Error(`unexpected ${url}`);
   }));
 }
 
+const snapshot = (over: Record<string, unknown> = {}) => ({
+  provider: "intervals-icu", externalId: "i100", name: "Berkeley Running", description: null, sportType: "Run", hidden: false,
+  seenAt: "2026-10-04T00:00:00.000Z", ...over,
+});
+const linkedRow = (over: Record<string, unknown> = {}) => ({
+  id: 5, name: "Berkeley Running", description: null, sportType: "Run", hidden: false,
+  metaEditedAt: null, upstreamMeta: snapshot(), ...over,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   byIdRows.value = [];
+  metaRow.value = null;
   updates.length = 0;
   sources.length = 0;
+  parsedSport.value = "Run";
+  detail = { id: "i100", icu_training_load: 42 };
   findSame.mockResolvedValue(null);
   bySource.mockResolvedValue(null);
+  hasFile.mockResolvedValue(false);
   insert.mockResolvedValue({ inserted: true, id: 1 });
   storeOriginal.mockResolvedValue({ rawSha256: FILE_SHA, legacy: null });
   storeRaw.mockResolvedValue(JSON_SHA);
@@ -102,7 +135,7 @@ beforeEach(() => {
   process.env.INTERVALS_ICU_API_KEY = "k";
 });
 
-describe("pullIntervalsActivities", () => {
+describe("pullIntervalsActivities: new activities", () => {
   it("stores the original from /file and the activity json, links both, then republishes", async () => {
     mockApi([activity()]);
     const r = await pullIntervalsActivities();
@@ -122,6 +155,8 @@ describe("pullIntervalsActivities", () => {
 
     const row = insert.mock.calls[0][0];
     expect(row).toMatchObject({ source: "intervals-icu", externalId: "i100", name: "Berkeley Running", sportType: "Run" });
+    // the upstream values at import are the baseline for later edits
+    expect(row.upstreamMeta).toMatchObject({ provider: "intervals-icu", externalId: "i100", name: "Berkeley Running", sportType: "Run", hidden: false });
     // raw store mode: no legacy public copy on the row
     expect(row.fitBlobPathname).toBeNull();
 
@@ -130,6 +165,13 @@ describe("pullIntervalsActivities", () => {
       { activityId: 1, provider: "intervals-icu", externalId: "i100", kind: "intervals-activity", rawSha256: JSON_SHA },
     ]);
     expect(republish).toHaveBeenCalledWith(1);
+  });
+
+  it("the fit file's sport is the ground truth for the type", async () => {
+    parsedSport.value = "TreadmillRun";
+    mockApi([activity({ type: "Run" })]);
+    await pullIntervalsActivities();
+    expect(insert.mock.calls[0][0].sportType).toBe("TreadmillRun");
   });
 
   it("writes the legacy fit columns only in fallback mode", async () => {
@@ -143,36 +185,33 @@ describe("pullIntervalsActivities", () => {
     ]);
   });
 
-  it("skips strava-sourced stubs without touching them", async () => {
+  it("skips stubs synced in from another service without touching them", async () => {
     mockApi([activity({ source: "STRAVA" })]);
     const r = await pullIntervalsActivities();
     expect(r).toMatchObject({ inserted: 0, skipped: 0 });
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("skips activities already pulled", async () => {
-    byIdRows.value = [{ id: 5 }];
-    mockApi([activity()]);
+  it("only imports from the last week; older ones in the metadata window are left alone", async () => {
+    const old = new Date(Date.now() - 10 * 86400000).toISOString();
+    mockApi([activity({ start_date: old, start_date_local: old.slice(0, 19) })]);
     expect(await pullIntervalsActivities()).toMatchObject({ inserted: 0, skipped: 1 });
+    expect(insert).not.toHaveBeenCalled();
+    // the list covers the 14-day metadata window
+    const listUrl = fetched.find((u) => u.includes("/activities?"))!;
+    const oldest = new URL(listUrl).searchParams.get("oldest")!;
+    expect(Date.now() - Date.parse(oldest)).toBeGreaterThan(13 * 86400000);
   });
 
-  it("skips activities already attached to another row as a source", async () => {
-    bySource.mockResolvedValue(9);
-    mockApi([activity()]);
-    expect(await pullIntervalsActivities()).toMatchObject({ inserted: 0, upgraded: 0, skipped: 1 });
-    expect(bySource).toHaveBeenCalledWith("intervals-icu", "i100");
-    expect(fetched.some((u) => u.includes("/activity/"))).toBe(false);
-    expect(storeOriginal).not.toHaveBeenCalled();
-    expect(republish).not.toHaveBeenCalled();
-  });
-
-  it("upgrades a strava-api row by attaching the original and republishing, never writing stats", async () => {
+  it("upgrades a row without a file by attaching the original; its name and type stay", async () => {
     findSame.mockResolvedValue({ id: 9, source: "strava-api", fitBlobPathname: null });
     mockApi([activity()]);
     const r = await pullIntervalsActivities();
     expect(r).toMatchObject({ inserted: 0, upgraded: 1 });
     expect(insert).not.toHaveBeenCalled();
-    expect(updates).toHaveLength(0);
+    // only the baseline snapshot is written: never name, type or stats
+    expect(updates).toHaveLength(1);
+    expect(Object.keys(updates[0]).sort()).toEqual(["updatedAt", "upstreamMeta"]);
     expect(sources.map((s) => [s.activityId, s.kind])).toEqual([
       [9, "device-file"],
       [9, "intervals-activity"],
@@ -180,38 +219,44 @@ describe("pullIntervalsActivities", () => {
     expect(republish).toHaveBeenCalledWith(9);
   });
 
-  it("upgrade in fallback mode sets only the legacy file columns", async () => {
+  it("upgrade in fallback mode also sets the legacy file columns", async () => {
     storeOriginal.mockResolvedValue({ rawSha256: LEGACY.sha256, legacy: LEGACY });
-    findSame.mockResolvedValue({ id: 9, source: "strava-api", fitBlobPathname: null });
+    findSame.mockResolvedValue({ id: 9, source: "manual", fitBlobPathname: null });
     mockApi([activity()]);
     await pullIntervalsActivities();
-    expect(updates).toHaveLength(1);
-    expect(Object.keys(updates[0]).sort()).toEqual(["fileType", "fitBlobPathname", "fitBlobUrl", "fitSha256", "updatedAt"]);
+    expect(updates).toHaveLength(2);
+    expect(Object.keys(updates[1]).sort()).toEqual(["fileType", "fitBlobPathname", "fitBlobUrl", "fitSha256", "updatedAt"]);
     expect(republish).toHaveBeenCalledWith(9);
   });
 
-  it("leaves rows that already have an original file alone", async () => {
-    findSame.mockResolvedValue({ id: 9, source: "upload", fitBlobPathname: "activities/fit/x.fit" });
+  it("links (never re-imports) rows that already have an original file", async () => {
+    findSame.mockResolvedValue({ id: 9, source: "upload", fitBlobPathname: null });
+    hasFile.mockResolvedValue(true);
     mockApi([activity()]);
-    expect(await pullIntervalsActivities()).toMatchObject({ skipped: 1, upgraded: 0 });
-    expect(updates).toHaveLength(0);
-    expect(sources).toHaveLength(0);
+    expect(await pullIntervalsActivities()).toMatchObject({ linked: 1, upgraded: 0, inserted: 0 });
+    expect(fetched.some((u) => u.endsWith("/file"))).toBe(false);
+    expect(storeOriginal).not.toHaveBeenCalled();
+    expect(sources).toEqual([{ activityId: 9, provider: "intervals-icu", externalId: "i100", kind: "intervals-activity", rawSha256: JSON_SHA }]);
+    expect(republish).not.toHaveBeenCalled();
   });
 
   it("falls back to summary stats when there is no file", async () => {
     mockApi([activity({ type: "WeightTraining", moving_time: 3000, elapsed_time: 3300 })], null);
     await pullIntervalsActivities();
-    expect(insert.mock.calls[0][0]).toMatchObject({
-      sportType: "WeightTraining",
-      fileType: null,
-      localDate: "2026-10-03",
-      localTime: "08:02",
-      utcOffsetMin: -420,
-      movingTimeS: 3000,
-    });
+    expect(insert.mock.calls[0][0]).toMatchObject({ sportType: "WeightTraining", fileType: null, movingTimeS: 3000, utcOffsetMin: -420 });
     expect(storeOriginal).not.toHaveBeenCalled();
     expect(sources.map((s) => s.kind)).toEqual(["summary", "intervals-activity"]);
     expect(republish).toHaveBeenCalledTimes(1); // published start for summary rows
+  });
+
+  it("maps intervals' trainer flag and unknown types without a file", async () => {
+    mockApi([activity({ type: "Ride", trainer: true })], null);
+    await pullIntervalsActivities();
+    expect(insert.mock.calls[0][0].sportType).toBe("IndoorRide");
+    insert.mockClear();
+    mockApi([activity({ type: "SomethingNew" })], null);
+    await pullIntervalsActivities();
+    expect(insert.mock.calls[0][0].sportType).toBe("Workout");
   });
 
   it("does not attach sources when the insert hits an existing row", async () => {
@@ -225,5 +270,178 @@ describe("pullIntervalsActivities", () => {
   it("reports a rejected api key as an error", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
     await expect(pullIntervalsActivities()).rejects.toThrow("rejected the api key");
+  });
+});
+
+describe("pullIntervalsActivities: metadata safety net", () => {
+  it("applies a rename made upstream to an already-imported row", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow();
+    mockApi([activity({ name: "Tempo by the bay" })]);
+    const r = await pullIntervalsActivities();
+    expect(r).toMatchObject({ updated: 1, inserted: 0 });
+    expect(updates[0]).toMatchObject({ name: "Tempo by the bay", upstreamMeta: { name: "Tempo by the bay" } });
+    expect(insert).not.toHaveBeenCalled();
+    expect(storeOriginal).not.toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalled();
+  });
+
+  it("a row attached to another one as a source gets the update too", async () => {
+    bySource.mockResolvedValue(9);
+    metaRow.value = linkedRow({ id: 9 });
+    mockApi([activity({ description: "legs heavy" })]);
+    expect(await pullIntervalsActivities()).toMatchObject({ updated: 1 });
+    expect(bySource).toHaveBeenCalledWith("intervals-icu", "i100");
+    expect(updates[0]).toMatchObject({ description: "legs heavy" });
+  });
+
+  it("nothing changed upstream: no write at all", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow();
+    mockApi([activity()]);
+    expect(await pullIntervalsActivities()).toMatchObject({ updated: 0, skipped: 1 });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("a site rename after the last sync wins over an upstream rename seen by the pull", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow({ name: "my name", metaEditedAt: { name: "2026-10-05T00:00:00.000Z" } });
+    mockApi([activity({ name: "garmin name" })]);
+    expect(await pullIntervalsActivities()).toMatchObject({ updated: 0 });
+    expect(updates[0]).not.toHaveProperty("name");
+    expect(updates[0].upstreamMeta).toMatchObject({ name: "garmin name" });
+  });
+
+  it("a type change marks the row for a rebuild", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow();
+    mockApi([activity({ type: "TrailRun" })]);
+    await pullIntervalsActivities();
+    expect(updates[0]).toMatchObject({ sportType: "TrailRun", needsRepublish: true });
+  });
+});
+
+describe("webhook events", () => {
+  it("parses intervals' payload shape, dropping junk, duplicates and other athletes", () => {
+    const events = parseWebhookEvents(
+      {
+        secret: "s",
+        events: [
+          { athlete_id: "i1", type: "ACTIVITY_UPLOADED", timestamp: "2026-10-03T15:20:00Z", activity: { id: "i100", name: "ignored" } },
+          { athlete_id: "i1", type: "ACTIVITY_UPLOADED", timestamp: "2026-10-03T15:20:00Z", activity: { id: "i100" } },
+          { athlete_id: "i2", type: "ACTIVITY_UPDATED", activity: { id: "i200" } },
+          { athlete_id: "i1", type: "ACTIVITY_UPDATED", activity: { id: "../../etc" } },
+          { athlete_id: "i1", type: "ACTIVITY_UPDATED" },
+          "nope",
+          { athlete_id: "i1", type: "ACTIVITY_UPDATED", timestamp: "bad", activity: { id: 300 } },
+        ],
+      },
+      "i1"
+    );
+    expect(events).toEqual([
+      { type: "ACTIVITY_UPLOADED", activityId: "i100", timestamp: new Date("2026-10-03T15:20:00Z") },
+      { type: "ACTIVITY_UPDATED", activityId: "300", timestamp: null },
+    ]);
+    expect(parseWebhookEvents(null)).toEqual([]);
+    expect(parseWebhookEvents({ events: "x" })).toEqual([]);
+  });
+
+  it("an upload re-reads the activity from the api and imports it", async () => {
+    detail = activity();
+    mockApi([]);
+    const r = await handleWebhookEvent({ type: "ACTIVITY_UPLOADED", activityId: "i100", timestamp: new Date() });
+    expect(r.result).toBe("inserted");
+    expect(fetched.filter((u) => /\/activity\/i100$/.test(u))).toHaveLength(1); // the json fetched once, reused
+    expect(insert.mock.calls[0][0]).toMatchObject({ name: "Berkeley Running", externalId: "i100" });
+    expect(republish).toHaveBeenCalledWith(1);
+  });
+
+  it("an update applies the api's current name with the event's time", async () => {
+    detail = activity({ name: "renamed in garmin" });
+    byIdRows.value = [{ id: 5 }];
+    // the site renamed it before the garmin rename happened
+    metaRow.value = linkedRow({ name: "site name", metaEditedAt: { name: "2026-10-05T00:00:00.000Z" } });
+    mockApi([]);
+    const r = await handleWebhookEvent({ type: "ACTIVITY_UPDATED", activityId: "i100", timestamp: new Date("2026-10-06T00:00:00Z") });
+    expect(r.result).toBe("updated");
+    expect(updates[0]).toMatchObject({ name: "renamed in garmin" });
+    // the fresh json is kept as a source
+    expect(sources).toEqual([{ activityId: 5, provider: "intervals-icu", externalId: "i100", kind: "intervals-activity", rawSha256: JSON_SHA }]);
+  });
+
+  it("an update older than the site's edit leaves the site's value", async () => {
+    detail = activity({ name: "renamed in garmin" });
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow({ name: "site name", metaEditedAt: { name: "2026-10-05T00:00:00.000Z" } });
+    mockApi([]);
+    const r = await handleWebhookEvent({ type: "ACTIVITY_UPDATED", activityId: "i100", timestamp: new Date("2026-10-04T12:00:00Z") });
+    expect(r.result).toBe("unchanged");
+    expect(updates[0]).not.toHaveProperty("name");
+  });
+
+  it("an update for an activity we don't have yet imports it", async () => {
+    detail = activity();
+    mockApi([]);
+    expect((await handleWebhookEvent({ type: "ACTIVITY_ANALYZED", activityId: "i100", timestamp: null })).result).toBe("inserted");
+  });
+
+  it("an update for a deleted activity does nothing", async () => {
+    detail = null;
+    mockApi([]);
+    expect((await handleWebhookEvent({ type: "ACTIVITY_UPDATED", activityId: "i100", timestamp: null })).result).toBe("gone");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("a delete hides the row only once the api confirms it is gone", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow();
+    detail = activity();
+    mockApi([]);
+    expect((await handleWebhookEvent({ type: "ACTIVITY_DELETED", activityId: "i100", timestamp: new Date() })).result).toBe("ignored");
+    expect(updates).toHaveLength(0);
+
+    detail = null;
+    mockApi([]);
+    expect((await handleWebhookEvent({ type: "ACTIVITY_DELETED", activityId: "i100", timestamp: new Date() })).result).toBe("hidden");
+    expect(updates[0]).toMatchObject({ hidden: true });
+  });
+
+  it("a delete never overrides a later site un-hide", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow({ metaEditedAt: { hidden: "2026-10-06T00:00:00.000Z" } });
+    detail = null;
+    mockApi([]);
+    const r = await handleWebhookEvent({ type: "ACTIVITY_DELETED", activityId: "i100", timestamp: new Date("2026-10-05T00:00:00Z") });
+    expect(r.result).toBe("unchanged");
+    expect(updates[0] ?? {}).not.toHaveProperty("hidden");
+  });
+
+  it("ignores other event types without calling the api", async () => {
+    mockApi([]);
+    expect((await handleWebhookEvent({ type: "WELLNESS_UPDATED", activityId: "i100", timestamp: null })).result).toBe("ignored");
+    expect(fetched).toHaveLength(0);
+  });
+
+  it("stubs from another service are never imported from a webhook", async () => {
+    detail = activity({ source: "STRAVA" });
+    mockApi([]);
+    expect((await handleWebhookEvent({ type: "ACTIVITY_UPLOADED", activityId: "i100", timestamp: null })).result).toBe("ignored");
+    expect(insert).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyIntervalsMetadata", () => {
+  it("is a no-op for an activity that isn't linked to any row", async () => {
+    expect(await applyIntervalsMetadata("i404", { name: "x" })).toEqual({ rowId: null, applied: [] });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("first sighting of a linked row records the baseline and keeps its name", async () => {
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow({ name: "archive name", upstreamMeta: null });
+    const r = await applyIntervalsMetadata("i100", { name: "Morning Run", description: null, sportType: "Run" });
+    expect(r.applied).toEqual([]);
+    expect(updates[0]).not.toHaveProperty("name");
+    expect(updates[0].upstreamMeta).toMatchObject({ name: "Morning Run" });
   });
 });
