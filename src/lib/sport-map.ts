@@ -194,7 +194,8 @@ export function fitSportType(sport?: string | number | null, subSport?: string |
 }
 
 // intervals.icu activity `type` values (its openapi spec, the
-// strava_sync_activity_types enum). all but Other are site types verbatim.
+// strava_sync_activity_types enum). all are site types verbatim; Other (garmin's
+// generic recordings) reads as a workout.
 export const INTERVALS_TYPES = [
   "Ride", "Run", "Swim", "WeightTraining", "Hike", "Walk", "AlpineSki", "BackcountrySki", "Badminton",
   "Canoeing", "Crossfit", "EBikeRide", "EMountainBikeRide", "Elliptical", "Golf", "GravelRide", "TrackRide",
@@ -209,7 +210,9 @@ export const INTERVALS_TYPES = [
 // trainer = intervals' indoor flag: a run on a treadmill or a ride on a
 // trainer without a virtual world
 export function intervalsSportType(type: string | null | undefined, trainer?: boolean | null): SportType {
-  if (!type) return GENERIC_SPORT_TYPE;
+  // garmin's "other" recordings (fit sport generic) arrive typed Other: they
+  // are workouts of no particular sport, same as their fit files say
+  if (!type || type === "Other") return GENERIC_SPORT_TYPE;
   if (trainer && type === "Run") return "TreadmillRun";
   if (trainer && type === "Ride") return "IndoorRide";
   return isSportType(type) ? type : GENERIC_SPORT_TYPE;

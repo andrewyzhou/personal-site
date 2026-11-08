@@ -198,9 +198,9 @@ describe("fit sport + sub_sport → sport type", () => {
 });
 
 describe("intervals.icu type → sport type", () => {
-  it.each(INTERVALS_TYPES)("%s maps to itself, a site type with an icon", (type) => {
+  it.each(INTERVALS_TYPES)("%s maps to a site type with an icon (itself, but Other is a workout)", (type) => {
     const mapped = intervalsSportType(type);
-    expect(mapped).toBe(type);
+    expect(mapped).toBe(type === "Other" ? "Workout" : type);
     expect(isSportType(mapped)).toBe(true);
     expect(iconExists(sportTypeIcon(mapped))).toBe(true);
   });
