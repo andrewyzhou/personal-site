@@ -6,7 +6,9 @@
 // sorted by time, at most one sample per second (the last one wins). values are
 // otherwise kept exactly as the source reported them; gaps (pauses) stay gaps.
 //
-// source precedence: device file (fit/gpx/tcx) > strava streams > strava polyline.
+// source precedence: device file (fit/gpx/tcx) > imported streams > imported
+// polyline. the "strava-*" kind names are stored keys from the old archive/api
+// imports (sources, hashes, canonical tracks) and stay as written.
 
 import { gzipSync, gunzipSync, strToU8, strFromU8 } from "fflate";
 import { parseTrackFile, type ParsedTrackFile, type TrackFileType } from "./fit";
@@ -43,7 +45,7 @@ export interface CanonicalTrack {
   source: {
     kind: TrackSourceKind;
     sha256: string; // raw object the track was built from
-    detailSha256?: string | null; // strava detail json used alongside streams/polyline
+    detailSha256?: string | null; // imported detail json used alongside streams/polyline
     fileType: TrackFileType | null;
   };
   sportType: string;
@@ -146,7 +148,7 @@ export function canonicalFromParsed(
       fileType: source.kind === "device-file" ? parsed.fileType : null,
     },
     sportType: parsed.sportType,
-    // the source's own start (fit session start / first gpx point / strava
+    // the source's own start (fit session start / first gpx point / imported
     // start_date), kept verbatim so dedupe keys and local dates never drift
     startEpochMs: parsed.startDateUtc.getTime(),
     utcOffsetMin: parsed.utcOffsetMin,
@@ -164,8 +166,8 @@ export function canonicalFromDeviceFile(bytes: Uint8Array, filename: string, sha
   return canonicalFromParsed(parseTrackFile(bytes, filename), { kind: "device-file", sha256 });
 }
 
-// strava DetailedActivity fields the builders read
-export interface StravaDetailLike {
+// fields of the imported detail json (the old api's DetailedActivity) the builders read
+export interface ImportedDetailLike {
   id: number;
   name?: string;
   sport_type?: string;
@@ -188,7 +190,7 @@ export interface StravaDetailLike {
   map?: { polyline?: string | null; summary_polyline?: string | null } | null;
 }
 
-export function stravaSummaryStats(d: StravaDetailLike): ComputedStats {
+export function importedSummaryStats(d: ImportedDetailLike): ComputedStats {
   return {
     distanceM: d.distance || 0,
     movingTimeS: d.moving_time || 0,
@@ -209,7 +211,7 @@ type StreamKey = (typeof STREAM_KEYS)[number];
 type StreamMap = Partial<Record<StreamKey, unknown[]>>;
 
 // accepts both key_by_type=true ({time: {data}}) and the array form ([{type, data}])
-export function normalizeStravaStreams(raw: unknown): StreamMap {
+export function normalizeImportedStreams(raw: unknown): StreamMap {
   const out: StreamMap = {};
   if (Array.isArray(raw)) {
     for (const s of raw as { type?: string; data?: unknown[] }[]) {
@@ -226,7 +228,7 @@ export function normalizeStravaStreams(raw: unknown): StreamMap {
   return out;
 }
 
-function stravaParsedBase(detail: StravaDetailLike, records: TrackRecord[], cumDist: number[]): ParsedTrackFile {
+function importedParsedBase(detail: ImportedDetailLike, records: TrackRecord[], cumDist: number[]): ParsedTrackFile {
   return {
     fileType: "fit", // placeholder: api tracks have no file; source.fileType is null
     sportType: detail.sport_type || detail.type || "Workout",
@@ -235,19 +237,19 @@ function stravaParsedBase(detail: StravaDetailLike, records: TrackRecord[], cumD
     hasLocalTime: detail.utc_offset !== undefined,
     records,
     cumDist,
-    sessionStats: stravaSummaryStats(detail),
+    sessionStats: importedSummaryStats(detail),
     kilojoules: detail.kilojoules ?? null,
     suggestedName: detail.name || "workout",
   };
 }
 
 // streams json + detail json (both raw bytes as returned by the api)
-export function canonicalFromStravaStreams(
-  detail: StravaDetailLike,
+export function canonicalFromImportedStreams(
+  detail: ImportedDetailLike,
   streamsRaw: unknown,
   shas: { streamsSha256: string; detailSha256: string }
 ): CanonicalTrack | null {
-  const s = normalizeStravaStreams(streamsRaw);
+  const s = normalizeImportedStreams(streamsRaw);
   const time = s.time as number[] | undefined;
   if (!time || time.length < 2) return null;
   const latlng = s.latlng as [number, number][] | undefined;
@@ -267,7 +269,7 @@ export function canonicalFromStravaStreams(
   }));
   const distance = s.distance as number[] | undefined;
   const cumDist = distance && distance.length === records.length ? distance : cumulativeDistances(records);
-  return canonicalFromParsed(stravaParsedBase(detail, records, cumDist), {
+  return canonicalFromParsed(importedParsedBase(detail, records, cumDist), {
     kind: "strava-streams",
     sha256: shas.streamsSha256,
     detailSha256: shas.detailSha256,
@@ -276,7 +278,7 @@ export function canonicalFromStravaStreams(
 
 // last resort: the detail's polyline (full when present, else summary). no
 // timestamps exist, so t is spread evenly over elapsed time and flagged synthetic.
-export function canonicalFromStravaPolyline(detail: StravaDetailLike, detailSha256: string): CanonicalTrack | null {
+export function canonicalFromImportedPolyline(detail: ImportedDetailLike, detailSha256: string): CanonicalTrack | null {
   const encoded = detail.map?.polyline || detail.map?.summary_polyline;
   if (!encoded) return null;
   const points = decodePolyline(encoded);
@@ -293,7 +295,7 @@ export function canonicalFromStravaPolyline(detail: StravaDetailLike, detailSha2
     speed: null,
   }));
   return canonicalFromParsed(
-    stravaParsedBase(detail, records, cumulativeDistances(records)),
+    importedParsedBase(detail, records, cumulativeDistances(records)),
     { kind: "strava-polyline", sha256: detailSha256, detailSha256 },
     { syntheticTime: true }
   );

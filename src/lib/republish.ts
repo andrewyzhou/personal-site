@@ -67,14 +67,14 @@ import {
   CANONICAL_FORMAT_VERSION,
   TRACK_SOURCE_PRECEDENCE,
   canonicalFromDeviceFile,
-  canonicalFromStravaPolyline,
-  canonicalFromStravaStreams,
+  canonicalFromImportedPolyline,
+  canonicalFromImportedStreams,
   canonicalToParsed,
   canonicalTrackKey,
   hasGps,
   serializeCanonical,
   type CanonicalTrack,
-  type StravaDetailLike,
+  type ImportedDetailLike,
   type TrackSourceKind,
 } from "./canonical-track";
 import { getRawStore, isRawStoreConfigured, sha256Hex } from "./raw-store";
@@ -675,14 +675,14 @@ export async function buildTrack(
   }
   const detailBytes = ref.kind === "strava-polyline" ? bytes : await deps.loadRaw(ref.detailSha256!, row);
   if (!detailBytes) return "unavailable";
-  const detail = JSON.parse(new TextDecoder().decode(detailBytes)) as StravaDetailLike;
+  const detail = JSON.parse(new TextDecoder().decode(detailBytes)) as ImportedDetailLike;
   if (ref.kind === "strava-streams") {
-    return canonicalFromStravaStreams(detail, JSON.parse(new TextDecoder().decode(bytes)), {
+    return canonicalFromImportedStreams(detail, JSON.parse(new TextDecoder().decode(bytes)), {
       streamsSha256: ref.sha256,
       detailSha256: ref.detailSha256!,
     });
   }
-  return canonicalFromStravaPolyline(detail, ref.sha256);
+  return canonicalFromImportedPolyline(detail, ref.sha256);
 }
 
 export async function republish(activityId: number, opts: RepublishOptions = {}): Promise<RepublishResult> {

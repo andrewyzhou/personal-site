@@ -1,7 +1,7 @@
 name: import activities
 
-# vercel hobby crons are daily-only; this pulls new strava / intervals.icu
-# activities every 30 minutes by hitting the same cron endpoint
+# vercel hobby crons are daily-only; this pulls new intervals.icu activities
+# every 30 minutes by hitting the same cron endpoint (the webhook is the fast path)
 on:
   schedule:
     - cron: "*/30 * * * *"

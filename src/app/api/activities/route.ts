@@ -5,12 +5,12 @@ import { isPublic, publicCalendarActivity } from "@/lib/public-activity";
 import { getCachedData } from "@/lib/cache";
 import { log } from "@/lib/log";
 import { liftCalendarEntries } from "@/lib/lift/public";
-import type { CalendarActivity } from "@/lib/strava";
+import type { CalendarActivity } from "@/lib/calendar-activity";
 
 export const dynamic = "force-dynamic";
 
-// shape-identical replacement for /api/strava/activities: full history, date
-// desc, no polylines (payload parity with the old response). rows go through
+// the public activity history for the calendar: full history, date
+// desc, no polylines. rows go through
 // the public serializer before they're cached, so the kv copy is public too.
 async function fetchActivities(): Promise<CalendarActivity[]> {
   const rows = await getDb()

@@ -9,14 +9,14 @@ import {
   CANONICAL_FORMAT_VERSION,
   TRACK_SOURCE_PRECEDENCE,
   canonicalFromDeviceFile,
-  canonicalFromStravaPolyline,
-  canonicalFromStravaStreams,
+  canonicalFromImportedPolyline,
+  canonicalFromImportedStreams,
   canonicalToParsed,
   canonicalTrackKey,
   deserializeCanonical,
   hasGps,
   normalizeSamples,
-  normalizeStravaStreams,
+  normalizeImportedStreams,
   serializeCanonical,
 } from "../canonical-track";
 import type { TrackRecord } from "../geo";
@@ -129,7 +129,7 @@ describe("strava streams builder", () => {
   };
 
   it("builds from key_by_type streams + detail", () => {
-    const t = canonicalFromStravaStreams(detail, streams, { streamsSha256: "a".repeat(64), detailSha256: "b".repeat(64) })!;
+    const t = canonicalFromImportedStreams(detail, streams, { streamsSha256: "a".repeat(64), detailSha256: "b".repeat(64) })!;
     expect(t.source).toEqual({ kind: "strava-streams", sha256: "a".repeat(64), detailSha256: "b".repeat(64), fileType: null });
     expect(t.utcOffsetMin).toBe(-420);
     expect(t.hasLocalTime).toBe(true);
@@ -141,17 +141,17 @@ describe("strava streams builder", () => {
 
   it("accepts the array stream form identically", () => {
     const arrayForm = Object.entries(streams).map(([type, s]) => ({ type, data: s.data }));
-    expect(normalizeStravaStreams(arrayForm)).toEqual(normalizeStravaStreams(streams));
+    expect(normalizeImportedStreams(arrayForm)).toEqual(normalizeImportedStreams(streams));
   });
 
   it("returns null without a time stream", () => {
-    expect(canonicalFromStravaStreams(detail, { latlng: streams.latlng }, { streamsSha256: "a".repeat(64), detailSha256: "b".repeat(64) })).toBeNull();
+    expect(canonicalFromImportedStreams(detail, { latlng: streams.latlng }, { streamsSha256: "a".repeat(64), detailSha256: "b".repeat(64) })).toBeNull();
   });
 });
 
 describe("strava polyline builder", () => {
   it("spreads synthetic time over elapsed time and keeps summary stats", () => {
-    const t = canonicalFromStravaPolyline(detail, "c".repeat(64))!;
+    const t = canonicalFromImportedPolyline(detail, "c".repeat(64))!;
     expect(t.syntheticTime).toBe(true);
     expect(t.source.kind).toBe("strava-polyline");
     expect(t.columns.t[0]).toBe(0);
@@ -160,7 +160,7 @@ describe("strava polyline builder", () => {
   });
 
   it("returns null without a polyline", () => {
-    expect(canonicalFromStravaPolyline({ ...detail, map: null }, "c".repeat(64))).toBeNull();
+    expect(canonicalFromImportedPolyline({ ...detail, map: null }, "c".repeat(64))).toBeNull();
   });
 });
 

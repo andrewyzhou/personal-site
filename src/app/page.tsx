@@ -112,7 +112,7 @@ export default function Home() {
       </section>
       <div className="section-divider" />
 
-      {/* section 4: github activity + strava calendar */}
+      {/* section 4: github activity + activity calendar */}
       <section className="py-16">
         {/* heading - visible on mobile only, above everything */}
         <h3 className="font-sans font-bold text-off-white text-3xl activity-stack:hidden" style={{ marginBottom: '1rem' }}>
@@ -120,7 +120,7 @@ export default function Home() {
         </h3>
 
         <div className="flex flex-col activity-stack:flex-row justify-between gap-8 activity-stack:gap-12">
-          {/* strava calendar - shows first on mobile, right on desktop */}
+          {/* activity calendar - shows first on mobile, right on desktop */}
           <div className="w-full activity-stack:w-2/5 flex justify-center activity-stack:justify-end activity-stack:items-center order-first activity-stack:order-last">
             <ErrorBoundary fallback={<p className="font-sans text-gray text-lg">{site.home.errors.calendar}</p>}>
               <ActivityCalendar />

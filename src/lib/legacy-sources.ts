@@ -5,7 +5,7 @@ import type { SourceProvider } from "./activity-sources";
 
 export function legacyProvider(source: string | null | undefined): SourceProvider {
   switch (source) {
-    // archive imports, api sync, and csv-only archive rows all carry a strava id
+    // archive imports, the retired api sync, and csv-only archive rows all carry an archive id
     case "strava-archive":
     case "strava-api":
     case "manual":

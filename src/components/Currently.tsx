@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { isSpotifyTrack, isStravaActivity, isLiteralBook, isStatsPayload } from "@/lib/validate";
+import { isSpotifyTrack, isLatestActivity, isLiteralBook, isStatsPayload } from "@/lib/validate";
 import { useSite } from "@/content/SiteProvider";
+import { sportFamily, sportMetric, sportNoun } from "@/lib/sport-types";
 
 interface SpotifyTrack {
   isPlaying: boolean;
@@ -14,7 +15,7 @@ interface SpotifyTrack {
   previousFetchedAt?: number | null;
 }
 
-interface StravaActivity {
+interface LatestActivity {
   id: number;
   name: string;
   type: string;
@@ -38,7 +39,7 @@ interface LiteralBook {
 export default function Currently({ showHeading = true }: { showHeading?: boolean } = {}) {
   const { currently: copy } = useSite();
   const [spotify, setSpotify] = useState<SpotifyTrack | null>(null);
-  const [strava, setStrava] = useState<StravaActivity | null>(null);
+  const [workout, setWorkout] = useState<LatestActivity | null>(null);
   const [book, setBook] = useState<LiteralBook | null>(null);
   const [apiCalls, setApiCalls] = useState<number | null>(null);
   const [prevApiCalls, setPrevApiCalls] = useState<number | null>(null);
@@ -124,7 +125,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
     async function fetchData() {
       try {
         // allSettled so one failed source can't discard the others' results
-        const [spotifyRes, stravaRes, literalRes, statsRes] = await Promise.allSettled([
+        const [spotifyRes, latestRes, literalRes, statsRes] = await Promise.allSettled([
           fetch("/api/spotify"),
           fetch("/api/activities/latest"),
           fetch("/api/literal"),
@@ -159,10 +160,10 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
           }
         }
 
-        const stravaData = await toJson(stravaRes);
-        if (isStravaActivity(stravaData)) {
-          const data = stravaData as StravaActivity & { latestActivityId?: number };
-          setStrava(data);
+        const latestData = await toJson(latestRes);
+        if (isLatestActivity(latestData)) {
+          const data = latestData as LatestActivity & { latestActivityId?: number };
+          setWorkout(data);
           if (data.fetchedAt && (!maxFetchedAt || data.fetchedAt > maxFetchedAt)) {
             maxFetchedAt = data.fetchedAt;
           }
@@ -171,7 +172,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
           }
           if (data.latestActivityId) {
             window.dispatchEvent(
-              new CustomEvent("strava-latest-activity", {
+              new CustomEvent("latest-activity", {
                 detail: { latestActivityId: data.latestActivityId },
               })
             );
@@ -219,20 +220,8 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
   }, []);
 
   const getActivityType = useCallback((type: string): string => {
-    const types: Record<string, string> = {
-      Run: "run",
-      Ride: "bike ride",
-      Swim: "swim",
-      Walk: "walk",
-      Hike: "hike",
-      WeightTraining: "lift",
-      Workout: "workout",
-      Tennis: "tennis",
-      Soccer: "soccer",
-      TrailRun: "trail run",
-      RockClimbing: "climbing",
-    };
-    return types[type] || type.toLowerCase();
+    // "a 1 hr climbing session" reads better than "climb session"
+    return sportFamily(type) === "climb" ? "climbing" : sportNoun(type);
   }, []);
 
   const formatSpotifyTime = useCallback((dateString: string): string => {
@@ -256,7 +245,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
     }
   }, []);
 
-  const formatStravaTime = useCallback((dateString: string): string => {
+  const formatWorkoutTime = useCallback((dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -382,13 +371,14 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
       }
     }
 
-    // strava part
-    if (strava) {
-      const timeAgo = formatStravaTime(strava.startDate);
-      const useDuration = ["WeightTraining", "Workout", "Yoga", "Crossfit", "Tennis", "Soccer", "RockClimbing"].includes(strava.type);
-      const needsSession = ["Yoga", "Crossfit", "Tennis", "Soccer", "RockClimbing"].includes(strava.type);
-      const activityMetric = useDuration ? strava.formattedDuration : strava.formattedDistance;
-      const activityType = getActivityType(strava.type);
+    // workout part
+    if (workout) {
+      const timeAgo = formatWorkoutTime(workout.startDate);
+      const useDuration = sportMetric(workout.type) === "duration";
+      // "a 40 min lift", but "a 1 hr yoga session"
+      const needsSession = useDuration && workout.type !== "WeightTraining" && workout.type !== "Workout";
+      const activityMetric = useDuration ? workout.formattedDuration : workout.formattedDistance;
+      const activityType = getActivityType(workout.type);
       const workoutText = needsSession
         ? `${activityMetric} ${activityType} session`
         : `${activityMetric} ${activityType}`;
@@ -399,13 +389,13 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
       links.push({
         start: linkStart,
         end: text.length,
-        url: `/activities/${strava.id}`,
+        url: `/activities/${workout.id}`,
       });
       text += " " + timeAgo + ".";
     }
 
     return { text, links };
-  }, [book, spotify, strava, formatSpotifyTime, formatStravaTime, getActivityType]);
+  }, [book, spotify, workout, formatSpotifyTime, formatWorkoutTime, getActivityType]);
 
   // reusable delete/type animation function
   const animateDeleteType = useCallback((
@@ -446,7 +436,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
 
   // trigger continue typing when data loads
   useEffect(() => {
-    if (!loading && displayedText === INITIAL_TEXT && (book || spotify || strava)) {
+    if (!loading && displayedText === INITIAL_TEXT && (book || spotify || workout)) {
       const { text } = buildPlainTextAndLinks();
 
       if (text.startsWith(INITIAL_TEXT)) {
@@ -461,7 +451,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
         });
       }
     }
-  }, [loading, displayedText, book, spotify, strava, buildPlainTextAndLinks, continueTyping, animateDeleteType]);
+  }, [loading, displayedText, book, spotify, workout, buildPlainTextAndLinks, continueTyping, animateDeleteType]);
 
   // footer animation: after body typing completes, animate fetch time (if refetched), then api calls
   useEffect(() => {

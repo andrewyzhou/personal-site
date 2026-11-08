@@ -21,7 +21,6 @@ interface CachedDataWithPrevious<T> {
 
 const CACHE_TTL = {
   spotify: 60 * 1000, // 1 minute
-  strava: 5 * 60 * 1000, // 5 minutes
   literal: 60 * 60 * 1000, // 1 hour
   activities_list: 5 * 60 * 1000, // 5 minutes — postgres is source of truth
   activities_latest: 60 * 1000, // 1 minute

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSpotifyTrack, isStravaActivity, isLiteralBook, isStatsPayload } from "../validate";
+import { isSpotifyTrack, isLatestActivity, isLiteralBook, isStatsPayload } from "../validate";
 
 describe("isSpotifyTrack", () => {
   it("accepts a valid track", () => {
@@ -24,7 +24,7 @@ describe("isSpotifyTrack", () => {
   });
 });
 
-describe("isStravaActivity", () => {
+describe("isLatestActivity", () => {
   const valid = {
     id: 123,
     name: "morning run",
@@ -35,16 +35,16 @@ describe("isStravaActivity", () => {
   };
 
   it("accepts a valid activity", () => {
-    expect(isStravaActivity(valid)).toBe(true);
+    expect(isLatestActivity(valid)).toBe(true);
   });
 
   it("rejects when formatted metrics are missing", () => {
-    expect(isStravaActivity({ ...valid, formattedDistance: undefined })).toBe(false);
-    expect(isStravaActivity({ ...valid, formattedDuration: undefined })).toBe(false);
+    expect(isLatestActivity({ ...valid, formattedDistance: undefined })).toBe(false);
+    expect(isLatestActivity({ ...valid, formattedDuration: undefined })).toBe(false);
   });
 
   it("rejects the metadata-only failure shape", () => {
-    expect(isStravaActivity({ fetchedAt: 1751800000000 })).toBe(false);
+    expect(isLatestActivity({ fetchedAt: 1751800000000 })).toBe(false);
   });
 });
 

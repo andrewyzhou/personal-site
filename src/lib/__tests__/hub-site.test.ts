@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { B_PREFIX, B_REDIRECTS, DEFAULT_SITE_DESIGN, hasBPage } from "@/designs/routes";
 import { dayLabel, sportGroup, summarize, toTrainingItem, type TrainingItem } from "@/content/training";
 import { activityStats, fogLine } from "@/content/activity";
-import type { CalendarActivity } from "@/lib/strava";
+import type { CalendarActivity } from "@/lib/calendar-activity";
 
 describe("hub site routing", () => {
   it("v1 stays the public default until the owner flips it", () => {

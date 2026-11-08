@@ -9,7 +9,7 @@
 
 import type { ActivityRow, FogEvent, RouteBounds } from "./db/schema";
 import type { ActivityMetrics } from "./metrics/types";
-import type { CalendarActivity } from "./strava";
+import type { CalendarActivity } from "./calendar-activity";
 
 export type Visibility = "public" | "hide-map" | "private";
 

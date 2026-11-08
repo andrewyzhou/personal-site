@@ -14,7 +14,7 @@ import {
   type ComputedStats,
 } from "./geo";
 import type { ParsedTrackFile } from "./fit";
-import type { CalendarActivity } from "./strava";
+import type { CalendarActivity } from "./calendar-activity";
 
 export const DETAIL_POLYLINE_MAX_POINTS = 1500;
 export const CARD_POLYLINE_MAX_POINTS = 100;
@@ -204,7 +204,7 @@ export async function findByDedupeKey(key: string): Promise<{ id: number; name: 
 }
 
 // one person can't start two activities within this window: the same workout
-// arriving from different sources (strava api, intervals.icu, upload) collides
+// arriving from different sources (archive, intervals.icu, upload) collides
 // here even when the sources disagree on elapsed time (so dedupe_key differs)
 export const SAME_ACTIVITY_WINDOW_S = 120;
 

@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { isStravaApiEnabled } from "@/lib/strava";
-import { syncStravaActivities, syncStravaPhotos } from "@/lib/strava-sync";
 import { isIntervalsConfigured, pullIntervalsActivities } from "@/lib/intervals";
 import { unauthorizedResponse } from "@/lib/admin-auth";
 import { log } from "@/lib/log";
@@ -16,11 +14,9 @@ const CRON_DEADLINE_MS = 35_000;
 const CRON_REBUILD_MAX_MS = 30_000;
 const MIN_REBUILD_MS = 5_000;
 
-// scheduled import from every configured source (vercel cron + github actions).
-// strava first: when both have the same workout, intervals.icu then upgrades
-// the strava row with the original file instead of the strava row merging later.
-// then, in whatever time is left, republish activities that zone/settings
-// changes left pending.
+// scheduled safety net behind the intervals.icu webhook (vercel cron + github
+// actions): pull new activities and recent metadata edits, then, in whatever
+// time is left, republish activities that zone/settings changes left pending.
 export async function GET(request: Request) {
   const started = Date.now();
   const secret = process.env.CRON_SECRET;
@@ -29,22 +25,6 @@ export async function GET(request: Request) {
   }
 
   const out: Record<string, unknown> = {};
-  if (isStravaApiEnabled()) {
-    try {
-      out.strava = await syncStravaActivities();
-    } catch (error) {
-      log.error("cron:activities", "strava sync failed", error);
-      out.strava = { error: (error as Error).message };
-    }
-  }
-  if (isStravaApiEnabled()) {
-    try {
-      out.stravaPhotos = await syncStravaPhotos();
-    } catch (error) {
-      log.error("cron:activities", "strava photo sync failed", error);
-      out.stravaPhotos = { error: (error as Error).message };
-    }
-  }
   if (isIntervalsConfigured()) {
     try {
       out.intervals = await pullIntervalsActivities();

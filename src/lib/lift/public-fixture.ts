@@ -6,7 +6,7 @@
 import { desc, eq } from "drizzle-orm";
 import { getExercise, type HistorySet } from "lift-core";
 import { activities, getDb } from "@/lib/db";
-import type { CalendarActivity } from "@/lib/strava";
+import type { CalendarActivity } from "@/lib/calendar-activity";
 import {
   isLiftOnlyPublic,
   liftFixtureOn,
