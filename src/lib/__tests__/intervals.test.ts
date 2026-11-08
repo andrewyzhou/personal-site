@@ -75,6 +75,7 @@ import {
   parseWebhookEvents,
   pullIntervalsActivities,
 } from "@/lib/intervals";
+import { UpstreamUnavailableError, withSyncRun } from "@/lib/sync-log";
 
 const FILE_SHA = "f".repeat(64);
 const JSON_SHA = "a".repeat(64);
@@ -443,5 +444,104 @@ describe("applyIntervalsMetadata", () => {
     expect(r.applied).toEqual([]);
     expect(updates[0]).not.toHaveProperty("name");
     expect(updates[0].upstreamMeta).toMatchObject({ name: "Morning Run" });
+  });
+});
+
+// the sync log prints its events to the console when there is no database
+function captureEvents() {
+  const lines: string[] = [];
+  vi.spyOn(console, "log").mockImplementation((line: unknown) => void lines.push(String(line)));
+  return lines;
+}
+
+describe("sync log and upstream failures", () => {
+  it("a 429 on the list ends the pull: the source is skipped for this run", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("slow down", { status: 429 })));
+    await expect(pullIntervalsActivities()).rejects.toBeInstanceOf(UpstreamUnavailableError);
+  });
+
+  it("a 5xx mid-run stops at once instead of retrying every activity", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url.includes("/activities?")) return new Response(JSON.stringify([activity(), activity({ id: "i101" })]));
+      return new Response("down", { status: 503 });
+    }));
+    await expect(pullIntervalsActivities()).rejects.toThrow("intervals answered 503");
+    expect(calls).toHaveLength(2);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("every api call is logged with method, host, path, status and bytes", async () => {
+    const lines = captureEvents();
+    mockApi([activity()]);
+    await withSyncRun({ trigger: "poll", source: "activities" }, () => pullIntervalsActivities());
+    const calls = lines.filter((l) => l.includes(" api_call "));
+    expect(calls.length).toBe(fetched.length);
+    expect(calls.some((l) => l.includes('"host":"intervals.icu"') && l.includes('"path":"/api/v1/activity/i100/file"') && l.includes('"bytes":3'))).toBe(true);
+    expect(lines.some((l) => l.includes(" insert ") && l.includes("#1"))).toBe(true);
+    expect(lines.some((l) => l.includes(" run_end "))).toBe(true);
+  });
+
+  it("a rename is logged as update_field with old, new and the winner", async () => {
+    const lines = captureEvents();
+    byIdRows.value = [{ id: 5 }];
+    metaRow.value = linkedRow();
+    mockApi([activity({ name: "Tempo by the bay" })]);
+    await withSyncRun({ trigger: "poll", source: "activities" }, () => pullIntervalsActivities());
+    const line = lines.find((l) => l.includes(" update_field "))!;
+    expect(line).toContain('"field":"name"');
+    expect(line).toContain('"old":"Berkeley Running"');
+    expect(line).toContain('"new":"Tempo by the bay"');
+    expect(line).toContain('"winner":"intervals-icu"');
+  });
+
+  it("a dry run decides and logs but writes and downloads nothing", async () => {
+    const lines = captureEvents();
+    const later = new Date(START.getTime() + 3600000).toISOString();
+    mockApi([activity(), activity({ id: "i101", start_date: later })]);
+    findSame.mockImplementation(async (d: Date) =>
+      d.getTime() > START.getTime() + 1000 ? { id: 9, source: "upload", name: "x", fitBlobPathname: null } : null
+    );
+    const r = await withSyncRun({ trigger: "script", source: "activities", dryRun: true }, () => pullIntervalsActivities());
+    expect(r).toMatchObject({ inserted: 1, upgraded: 1 });
+    expect(insert).not.toHaveBeenCalled();
+    expect(storeOriginal).not.toHaveBeenCalled();
+    expect(storeRaw).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(republish).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(fetched.some((u) => u.endsWith("/file"))).toBe(false);
+    expect(lines.some((l) => l.startsWith("[dry run]") && l.includes(" insert ") && l.includes("would insert"))).toBe(true);
+    expect(lines.some((l) => l.startsWith("[dry run]") && l.includes(" merge ") && l.includes("#9"))).toBe(true);
+  });
+
+  it("leaves rows garmin follows alone while garmin is on", async () => {
+    process.env.GARMIN_PERSONAL_API_KEY = "g";
+    try {
+      byIdRows.value = [{ id: 5 }];
+      metaRow.value = linkedRow({ upstreamMeta: snapshot({ provider: "garmin", externalId: "123" }) });
+      mockApi([activity({ name: "Tempo by the bay" })]);
+      expect(await pullIntervalsActivities()).toMatchObject({ updated: 0, skipped: 1 });
+      expect(updates).toHaveLength(0);
+    } finally {
+      delete process.env.GARMIN_PERSONAL_API_KEY;
+    }
+  });
+
+  it("linking to a row garmin follows keeps garmin's snapshot", async () => {
+    process.env.GARMIN_PERSONAL_API_KEY = "g";
+    try {
+      findSame.mockResolvedValue({
+        id: 9, source: "garmin", name: "x", fitBlobPathname: null,
+        upstreamMeta: snapshot({ provider: "garmin", externalId: "123" }),
+      });
+      hasFile.mockResolvedValue(true);
+      mockApi([activity()]);
+      expect(await pullIntervalsActivities()).toMatchObject({ linked: 1 });
+      expect(updates).toHaveLength(0);
+    } finally {
+      delete process.env.GARMIN_PERSONAL_API_KEY;
+    }
   });
 });

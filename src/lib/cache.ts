@@ -104,6 +104,35 @@ export async function invalidateCache(...keys: CacheKey[]): Promise<void> {
 }
 
 /**
+ * plain kv entries with their own expiry (e.g. a short-lived api token).
+ * failures read as a miss / are logged, never thrown.
+ */
+export async function kvGet<T>(key: string): Promise<T | null> {
+  try {
+    return (await redis.get<T>(key)) ?? null;
+  } catch (error) {
+    log.error(`cache:${key}`, "redis read failed", error);
+    return null;
+  }
+}
+
+export async function kvSet(key: string, value: unknown, ttlSeconds: number): Promise<void> {
+  try {
+    await redis.set(key, value, { ex: Math.max(1, Math.floor(ttlSeconds)) });
+  } catch (error) {
+    log.error(`cache:${key}`, "redis write failed", error);
+  }
+}
+
+export async function kvDel(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+  } catch (error) {
+    log.error(`cache:${key}`, "redis delete failed", error);
+  }
+}
+
+/**
  * increment api calls counter and return both previous and new count
  */
 export async function incrementApiCalls(): Promise<{ prevCount: number; apiCalls: number }> {

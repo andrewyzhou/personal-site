@@ -1,0 +1,22 @@
+[
+  {
+    "activityId": 17283940001,
+    "activityName": "Berkeley Running",
+    "description": null,
+    "startTimeLocal": "__LOCAL__",
+    "startTimeGMT": "__GMT__",
+    "activityType": { "typeId": 1, "typeKey": "running", "parentTypeId": 17 },
+    "distance": 8046.7,
+    "duration": 2701.3,
+    "elapsedDuration": 2755.0,
+    "movingDuration": 2690.0,
+    "elevationGain": 61.0,
+    "averageSpeed": 2.979,
+    "maxSpeed": 4.1,
+    "averageHR": 151.0,
+    "maxHR": 174.0,
+    "averageRunningCadenceInStepsPerMinute": 168.5,
+    "manualActivity": false,
+    "hasPolyline": true
+  }
+]

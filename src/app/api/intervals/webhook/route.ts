@@ -3,11 +3,13 @@ import { createHash, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
 import { handleWebhookEvent, isIntervalsConfigured, parseWebhookEvents, type WebhookOutcome } from "@/lib/intervals";
 import { log } from "@/lib/log";
+import { syncEvent, withSyncRun } from "@/lib/sync-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MAX_BODY_BYTES = 1_000_000;
+const NO_CHANGE: WebhookOutcome["result"][] = ["ignored", "unchanged", "known", "skipped", "gone"];
 
 // constant time, whatever the lengths (both sides hashed to 32 bytes first)
 export function secretMatches(given: unknown, expected: string): boolean {
@@ -43,23 +45,32 @@ export async function POST(request: Request) {
 
   const events = parseWebhookEvents(body, process.env.INTERVALS_ICU_ATHLETE_ID ?? null);
   if (events.length > 0) {
-    after(async () => {
-      const outcomes: WebhookOutcome[] = [];
-      for (const event of events) {
-        try {
-          outcomes.push(await handleWebhookEvent(event));
-        } catch (error) {
-          // the scheduled pull picks up anything that failed here
-          log.error("intervals:webhook", `${event.type} ${event.activityId} failed`, error);
+    after(() =>
+      withSyncRun({ trigger: "webhook", source: "intervals" }, async () => {
+        const outcomes: WebhookOutcome[] = [];
+        for (const event of events) {
+          try {
+            const outcome = await handleWebhookEvent(event);
+            outcomes.push(outcome);
+            // imports and field changes log themselves; the no-ops are logged here
+            if (NO_CHANGE.includes(outcome.result)) {
+              await syncEvent({ source: "intervals", kind: "skip", externalId: event.activityId, detail: { reason: `webhook ${event.type}: ${outcome.result}` } });
+            }
+          } catch (error) {
+            // the scheduled pull picks up anything that failed here
+            log.error("intervals:webhook", `${event.type} ${event.activityId} failed`, error);
+            await syncEvent({ source: "intervals", kind: "error", externalId: event.activityId, detail: { webhook: event.type, message: (error as Error).message } });
+          }
         }
-      }
-      const changed = outcomes.filter((o) => !["ignored", "unchanged", "known", "skipped", "gone"].includes(o.result));
-      if (changed.length > 0) {
-        revalidatePath("/training");
-        revalidatePath("/activities/[id]", "page");
-        log.info("intervals:webhook", changed.map((o) => `${o.type} ${o.id}: ${o.result}`).join(", "));
-      }
-    });
+        const changed = outcomes.filter((o) => !NO_CHANGE.includes(o.result));
+        if (changed.length > 0) {
+          revalidatePath("/training");
+          revalidatePath("/activities/[id]", "page");
+          log.info("intervals:webhook", changed.map((o) => `${o.type} ${o.id}: ${o.result}`).join(", "));
+        }
+        return { events: events.length, changed: changed.length };
+      })
+    );
   }
   return NextResponse.json({ ok: true, events: events.length });
 }

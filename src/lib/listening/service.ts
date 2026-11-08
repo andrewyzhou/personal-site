@@ -9,6 +9,7 @@ import type { RecentPlay } from "./admin-data";
 import { createMemoryRepo, readOnlyRepo, type ListeningRepo, type MemoryRepo, type PlayRecord } from "./repo";
 import { dbListeningRepo, listeningTablesExist } from "./repo-db";
 import { createSpotifyHttp } from "./spotify-api";
+import { loggedFetch } from "../sync-log";
 
 export class ListeningNotMigratedError extends Error {
   constructor() {
@@ -75,7 +76,9 @@ export function previewRow(p: PlayRecord): RecentPlay {
 
 export async function runListeningCollect(opts: RunOptions = {}): Promise<RunResult> {
   if (!isListeningConfigured()) throw new Error("spotify is not configured (SPOTIFY_CLIENT_ID / _SECRET / _REFRESH_TOKEN)");
-  const http = createSpotifyHttp({ getToken: () => getAccessToken() });
+  // every spotify call of a collect lands in the sync log
+  const fetchImpl = loggedFetch("spotify");
+  const http = createSpotifyHttp({ getToken: () => getAccessToken(fetchImpl), fetchImpl });
 
   if (opts.dryRun) {
     const raw = { n: 0, bytes: 0 };

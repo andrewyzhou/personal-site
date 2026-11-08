@@ -12,6 +12,8 @@ export function legacyProvider(source: string | null | undefined): SourceProvide
       return "strava";
     case "intervals-icu":
       return "intervals-icu";
+    case "garmin":
+      return "garmin";
     default:
       return "upload";
   }

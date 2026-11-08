@@ -1,0 +1,37 @@
+name: sync activities
+
+# the frequent pull: every 10 minutes, 06:00 to midnight los angeles time.
+# cron is utc and los angeles moves between utc-7 and utc-8, so the schedule
+# covers both (13:00-07:59 utc) and the first step drops runs outside 06-24 local.
+on:
+  schedule:
+    - cron: "*/10 0-7,13-23 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-activities
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: within 06:00-24:00 los angeles
+        id: window
+        run: |
+          hour=$(TZ=America/Los_Angeles date +%-H)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$hour" -ge 6 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "outside the window (los angeles hour $hour), skipping"
+          fi
+      - name: POST /api/sync/activities
+        if: steps.window.outputs.run == 'true'
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -sS --fail-with-body --max-time 90 -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/sync/activities"

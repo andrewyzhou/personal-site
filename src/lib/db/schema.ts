@@ -408,3 +408,4 @@ export type CommentRow = typeof comments.$inferSelect;
 
 export * from "./lift-schema";
 export * from "./listening-schema";
+export * from "./sync-schema";

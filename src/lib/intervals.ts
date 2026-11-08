@@ -11,7 +11,7 @@
 // (metadata-merge.ts). server-only.
 
 import { eq } from "drizzle-orm";
-import { getDb, activities, type ActivityRow } from "./db";
+import { getDb, activities } from "./db";
 import {
   buildActivityValues,
   computePublished,
@@ -33,11 +33,14 @@ import {
 import { republish } from "./republish";
 import { invalidateCache } from "./cache";
 import { intervalsSportType } from "./sport-map";
-import { mergeUpstreamMeta, type MergeResult, type UpstreamSnapshot } from "./metadata-merge";
-import { staleMark } from "./privacy/stale";
+import { mergeUpstreamMeta, type UpstreamSnapshot } from "./metadata-merge";
+import { applyUpstreamMeta, loadMetaRow, type MetaOutcome } from "./upstream-meta";
+import { isDryRun, syncEvent, syncFetch, throwIfUnavailable, UpstreamUnavailableError } from "./sync-log";
+import { isGarminConfigured } from "./garmin-config";
 
 const API = "https://intervals.icu/api/v1";
 const PROVIDER = "intervals-icu";
+const SOURCE = "intervals"; // the sync-log name
 const FETCH_TIMEOUT_MS = 15000;
 // each new activity is a file download + parse + raw put; keep a run well
 // inside the 60s function limit and let the next run continue
@@ -81,10 +84,11 @@ function authHeader(): string {
 }
 
 async function intervalsFetch(path: string): Promise<Response> {
-  const response = await fetch(`${API}${path}`, {
+  const response = await syncFetch(SOURCE, `${API}${path}`, {
     headers: { Authorization: authHeader() },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
+  throwIfUnavailable(response, SOURCE);
   if (response.status === 401 || response.status === 403) {
     throw new Error("intervals.icu rejected the api key");
   }
@@ -250,31 +254,69 @@ export async function findLinkedRow(id: string): Promise<number | null> {
 
 export type ImportOutcome = "inserted" | "upgraded" | "linked" | "known" | "skipped";
 
+// a row whose metadata the garmin personal api follows (garmin wrote the last
+// snapshot): intervals only mirrors garmin connect, so it leaves those alone
+const garminOwns = (snapshot: UpstreamSnapshot | null | undefined) =>
+  snapshot?.provider === "garmin" && isGarminConfigured();
+
 // import one activity the way the pull does. a workout already on the site
 // from another source is never duplicated: without a device file it gets the
 // original attached (route + stats rebuilt, its name and type kept); with one
-// it is only linked, so later garmin renames reach it.
+// it is only linked, so later garmin renames reach it. a dry run decides and
+// logs the same way but writes nothing (and downloads nothing).
 export async function importIntervalsActivity(
   a: IntervalsActivity,
   opts: { json?: Uint8Array; now?: Date } = {}
 ): Promise<ImportOutcome> {
-  if (!isImportable(a)) return "skipped";
+  if (!isImportable(a)) {
+    await syncEvent({ source: SOURCE, kind: "skip", externalId: a.id, detail: { reason: "not importable", upstreamSource: a.source ?? null } });
+    return "skipped";
+  }
   if ((await findLinkedRow(a.id)) !== null) return "known";
   const now = opts.now ?? new Date();
   const db = getDb();
+  const dry = isDryRun();
 
   const same = await findSameActivity(new Date(a.start_date!));
   if (same) {
     const sameHasFile = !!same.fitBlobPathname || (await hasDeviceFile(same.id));
+    const merge = {
+      matchedBy: "start time",
+      start: a.start_date,
+      rowSource: same.source,
+      rowHasFile: sameHasFile,
+      rowName: same.name,
+      upstreamName: a.name ?? null,
+    };
+    if (dry) {
+      await syncEvent({
+        source: SOURCE,
+        kind: "merge",
+        activityId: same.id,
+        externalId: a.id,
+        detail: { ...merge, action: sameHasFile ? "link (row already has a device file)" : "download original, attach, republish" },
+      });
+      return sameHasFile ? "linked" : "upgraded";
+    }
     const bytes = sameHasFile ? null : await downloadOriginal(a.id);
     const jsonSha = await storeActivityJson(a.id, opts.json);
-    // the first sighting: later upstream edits are measured against this
-    await db
-      .update(activities)
-      .set({ upstreamMeta: firstSnapshot(a, now), updatedAt: new Date() })
-      .where(eq(activities.id, same.id));
+    // the first sighting: later upstream edits are measured against this.
+    // a row garmin already follows keeps garmin's snapshot.
+    if (!garminOwns(same.upstreamMeta)) {
+      await db
+        .update(activities)
+        .set({ upstreamMeta: firstSnapshot(a, now), updatedAt: new Date() })
+        .where(eq(activities.id, same.id));
+    }
     if (!bytes) {
       await attachSources(same.id, a.id, null, jsonSha, { summaryMarker: !sameHasFile });
+      await syncEvent({
+        source: SOURCE,
+        kind: "merge",
+        activityId: same.id,
+        externalId: a.id,
+        detail: { ...merge, action: sameHasFile ? "linked (row already has a device file)" : "linked (no original file upstream)" },
+      });
       return "linked";
     }
     const { values, stored } = await fromOriginal(a, bytes);
@@ -292,50 +334,64 @@ export async function importIntervalsActivity(
         .where(eq(activities.id, same.id));
     }
     await attachSources(same.id, a.id, stored, jsonSha);
+    await syncEvent({
+      source: SOURCE,
+      kind: "attach",
+      activityId: same.id,
+      externalId: a.id,
+      detail: { ...merge, action: "original attached, republished", rawSha256: stored.rawSha256, bytes: bytes.length },
+    });
     await republish(same.id);
     return "upgraded";
   }
 
+  if (dry) {
+    await syncEvent({
+      source: SOURCE,
+      kind: "insert",
+      externalId: a.id,
+      detail: { action: "would insert", start: a.start_date, name: a.name ?? null, type: a.type ?? null, file: a.file_type ?? null },
+    });
+    return "inserted";
+  }
   const jsonSha = await storeActivityJson(a.id, opts.json);
   const bytes = await downloadOriginal(a.id);
   const built = bytes ? await fromOriginal(a, bytes) : null;
   const row = built ? built.values : fromSummary(a);
   const outcome = await insertActivity({ ...row, upstreamMeta: firstSnapshot(a, now) });
-  if (!outcome.inserted) return "skipped";
+  if (!outcome.inserted) {
+    await syncEvent({
+      source: SOURCE,
+      kind: "skip",
+      activityId: outcome.id,
+      externalId: a.id,
+      detail: { reason: "dedupe key already present", start: a.start_date },
+    });
+    return "skipped";
+  }
   await attachSources(outcome.id, a.id, built?.stored ?? null, jsonSha);
+  await syncEvent({
+    source: SOURCE,
+    kind: "insert",
+    activityId: outcome.id,
+    externalId: a.id,
+    detail: {
+      start: a.start_date,
+      name: row.name,
+      sportType: row.sportType,
+      from: built ? "original file" : "summary only",
+      ...(built ? { rawSha256: built.stored.rawSha256, bytes: bytes!.length } : {}),
+    },
+  });
   // summary rows too: republish writes their published (coarsened) start
   await republish(outcome.id);
   return "inserted";
 }
 
-type MetaRow = Pick<ActivityRow, "id" | "name" | "description" | "sportType" | "hidden" | "metaEditedAt" | "upstreamMeta">;
-
-async function loadMetaRow(id: number): Promise<MetaRow | null> {
-  const rows = await getDb()
-    .select({
-      id: activities.id,
-      name: activities.name,
-      description: activities.description,
-      sportType: activities.sportType,
-      hidden: activities.hidden,
-      metaEditedAt: activities.metaEditedAt,
-      upstreamMeta: activities.upstreamMeta,
-    })
-    .from(activities)
-    .where(eq(activities.id, id))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export interface MetaOutcome {
-  rowId: number | null;
-  applied: MergeResult["applied"];
-}
+export type { MetaOutcome };
 
 // apply upstream metadata (name, description, type; hidden on delete) to the
-// linked row, newest edit wins. only this row: split halves keep their own
-// names. a sport change marks the row stale (cleaning and metrics depend on
-// it; the rebuild job republishes it).
+// linked row, newest edit wins (upstream-meta.ts)
 export async function applyIntervalsMetadata(
   id: string,
   upstream: { name?: string | null; description?: string | null; sportType?: string | null; hidden?: boolean },
@@ -345,45 +401,37 @@ export async function applyIntervalsMetadata(
   if (rowId === null) return { rowId: null, applied: [] };
   const row = await loadMetaRow(rowId);
   if (!row) return { rowId: null, applied: [] };
-  const now = opts.now ?? new Date();
-  const merged = mergeUpstreamMeta({
-    current: { name: row.name, description: row.description, sportType: row.sportType, hidden: row.hidden },
-    siteEdits: row.metaEditedAt,
-    previous: row.upstreamMeta,
-    upstream,
-    provider: PROVIDER,
-    externalId: id,
-    changedAt: opts.changedAt ?? null,
-    now,
-  });
-  const prev = row.upstreamMeta;
-  const snapshotChanged =
-    !prev ||
-    prev.provider !== merged.snapshot.provider ||
-    prev.externalId !== merged.snapshot.externalId ||
-    prev.name !== merged.snapshot.name ||
-    prev.description !== merged.snapshot.description ||
-    prev.sportType !== merged.snapshot.sportType ||
-    prev.hidden !== merged.snapshot.hidden;
-  if (!snapshotChanged && merged.applied.length === 0) return { rowId, applied: [] };
-
-  const sportChanged = merged.updates.sportType !== undefined && merged.updates.sportType !== row.sportType;
-  await getDb()
-    .update(activities)
-    .set({
-      ...merged.updates,
-      ...(sportChanged ? staleMark() : {}),
-      upstreamMeta: merged.snapshot,
-      updatedAt: new Date(),
-    })
-    .where(eq(activities.id, rowId));
-  // keep what upstream said when it changed (content-addressed: no duplicates)
-  if (opts.json) {
-    const sha = await storeRawPayload(opts.json, "intervals-activity", { provider: PROVIDER, externalId: id });
-    if (sha) await addActivitySource({ activityId: rowId, provider: PROVIDER, externalId: id, kind: "intervals-activity", rawSha256: sha });
+  if (garminOwns(row.upstreamMeta)) {
+    // logged only when the two disagree on what garmin connect says
+    const g = row.upstreamMeta!;
+    const differs =
+      (upstream.name !== undefined && (upstream.name?.trim() || null) !== g.name) ||
+      (upstream.description !== undefined && (upstream.description?.trim() || null) !== g.description);
+    if (differs) {
+      await syncEvent({
+        source: SOURCE,
+        kind: "skip",
+        activityId: rowId,
+        externalId: id,
+        detail: {
+          reason: "garmin follows this row",
+          intervals: { name: upstream.name ?? null, description: upstream.description ?? null },
+          garmin: { name: g.name, description: g.description },
+        },
+      });
+    }
+    return { rowId, applied: [] };
   }
-  if (merged.applied.length > 0) await invalidateCache("activities_list", "activities_latest");
-  return { rowId, applied: merged.applied };
+  return applyUpstreamMeta({
+    row,
+    provider: PROVIDER,
+    source: SOURCE,
+    externalId: id,
+    upstream,
+    changedAt: opts.changedAt,
+    now: opts.now,
+    raw: opts.json ? { bytes: opts.json, kind: "intervals-activity" } : undefined,
+  });
 }
 
 export interface PullResult {
@@ -397,7 +445,8 @@ export interface PullResult {
 }
 
 // the safety net behind the webhook: import what's new from the last `days`,
-// and re-apply metadata for the last `metadataDays`
+// and re-apply metadata for the last `metadataDays`. a 429/5xx from intervals
+// ends the pull (UpstreamUnavailableError): the next run picks up from there.
 export async function pullIntervalsActivities({
   days = DEFAULT_LOOKBACK_DAYS,
   metadataDays = METADATA_LOOKBACK_DAYS,
@@ -431,11 +480,16 @@ export async function pullIntervalsActivities({
       if (outcome === "inserted" || outcome === "upgraded" || outcome === "linked") result[outcome]++;
       else result.skipped++;
     } catch (error) {
+      if (error instanceof UpstreamUnavailableError) throw error;
       result.failures.push({ id: a.id, error: (error as Error).message });
+      await syncEvent({ source: SOURCE, kind: "error", externalId: a.id, detail: { message: (error as Error).message } });
     }
   }
 
-  if (result.inserted + result.upgraded > 0) {
+  if (result.more) {
+    await syncEvent({ source: SOURCE, kind: "skip", detail: { reason: `more than ${MAX_NEW_PER_RUN} new: the rest wait for the next run` } });
+  }
+  if (result.inserted + result.upgraded > 0 && !isDryRun()) {
     await invalidateCache("activities_list", "activities_latest");
   }
   return result;

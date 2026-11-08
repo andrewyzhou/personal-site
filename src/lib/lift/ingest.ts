@@ -13,6 +13,7 @@ import {
   type LiftWarning,
 } from "@/lib/db";
 import { log } from "@/lib/log";
+import { syncEvent } from "@/lib/sync-log";
 import { getWorkoutLinks, linkWorkout } from "./link";
 import { revalidateLiftPublic } from "./revalidate";
 import {
@@ -391,6 +392,13 @@ export async function ingestShareText(rawText: string, opts: { source: IngestSou
 
   if (!plan.workout || !plan.summary) {
     log.warn("lift:ingest", `${ingestId}: ${plan.rejected ?? "nothing parsed"}, raw kept`);
+    await syncEvent({
+      source: "lift",
+      kind: "skip",
+      externalId: ingestId,
+      trigger: opts.source === "telegram" ? "telegram" : "manual",
+      detail: { via: opts.source, outcome: "empty", reason: plan.rejected ?? "nothing parsed", duplicate: Boolean(existing) },
+    });
     return {
       status: "empty",
       duplicate: Boolean(existing),
@@ -413,6 +421,20 @@ export async function ingestShareText(rawText: string, opts: { source: IngestSou
   const { links, known } = await safeLinks(() => (keep ? currentLinks(workout) : linkWorkout(workout)), workout.id);
   if (!keep) revalidateLiftPublic();
   log.info("lift:ingest", `${ingestId} -> ${workout.id} (${links.length} links, ${status}${keep ? `, kept ${keep.kind}` : ""})`);
+  await syncEvent({
+    source: "lift",
+    kind: duplicate ? "skip" : updated ? "update_field" : "insert",
+    externalId: ingestId,
+    trigger: opts.source === "telegram" ? "telegram" : "manual",
+    detail: {
+      via: opts.source,
+      outcome: status,
+      workoutId: workout.id,
+      ...(keep ? { kept: keep.kind } : {}),
+      linkedActivities: links.map((l) => l.activityId),
+      linksKnown: known,
+    },
+  });
 
   if (keep?.kind === "app-edits") {
     const text = keptEditsWarning(keep.title, workout.id).message;
