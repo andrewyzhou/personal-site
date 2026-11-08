@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { unauthorizedResponse } from "@/lib/admin-auth";
 import { log } from "@/lib/log";
 import { ListeningNotMigratedError, isListeningConfigured, runListeningCollect } from "@/lib/listening/service";
+import { syncEvent, withSyncRun } from "@/lib/sync-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +18,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, skipped: "spotify not configured" });
   }
   try {
-    const r = await runListeningCollect();
+    // the run_end event carries the collect counts
+    const r = await withSyncRun({ trigger: "cron", source: "spotify" }, async () => {
+      const r = await runListeningCollect();
+      if (!r.ok) await syncEvent({ source: "spotify", kind: "error", detail: { message: r.error ?? "collect failed" } });
+      return r;
+    });
     if (!r.ok) log.warn("cron:listening", `collect failed: ${r.error}`);
     return NextResponse.json(r, { status: r.ok ? 200 : 502 });
   } catch (error) {

@@ -12,7 +12,7 @@ import { r2Head, r2Put, r2PublicUrl } from "./r2";
 // stored provider/kind names. "strava" and the "strava-*" kinds are what the
 // archive imports and the retired api sync wrote; rows keep them and republish
 // still reads them.
-export type SourceProvider = "strava" | "intervals-icu" | "upload" | "manual";
+export type SourceProvider = "strava" | "intervals-icu" | "garmin" | "upload" | "manual";
 export type SourceKind =
   | "device-file"
   | "strava-streams"
@@ -20,6 +20,7 @@ export type SourceKind =
   | "strava-laps"
   | "strava-photos"
   | "intervals-activity"
+  | "garmin-activity"
   | "summary";
 
 export async function addActivitySource(source: {

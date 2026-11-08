@@ -238,3 +238,37 @@ export function freeTextSportType(raw: string | null | undefined): SportType {
   if (n.includes("paddl") || n.includes("kayak")) return "Kayaking";
   return GENERIC_SPORT_TYPE;
 }
+
+// garmin connect activity typeKeys (the personal api's activityType.typeKey,
+// the same keys garmin connect's own pages use). keys normalized like the fit
+// table; a "_ws"/"_v2" suffix is dropped. anything unlisted falls back to the
+// free-text rules, then a generic workout.
+const GARMIN_TYPE_KEYS: Record<string, SportType> = {
+  running: "Run", streetrunning: "Run", trackrunning: "Run", ultrarun: "Run", obstaclerun: "Run",
+  trailrunning: "TrailRun", treadmillrunning: "TreadmillRun", indoorrunning: "TreadmillRun", virtualrun: "VirtualRun",
+  cycling: "Ride", roadbiking: "Ride", bmx: "Ride", recumbentcycling: "Ride", gravelcycling: "GravelRide",
+  mountainbiking: "MountainBikeRide", cyclocross: "Cyclocross", trackcycling: "TrackRide", indoorcycling: "IndoorRide",
+  virtualride: "VirtualRide", ebikefitness: "EBikeRide", ebikemountain: "EMountainBikeRide", handcycling: "Handcycle",
+  swimming: "Swim", lapswimming: "Swim", openwaterswimming: "OpenWaterSwim",
+  walking: "Walk", casualwalking: "Walk", speedwalking: "Walk", hiking: "Hike", snowshoe: "Snowshoe",
+  strengthtraining: "WeightTraining", indoorcardio: "Workout", fitnessequipment: "Workout", hiit: "HighIntensityIntervalTraining",
+  elliptical: "Elliptical", stairclimbing: "StairStepper", floorclimbing: "StairStepper", rowing: "Rowing", indoorrowing: "Rowing",
+  yoga: "Yoga", pilates: "Pilates", breathwork: "Meditation", meditation: "Meditation", mobility: "Mobility",
+  rockclimbing: "RockClimbing", indoorclimbing: "IndoorClimbing", bouldering: "Bouldering",
+  resortskiingsnowboarding: "AlpineSki", resortskiing: "AlpineSki", resortsnowboarding: "Snowboard",
+  backcountryskiing: "BackcountrySki", backcountryskiingsnowboarding: "BackcountrySki",
+  crosscountryskiing: "NordicSki", skateskiing: "NordicSki",
+  kayaking: "Kayaking", standuppaddleboarding: "StandUpPaddling", surfing: "Surfing", sailing: "Sail",
+  kiteboarding: "Kitesurf", windsurfing: "Windsurf",
+  tennis: "Tennis", pickleball: "Pickleball", padel: "Padel", squash: "Squash", badminton: "Badminton",
+  tabletennis: "TableTennis", racquetball: "Racquetball",
+  soccer: "Soccer", basketball: "Basketball", golf: "Golf", discgolf: "DiscGolf", boxing: "Boxing",
+  jumprope: "JumpRope", dance: "Dance", inlineskating: "InlineSkate", iceskating: "IceSkate",
+  multisport: "Multisport", transition: "Transition", other: GENERIC_SPORT_TYPE,
+};
+
+export function garminSportType(typeKey: string | null | undefined): SportType {
+  const key = norm(String(typeKey ?? "").replace(/_(ws|v\d+)$/i, ""));
+  if (!key) return GENERIC_SPORT_TYPE;
+  return GARMIN_TYPE_KEYS[key] ?? freeTextSportType(key);
+}

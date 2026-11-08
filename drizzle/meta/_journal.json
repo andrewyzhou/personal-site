@@ -99,6 +99,13 @@
       "when": 1794163673240,
       "tag": "0013_remove_unused",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794165530496,
+      "tag": "0014_sync_events",
+      "breakpoints": true
     }
   ]
 }

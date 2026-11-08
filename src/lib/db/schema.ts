@@ -371,3 +371,4 @@ export const counters = pgTable(
 
 export * from "./lift-schema";
 export * from "./listening-schema";
+export * from "./sync-schema";

@@ -9,8 +9,8 @@ const RECENTLY_PLAYED_ENDPOINT = "https://api.spotify.com/v1/me/player/recently-
 
 const FETCH_TIMEOUT_MS = 5000;
 
-export async function getAccessToken(): Promise<string> {
-  const response = await fetch(TOKEN_ENDPOINT, {
+export async function getAccessToken(fetchImpl: typeof fetch = fetch): Promise<string> {
+  const response = await fetchImpl(TOKEN_ENDPOINT, {
     method: "POST",
     headers: {
       Authorization: `Basic ${BASIC_AUTH}`,

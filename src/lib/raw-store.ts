@@ -23,6 +23,7 @@ export type RawKind =
   | "strava-laps"
   | "strava-photos"
   | "intervals-activity"
+  | "garmin-activity"
   | "strava-export-file"
   | "strava-export-manifest"
   | "photo-original"
