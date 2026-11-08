@@ -55,7 +55,7 @@ describe("planShareIngest with the real lift-core", () => {
   it("formats the summary line", () => {
     // tonnage rules (e.g. whether "+25 lb" counts) belong to lift-core, so only the shape is pinned
     expect(formatIngestSummary(plan.summary!, [])).toMatch(
-      /^logged push day · wed nov 4 · 2 exercises · 4 sets · \d{1,3}(,\d{3})* lb · watch: not linked yet$/
+      /^logged push day · wed nov 4 · 2 exercises · 4 sets · \d{1,3}(,\d{3})* lb · created lift session$/
     );
   });
 

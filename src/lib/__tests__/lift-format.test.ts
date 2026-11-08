@@ -87,18 +87,28 @@ const PRIMARY: LinkedActivity = {
 describe("lift summary text", () => {
   it("formats the bot/api one-liner", () => {
     expect(formatIngestSummary(SUMMARY, [PRIMARY])).toBe(
-      "logged push day · wed nov 4 · 2 exercises · 4 sets · 1,850 lb · watch: linked (weight training 18:10)"
+      "logged push day · wed nov 4 · 2 exercises · 4 sets · 1,850 lb · added to weight training 18:10"
     );
   });
 
   it("covers unlinked, duplicate, singular and continuation cases", () => {
     const one = { ...SUMMARY, exerciseCount: 1, workingSets: 1 };
     expect(formatIngestSummary(one, [], { duplicate: true })).toBe(
-      "already logged push day · wed nov 4 · 1 exercise · 1 set · 1,850 lb · watch: not linked yet"
+      "already logged push day · wed nov 4 · 1 exercise · 1 set · 1,850 lb · created lift session"
     );
     const cont: LinkedActivity = { ...PRIMARY, activityId: 2, role: "continuation", localTime: "18:55" };
     const dup: LinkedActivity = { ...PRIMARY, activityId: 3, role: "duplicate", sportType: "Workout" };
-    expect(formatIngestSummary(SUMMARY, [PRIMARY, cont, dup])).toMatch(/watch: linked \(weight training 18:10 \+1 more\)$/);
+    expect(formatIngestSummary(SUMMARY, [PRIMARY, cont, dup])).toMatch(/ · added to weight training 18:10 \+1 more$/);
+  });
+
+  it("names the activity it was added to, and says created lift session otherwise", () => {
+    const named: LinkedActivity = { ...PRIMARY, name: "  Evening   lift " };
+    expect(formatWatch([named])).toBe("added to Evening lift (weight training 18:10)");
+    const ride: LinkedActivity = { ...PRIMARY, role: "overrun", sportType: "Ride", localTime: "17:00", name: "bike + lift" };
+    expect(formatWatch([ride])).toBe("added to bike + lift (ride from 17:00)");
+    expect(formatWatch([{ ...ride, name: "" }])).toBe("added to ride from 17:00");
+    expect(formatWatch([{ ...ride, name: "x".repeat(80) }])).toMatch(/^added to x{59}… \(ride from 17:00\)$/);
+    expect(formatWatch([])).toBe("created lift session");
   });
 
   it("drops tonnage for bodyweight-only days and handles kg", () => {
@@ -140,7 +150,7 @@ describe("lift details text", () => {
     expect(plan.workout!.workout.id).toBe("share-caterxeu");
     expect(formatIngestDetails(summary, [], { workoutId: "share-caterxeu", warnings: plan.warnings })).toBe(
       [
-        "logged full body b · mon nov 2 · 3 exercises · 6 sets · 3,970 lb · watch: not linked yet",
+        "logged full body b · mon nov 2 · 3 exercises · 6 sets · 3,970 lb · created lift session",
         "squat (barbell): 2×5 @ 185 lb · top e1rm 216 lb",
         "deadlift (barbell): 185×5, 185×4 lb · top e1rm 216 lb",
         "bicep curl (dumbbell): 35×6, 35×7 lb · top e1rm 43 lb",
@@ -174,7 +184,7 @@ describe("lift details text", () => {
   it("links the watch recording when there is one, and says updated for an edit", () => {
     const text = formatIngestDetails(summary, [WEIGHTS], { workoutId: "share-caterxeu", updated: true });
     const lines = text.split("\n");
-    expect(lines[0]).toMatch(/^updated full body b · mon nov 2 · .* · watch: linked \(weight training 19:16\)$/);
+    expect(lines[0]).toMatch(/^updated full body b · mon nov 2 · .* · added to weight training 19:16$/);
     expect(lines.at(-1)).toBe(
       "https://www.andrewzhou.org/activities/16712345678"
     );
@@ -303,7 +313,7 @@ describe("timingFromLinks", () => {
       durationS: null,
     });
     expect(timingFromLinks([overrun])).toBeNull();
-    expect(formatWatch([overrun])).toBe("watch: linked (inside weight training from 14:01)");
+    expect(formatWatch([overrun])).toBe("added to weight training from 14:01");
   });
 
   it("is null without a primary", () => {

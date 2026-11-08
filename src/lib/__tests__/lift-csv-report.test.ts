@@ -221,16 +221,16 @@ describe("dry run report", () => {
       rec(3, b, -2, 30),
       rec(4, b, 35, 25), // split recording after a 7 min gap
       rec(5, c, -45, 120), // watch started early and left running
-      rec(6, d, 0, 40, "Run"),
+      rec(6, d, 0, 40, "Run"), // any sport links now
     ];
     const r = report({ activities: recordings }).report.linking;
     expect(r).toEqual({
       checked: true,
-      recordings: 5,
-      linkedWorkouts: 3,
-      liftOnly: 37,
-      anchoredBy: { primary: 2, overrun: 1 },
-      links: { primary: 2, duplicate: 1, continuation: 1, overrun: 1 },
+      recordings: 6,
+      linkedWorkouts: 4,
+      liftOnly: 36,
+      anchoredBy: { primary: 3, overrun: 1 },
+      links: { primary: 3, duplicate: 1, continuation: 1, overrun: 1 },
     });
     expect(activityQueryRange(workouts)).toEqual({ from: "2026-04-01", to: "2026-09-25" });
   });

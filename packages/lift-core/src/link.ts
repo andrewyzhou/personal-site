@@ -4,7 +4,13 @@ import type { ActivityLink, LinkCandidate, LinkRole } from "./types";
 export const STRENGTH_SPORT_TYPES: readonly string[] = ["WeightTraining", "Workout"];
 
 export interface LinkOptions {
-  /** max |start delta| for primary/duplicate matches, minutes (default 20) */
+  /** how long before a recording starts the lift may begin and still belong to it, minutes (default 30) */
+  leadMin?: number;
+  /**
+   * |start delta| inside which a recording counts as the lift's own (primary, its timing becomes the
+   * workout's) rather than one the lift started partway through (overrun); also the reach for a
+   * second device's duplicate. minutes (default 20)
+   */
   windowMin?: number;
   /** max gap between the end of a linked recording and the start of a continuation, minutes (default 15) */
   continuationGapMin?: number;
@@ -30,19 +36,26 @@ interface Span {
   start: number;
   end: number;
   delta: number;
+  strength: boolean;
 }
 
 /**
- * pick which watch recordings belong to a lifting workout. share text
- * only has a start time, so matching is by start (+-windowMin); split
- * recordings chain on as continuations; a second recording within the window
- * (two devices) is a duplicate. pure: never mutates the candidates.
+ * pick which watch recordings a lifting workout belongs to. share text only
+ * has a start time. the lift belongs to a recording of any sport when it
+ * starts within [recording start - leadMin, recording end] (a "bike + lift"
+ * session recorded as one ride counts). when several match, a strength
+ * recording wins, then the closest start (so among recordings already running,
+ * the latest-starting one). split strength recordings chain on as
+ * continuations, and a second strength recording within the window (two
+ * devices) is a duplicate. no match: nothing (a lift-only session). pure:
+ * never mutates the candidates.
  */
 export function linkWorkoutToActivities(
   workoutLocalStart: string,
   candidates: readonly LinkCandidate[],
   options?: LinkOptions,
 ): ActivityLink[] {
+  const leadMin = options?.leadMin ?? 30;
   const windowMin = options?.windowMin ?? 20;
   const gapMin = options?.continuationGapMin ?? 15;
   const w = localMinutes(workoutLocalStart);
@@ -50,39 +63,31 @@ export function linkWorkoutToActivities(
 
   const spans: Span[] = [];
   for (const c of candidates) {
-    if (!STRENGTH_SPORT_TYPES.includes(c.sportType)) continue;
     const start = localMinutes(c.localStart);
     if (start === null) continue;
     const elapsed = Number.isFinite(c.elapsedS) && c.elapsedS > 0 ? c.elapsedS : 0;
-    spans.push({ c, start, end: start + elapsed / 60, delta: start - w });
+    spans.push({ c, start, end: start + elapsed / 60, delta: start - w, strength: STRENGTH_SPORT_TYPES.includes(c.sportType) });
   }
 
-  let primary: Span | null = null;
+  let best: Span | null = null;
   for (const s of spans) {
-    if (Math.abs(s.delta) > windowMin) continue;
-    if (
-      primary === null ||
-      Math.abs(s.delta) < Math.abs(primary.delta) ||
-      (Math.abs(s.delta) === Math.abs(primary.delta) && s.start < primary.start)
-    ) {
-      primary = s;
-    }
+    // end >= start, so a zero-length recording still matches from leadMin before it up to its start
+    if (w < s.start - leadMin || w > s.end) continue;
+    if (best === null || better(s, best)) best = s;
   }
-  if (primary === null) {
-    // forgot to stop: the workout starts inside a recording that began earlier than
-    // the window. the latest-starting container is the most specific one.
-    let container: Span | null = null;
-    for (const s of spans) {
-      if (s.start <= w && w <= s.end && (container === null || s.start > container.start)) container = s;
-    }
-    if (container === null) return [];
-    return [{ activityId: container.c.id, role: "overrun", deltaMin: Math.round(container.delta) }];
+  if (best === null) return [];
+
+  // the lift started well into this recording: it anchors the workout's day and offset only
+  if (best.delta < -windowMin) {
+    return [{ activityId: best.c.id, role: "overrun", deltaMin: Math.round(best.delta) }];
   }
 
-  const roles = new Map<Span, LinkRole>([[primary, "primary"]]);
-  const p = primary;
-  for (const s of spans) {
-    if (s === p) continue;
+  const roles = new Map<Span, LinkRole>([[best, "primary"]]);
+  const p = best;
+  // only strength recordings attach as extra pieces of the same lift; a run
+  // after the gym is its own activity
+  const extras = spans.filter((s) => s !== p && s.strength);
+  for (const s of extras) {
     // a short recording that ended just before the workout start still counts as in the window
     const distance = s.end < w ? w - s.end : s.start > w ? s.start - w : 0;
     if (distance > windowMin) continue;
@@ -94,7 +99,7 @@ export function linkWorkoutToActivities(
   let added = true;
   while (added) {
     added = false;
-    for (const s of spans) {
+    for (const s of extras) {
       if (roles.has(s) || s.start - w > MAX_CHAIN_MIN) continue;
       for (const linked of roles.keys()) {
         if (s.start > linked.start && s.start - linked.end <= gapMin) {
@@ -109,4 +114,14 @@ export function linkWorkoutToActivities(
   return [...roles.entries()]
     .sort(([a], [b]) => a.start - b.start || a.c.id - b.c.id)
     .map(([s, role]) => ({ activityId: s.c.id, role, deltaMin: Math.round(s.delta) }));
+}
+
+/** strength first, then the closest start, then the earlier start (already running), then the lower id */
+function better(a: Span, b: Span): boolean {
+  if (a.strength !== b.strength) return a.strength;
+  const da = Math.abs(a.delta);
+  const db = Math.abs(b.delta);
+  if (da !== db) return da < db;
+  if (a.start !== b.start) return a.start < b.start;
+  return a.c.id < b.c.id;
 }

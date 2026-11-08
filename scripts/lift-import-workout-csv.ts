@@ -7,7 +7,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { and, eq, gte, inArray, isNull, lte, notExists } from "drizzle-orm";
-import { sha256Hex, STRENGTH_SPORT_TYPES, type LinkRole, type WeightUnit } from "lift-core";
+import { sha256Hex, type LinkRole, type WeightUnit } from "lift-core";
 import { activities, exercises, getDb, liftIngests, liftWorkoutActivities, liftWorkoutExercises, liftWorkouts } from "../src/lib/db";
 import {
   activityQueryRange,
@@ -111,7 +111,7 @@ async function loadKnownExercises(db: Db, ids: readonly string[]): Promise<Set<s
   return known;
 }
 
-/** strength recordings in the range that no live workout has claimed (one query) */
+/** recordings (any sport) in the range that no live workout has claimed (one query) */
 async function loadRecordings(db: Db, from: string, to: string): Promise<ActivityRow[]> {
   return db
     .select({
@@ -124,7 +124,6 @@ async function loadRecordings(db: Db, from: string, to: string): Promise<Activit
     .from(activities)
     .where(
       and(
-        inArray(activities.sportType, [...STRENGTH_SPORT_TYPES]),
         gte(activities.localDate, from),
         lte(activities.localDate, to),
         eq(activities.hidden, false),

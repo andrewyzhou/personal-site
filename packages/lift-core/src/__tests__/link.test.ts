@@ -53,28 +53,71 @@ describe("linkWorkoutToActivities", () => {
     expect(linkWorkoutToActivities("2026-11-02T20:30", [c(2, "2026-11-02T14:01", 21909)])).toEqual([]);
   });
 
-  it("ignores non-strength activities", () => {
-    const out = linkWorkoutToActivities("2026-11-02T14:05", [
-      c(1, "2026-11-02T14:05", 3600, "Ride"),
-      c(2, "2026-11-02T14:07", 3600, "Run"),
-    ]);
-    expect(out).toEqual([]);
+  it("prefers a strength recording over any other sport", () => {
     const mixed = linkWorkoutToActivities("2026-11-02T14:05", [
       c(1, "2026-11-02T14:05", 3600, "Ride"),
       c(2, "2026-11-02T14:15", 3600),
     ]);
     expect(mixed).toEqual([{ activityId: 2, role: "primary", deltaMin: 10 }]);
+    // even a strength recording the lift started well into beats a ride starting right then
+    const container = linkWorkoutToActivities("2026-11-02T14:05", [
+      c(1, "2026-11-02T14:05", 3600, "Ride"),
+      c(2, "2026-11-02T13:00", 3 * 3600),
+    ]);
+    expect(container).toEqual([{ activityId: 2, role: "overrun", deltaMin: -65 }]);
   });
 
-  it("returns nothing when no start is within the window", () => {
-    expect(linkWorkoutToActivities("2026-11-02T14:05", [c(1, "2026-11-02T14:30", 3600)])).toEqual([]);
+  it("bike + lift: a lift inside a ride belongs to the ride", () => {
+    // ride 17:00-18:40, lift shared as starting 18:05
+    expect(linkWorkoutToActivities("2026-11-04T18:05", [c(7, "2026-11-04T17:00", 6000, "Ride")])).toEqual([
+      { activityId: 7, role: "overrun", deltaMin: -65 },
+    ]);
+    // a lift that starts with the recording takes its timing (primary)
+    expect(linkWorkoutToActivities("2026-11-04T17:05", [c(7, "2026-11-04T17:00", 6000, "Ride")])).toEqual([
+      { activityId: 7, role: "primary", deltaMin: -5 },
+    ]);
+  });
+
+  it("matches any sport from 30 min before its start to its end", () => {
+    const run = (start: string) => linkWorkoutToActivities(start, [c(3, "2026-11-04T18:00", 3600, "Run")]);
+    expect(run("2026-11-04T17:29")).toEqual([]);
+    expect(run("2026-11-04T17:30")).toEqual([{ activityId: 3, role: "primary", deltaMin: 30 }]);
+    expect(run("2026-11-04T18:20")).toEqual([{ activityId: 3, role: "primary", deltaMin: -20 }]);
+    expect(run("2026-11-04T18:21")).toEqual([{ activityId: 3, role: "overrun", deltaMin: -21 }]);
+    expect(run("2026-11-04T19:00")).toEqual([{ activityId: 3, role: "overrun", deltaMin: -60 }]);
+    expect(run("2026-11-04T19:01")).toEqual([]);
+  });
+
+  it("among other sports, the latest-starting recording that contains the lift wins", () => {
+    const out = linkWorkoutToActivities("2026-11-04T12:00", [
+      c(1, "2026-11-04T09:00", 5 * 3600, "Hike"),
+      c(2, "2026-11-04T11:00", 2 * 3600, "Walk"),
+    ]);
+    expect(out).toEqual([{ activityId: 2, role: "overrun", deltaMin: -60 }]);
+  });
+
+  it("other sports never attach as duplicates or continuations", () => {
+    const out = linkWorkoutToActivities("2026-11-04T18:00", [
+      c(1, "2026-11-04T18:00", 3600),
+      c(2, "2026-11-04T18:05", 1800, "Run"),
+      c(3, "2026-11-04T19:05", 1800, "Run"),
+    ]);
+    expect(out).toEqual([{ activityId: 1, role: "primary", deltaMin: 0 }]);
+  });
+
+  it("a recording that ended before the lift started doesn't match", () => {
+    expect(linkWorkoutToActivities("2026-11-04T18:08", [c(1, "2026-11-04T17:45", 926, "Workout")])).toEqual([]);
+  });
+
+  it("returns nothing when no recording is within reach", () => {
+    expect(linkWorkoutToActivities("2026-11-02T14:05", [c(1, "2026-11-02T14:40", 3600)])).toEqual([]);
     expect(linkWorkoutToActivities("2026-11-02T14:05", [])).toEqual([]);
   });
 
-  it("respects a custom window", () => {
-    expect(
-      linkWorkoutToActivities("2026-11-02T14:05", [c(1, "2026-11-02T14:30", 3600)], { windowMin: 30 }),
-    ).toEqual([{ activityId: 1, role: "primary", deltaMin: 25 }]);
+  it("respects a custom lead", () => {
+    expect(linkWorkoutToActivities("2026-11-02T14:05", [c(1, "2026-11-02T14:40", 3600)], { leadMin: 40 })).toEqual([
+      { activityId: 1, role: "primary", deltaMin: 35 },
+    ]);
   });
 
   it("marks an overlapping second device as a duplicate", () => {
