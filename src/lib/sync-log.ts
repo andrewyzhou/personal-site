@@ -7,7 +7,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { and, eq, lt } from "drizzle-orm";
-import { getDb, syncEvents } from "./db";
+import { getDb } from "./db";
+import { syncEvents } from "./db/sync-schema";
 
 export type SyncTrigger = "cron" | "poll" | "manual" | "telegram" | "webhook" | "script";
 export type SyncKind =

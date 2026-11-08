@@ -6,7 +6,8 @@
 // --run takes a full run id or its first 8 characters (as printed). read-only.
 
 import { and, desc, eq, gte, like, type SQL } from "drizzle-orm";
-import { getDb, syncEvents } from "../src/lib/db";
+import { getDb } from "../src/lib/db";
+import { syncEvents } from "../src/lib/db/sync-schema";
 import { formatEvent, parseSince } from "../src/lib/sync-log";
 
 function arg(name: string): string | undefined {
