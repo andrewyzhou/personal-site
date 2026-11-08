@@ -56,15 +56,15 @@ describe("sport-type table", () => {
     expect(sportTypeLabel("SomethingNew")).toBe("something new");
   });
 
-  it("keeps the labels, nouns and icons existing rows already render with", () => {
+  it("labels, nouns and icons for the common types", () => {
     const expected: Record<string, [string, string, string]> = {
       Run: ["run", "run", "run"],
       TrailRun: ["trail run", "trail run", "trailrun"],
-      VirtualRun: ["virtual run", "run", "run"],
+      VirtualRun: ["virtual run", "run", "treadmill"],
       Ride: ["ride", "bike ride", "ride"],
-      VirtualRide: ["virtual ride", "bike ride", "ride"],
-      MountainBikeRide: ["mountain bike ride", "bike ride", "ride"],
-      GravelRide: ["gravel ride", "bike ride", "ride"],
+      VirtualRide: ["virtual ride", "bike ride", "indoorride"],
+      MountainBikeRide: ["mountain bike ride", "bike ride", "mtb"],
+      GravelRide: ["gravel ride", "bike ride", "gravel"],
       Swim: ["swim", "swim", "swim"],
       Walk: ["walk", "walk", "walk"],
       Hike: ["hike", "hike", "hike"],
@@ -74,7 +74,7 @@ describe("sport-type table", () => {
       Tennis: ["tennis", "tennis", "tennis"],
       Soccer: ["soccer", "soccer", "soccer"],
       RockClimbing: ["rock climbing", "climb", "climb"],
-      Crossfit: ["crossfit", "crossfit", "weight"],
+      Crossfit: ["crossfit", "crossfit", "kettlebell"],
       Golf: ["golf", "golf", "golf"],
     };
     for (const [type, [label, noun, icon]] of Object.entries(expected)) {

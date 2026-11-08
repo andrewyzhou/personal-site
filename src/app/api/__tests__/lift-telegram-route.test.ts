@@ -10,7 +10,7 @@ import { POST } from "@/app/api/lift/telegram/route";
 const fetchMock = vi.fn();
 
 const DETAILS = [
-  "logged push day · wed nov 4 · 1 exercise · 2 sets · 1,850 lb · watch: not linked yet",
+  "logged push day · wed nov 4 · 1 exercise · 2 sets · 1,850 lb · created lift session",
   "bench press (barbell): 2×5 @ 185 lb · top e1rm 216 lb",
   "https://www.andrewzhou.org/lifts/q2W8vN0aZk1pL4xE",
 ].join("\n");

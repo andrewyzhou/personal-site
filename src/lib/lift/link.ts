@@ -1,11 +1,12 @@
-import { and, asc, eq, gte, inArray, isNull, lte, ne, notExists } from "drizzle-orm";
-import { linkWorkoutToActivities, STRENGTH_SPORT_TYPES, type LinkCandidate } from "lift-core";
+import { and, asc, eq, gte, isNull, lte, ne, notExists } from "drizzle-orm";
+import { linkWorkoutToActivities, type LinkCandidate } from "lift-core";
 import { activities, getDb, liftWorkoutActivities, liftWorkouts } from "@/lib/db";
 import { log } from "@/lib/log";
 import type { LinkedActivity } from "./summary";
 import { addDays } from "./time";
 
-// links a workout to the watch's strength recordings. only ever inserts into
+// links a workout to the watch recording it happened in (any sport, strength
+// preferred: see lift-core link.ts). only ever inserts into
 // lift_workout_activities and updates the workout's own timing columns; the
 // activities rows are read, never written.
 
@@ -65,6 +66,7 @@ function toPublic(l: LinkedRecording): LinkedActivity {
     deltaMin: l.deltaMin,
     sportType: l.sportType,
     localTime: l.localTime,
+    name: l.name,
   };
 }
 
@@ -77,6 +79,7 @@ async function loadLinks(workoutId: string): Promise<LinkedRecording[]> {
       method: liftWorkoutActivities.method,
       deltaMin: liftWorkoutActivities.deltaMin,
       sportType: activities.sportType,
+      name: activities.name,
       localTime: activities.localTime,
       startDateUtc: activities.startDateUtc,
       utcOffsetMin: activities.utcOffsetMin,
@@ -98,7 +101,7 @@ export async function getWorkoutLinks(workoutId: string): Promise<LinkedActivity
   return (await loadLinks(workoutId)).map(toPublic);
 }
 
-/** strength recordings within a day of `startedLocal` that no other live workout has claimed */
+/** recordings of any sport within a day of `startedLocal` that no other live workout has claimed */
 export function candidateRecordingsQuery(db: ReturnType<typeof getDb>, workout: { id: string; startedLocal: string }) {
   const day = workout.startedLocal.slice(0, 10);
   return db
@@ -112,7 +115,6 @@ export function candidateRecordingsQuery(db: ReturnType<typeof getDb>, workout: 
     .from(activities)
     .where(
       and(
-        inArray(activities.sportType, [...STRENGTH_SPORT_TYPES]),
         gte(activities.localDate, addDays(day, -1)),
         lte(activities.localDate, addDays(day, 1)),
         eq(activities.hidden, false),

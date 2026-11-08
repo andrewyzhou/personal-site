@@ -4,7 +4,6 @@ import {
   linkWorkoutToActivities,
   parseWorkoutCsv,
   resolveExerciseName,
-  STRENGTH_SPORT_TYPES,
   type DistanceUnit,
   type LinkRole,
   type ParsedWorkout,
@@ -277,7 +276,7 @@ export interface CsvReportInput {
   parsedExport: ParsedExport;
   /** stored workouts (soft-deleted ones too); null when the db wasn't read */
   existing: readonly ExistingWorkoutKey[] | null;
-  /** unclaimed strength recordings over the csv's range; null when not read */
+  /** unclaimed recordings (any sport) over the csv's range; null when not read */
   activities: readonly ActivityRow[] | null;
   /** custom exercise ids already in the exercises table; null when not read */
   knownExerciseIds?: ReadonlySet<string> | null;
@@ -370,7 +369,7 @@ export function buildCsvReport(input: CsvReportInput): { report: CsvReport; fres
   // linking: one read of the recordings, then the pure linker per workout
   const linking: CsvReport["linking"] = {
     checked: input.activities != null,
-    recordings: input.activities?.filter((a) => STRENGTH_SPORT_TYPES.includes(a.sportType)).length ?? 0,
+    recordings: input.activities?.length ?? 0,
     linkedWorkouts: 0,
     liftOnly: part.fresh.length,
     anchoredBy: { primary: 0, overrun: 0 },
@@ -489,7 +488,7 @@ export function formatCsvReport(r: CsvReport): string {
   const l = r.linking;
   if (!l.checked) p("watch recordings: not checked");
   else {
-    p(`watch recordings: ${l.recordings} unclaimed strength recordings in range`);
+    p(`watch recordings: ${l.recordings} unclaimed recordings in range (any sport)`);
     p(`  would link:  ${l.linkedWorkouts} workouts (${l.anchoredBy.primary} by start time, ${l.anchoredBy.overrun} inside a long recording)`);
     p(`  link rows:   ${l.links.primary} primary, ${l.links.duplicate} duplicate, ${l.links.continuation} continuation, ${l.links.overrun} overrun`);
     p(`  lift-only:   ${l.liftOnly} workouts`);

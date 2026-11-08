@@ -183,7 +183,7 @@ describe("ingestShareText", () => {
     expect(batch.mock.calls[0][0]).toHaveLength(8);
     expect(linkWorkout).toHaveBeenCalledWith(expect.objectContaining({ id: "share-Slug1", startedLocal: "2026-11-04T18:12" }));
     expect(res).toMatchObject({ status: "created", duplicate: false, workoutId: "share-Slug1", ingestId: "ing_" + "ab".repeat(12) });
-    expect(res.text).toMatch(/^logged push day · .* · watch: linked \(weight training 18:10\)$/);
+    expect(res.text).toMatch(/^logged push day · .* · added to weight training 18:10$/);
   });
 
   it("still succeeds when linking blows up", async () => {
@@ -192,7 +192,7 @@ describe("ingestShareText", () => {
     const res = await ingestShareText("raw", { source: "shortcut" });
     expect(res.status).toBe("created");
     expect(res.links).toEqual([]);
-    expect(res.text).toMatch(/watch: not linked yet$/);
+    expect(res.text).toMatch(/created lift session$/);
   });
 
   it("a byte-identical re-send of a live workout only re-inserts the raw ingest row", async () => {

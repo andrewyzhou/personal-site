@@ -32,6 +32,8 @@ export default async function SportTypesPage() {
   }
   const intervals = new Set<string>(INTERVALS_TYPES);
   const families = Object.keys(FAMILIES) as SportFamily[];
+  // every distinct icon file, for checking each one large and at list size
+  const iconSet = [...new Set([...SPORT_TYPE_KEYS.map(sportTypeIcon), ...families.map((f) => FAMILIES[f].icon), GENERIC_ICON])];
 
   return (
     <main className="sport-types-page" style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 16px 64px" }}>
@@ -43,6 +45,8 @@ export default async function SportTypesPage() {
         .sport-types-page .st-meta { min-width: 0; overflow-wrap: anywhere; }
         .sport-types-page .st-fam { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
         .sport-types-page .st-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px; }
+        .sport-types-page .st-zoom { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+        .sport-types-page .st-zoom-cell { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 6px 10px; }
       `}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <h1 className="font-sans font-bold text-off-white text-3xl">sport types</h1>
@@ -101,6 +105,21 @@ export default async function SportTypesPage() {
           </section>
         );
       })}
+
+      <h2 className="font-sans font-medium text-off-white text-lg" style={{ marginBottom: 10 }}>
+        the icon set <span className="text-gray text-sm">· {iconSet.length} files, sources in /icons/activities/LICENSES.md</span>
+      </h2>
+      <div className="st-zoom">
+        {iconSet.map((icon) => (
+          <div key={icon} className="st-zoom-cell card-bg rounded-lg" data-icon={icon}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/icons/activities/${icon}.svg`} alt={icon} width={64} height={64} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/icons/activities/${icon}.svg`} alt="" width={16} height={16} />
+            <span className="font-sans text-gray text-xs">{icon}</span>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

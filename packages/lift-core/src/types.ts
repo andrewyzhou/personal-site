@@ -172,7 +172,7 @@ export interface SearchResult {
 }
 
 // ---------------------------------------------------------------------------
-// activity linking (strength recordings from the watch)
+// activity linking (the watch recording a lift happened in: any sport, strength preferred)
 
 export interface LinkCandidate {
   id: number;
@@ -182,7 +182,11 @@ export interface LinkCandidate {
   elapsedS: number;
 }
 
-/** overrun: the workout started inside a recording that began well before it (watch left running) */
+/**
+ * primary: the lift's own recording (started near the lift), its timing becomes the workout's.
+ * overrun: the lift started inside a recording that began well before it (a ride with a lift on
+ * the end, or the watch left running); only its utc offset is used.
+ */
 export type LinkRole = "primary" | "duplicate" | "continuation" | "overrun";
 
 export interface ActivityLink {

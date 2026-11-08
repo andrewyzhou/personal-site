@@ -14,6 +14,8 @@ export interface LinkedActivity {
   sportType: string;
   /** 'HH:MM' local start of the recording */
   localTime: string;
+  /** the activity's title, when known */
+  name?: string;
 }
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -45,17 +47,18 @@ export function formatVolume(volumeKg: number, unit: WeightUnit): string {
   return `${Math.round(v).toLocaleString("en-US")} ${unit}`;
 }
 
+/** "added to evening ride (ride from 17:00)" / "added to weight training 18:10" / "created lift session" */
 export function formatWatch(links: readonly LinkedActivity[]): string {
   const primary = links.find((l) => l.role === "primary");
-  if (!primary) {
-    const overrun = links.find((l) => l.role === "overrun");
-    // the watch was left running from an earlier start; say so instead of a misleading time
-    if (overrun) return `watch: linked (inside ${sportLabel(overrun.sportType)} from ${overrun.localTime})`;
-    return "watch: not linked yet";
-  }
-  const extra = links.filter((l) => l.role === "continuation").length;
-  const more = extra ? ` +${extra} more` : "";
-  return `watch: linked (${sportLabel(primary.sportType)} ${primary.localTime}${more})`;
+  // an overrun link means the lift started partway into the recording (a ride
+  // with a lift on the end, or the watch left running): say "from" its start
+  const rec = primary ?? links.find((l) => l.role === "overrun");
+  if (!rec) return "created lift session";
+  const when = `${sportLabel(rec.sportType)} ${primary ? "" : "from "}${rec.localTime}`;
+  const name = rec.name?.replace(/\s+/g, " ").trim();
+  const what = name ? `${truncateText(name, 60)} (${when})` : when;
+  const extra = primary ? links.filter((l) => l.role === "continuation").length : 0;
+  return `added to ${what}${extra ? ` +${extra} more` : ""}`;
 }
 
 export interface SummaryOptions {
