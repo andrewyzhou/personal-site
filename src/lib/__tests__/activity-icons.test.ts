@@ -33,7 +33,7 @@ describe("activity icon files", () => {
   });
 
   it.each(FILES)("%s.svg has its source and license recorded", (name) => {
-    const row = LICENSES.split("\n").find((l) => l.startsWith(`| \`${name}.svg\` |`));
+    const row = LICENSES.split(/\r?\n/).find((l) => l.startsWith(`| \`${name}.svg\` |`));
     expect(row).toBeDefined();
     expect(row).toMatch(/\| (MIT|Apache-2\.0|repo LICENSE) \|$/);
   });
