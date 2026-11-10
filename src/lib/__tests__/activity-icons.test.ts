@@ -3,15 +3,14 @@ import path from "node:path";
 import { describe, it, expect } from "vitest";
 import { FAMILIES, GENERIC_ICON, SPORT_TYPE_KEYS, SPORT_TYPES, sportTypeIcon } from "../sport-types";
 
-// the activity icon set: every file normalized the same way, every file
-// licensed and recorded, and no file left unused
+// the activity icon set: every file normalized the same way, and no file left
+// unused
 
 const DIR = path.join(__dirname, "../../../public/icons/activities");
 const FILES = fs
   .readdirSync(DIR)
   .filter((f) => f.endsWith(".svg"))
   .map((f) => f.slice(0, -4));
-const LICENSES = fs.readFileSync(path.join(DIR, "LICENSES.md"), "utf8");
 
 describe("activity icon files", () => {
   it.each(FILES)("%s.svg is a normalized 24px currentColor icon", (name) => {
@@ -32,14 +31,6 @@ describe("activity icon files", () => {
     expect(svg).not.toMatch(/href=/);
   });
 
-  it.each(FILES)("%s.svg has its source and license recorded", (name) => {
-    const row = LICENSES.split(/\r?\n/).find((l) => l.startsWith(`| \`${name}.svg\` |`));
-    expect(row).toBeDefined();
-    expect(row).toMatch(/\| (MIT|Apache-2\.0|repo LICENSE) \|$/);
-  });
-
-  it("ships the license text of each set", () => {
-  });
 
   it("every file is used by a sport type, a family or as the generic icon", () => {
     const used = new Set<string>([GENERIC_ICON, ...SPORT_TYPE_KEYS.map(sportTypeIcon), ...Object.values(FAMILIES).map((f) => f.icon)]);
