@@ -651,8 +651,8 @@ export default function ActivityCalendar() {
     const statDefs: { types: string[]; icon: string; format: (acts: CalendarActivity[]) => string }[] = [
       stat(["run"], miles),
       stat(["ride"], miles),
-      stat(["walk", "hike"], miles, "walk"),
-      stat(["strength", "cardio"], minutes, "weight"),
+      stat(["walk", "hike"], miles, "shoe"),
+      stat(["strength", "cardio"], minutes, "dumbbell"),
       stat(["team"], minutes),
       stat(["mind"], minutes),
       stat(["racket"], minutes),

@@ -521,7 +521,7 @@ export default function AdminCalendar() {
 // symbol key: one entry per kind, always visible so the icons are legible
 function Legend() {
   const entries: { icon: string; label: string }[] = [
-    { icon: "/icons/activities/run.svg", label: "activity" },
+    { icon: "/icons/activities/running-shoe.svg", label: "activity" },
     { icon: "/icons/leetcode.svg", label: "leetcode" },
     { icon: "/icons/github.svg", label: "commits" },
     { icon: "/icons/blog.svg", label: "blog" },

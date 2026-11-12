@@ -58,24 +58,24 @@ describe("sport-type table", () => {
 
   it("labels, nouns and icons for the common types", () => {
     const expected: Record<string, [string, string, string]> = {
-      Run: ["run", "run", "run"],
-      TrailRun: ["trail run", "trail run", "trailrun"],
-      VirtualRun: ["virtual run", "run", "treadmill"],
-      Ride: ["ride", "bike ride", "ride"],
-      VirtualRide: ["virtual ride", "bike ride", "indoorride"],
-      MountainBikeRide: ["mountain bike ride", "bike ride", "mtb"],
-      GravelRide: ["gravel ride", "bike ride", "gravel"],
-      Swim: ["swim", "swim", "swim"],
-      Walk: ["walk", "walk", "walk"],
-      Hike: ["hike", "hike", "hike"],
-      WeightTraining: ["weight training", "lift", "weight"],
-      Workout: ["workout", "workout", "workout"],
-      Yoga: ["yoga", "yoga", "yoga"],
-      Tennis: ["tennis", "tennis", "tennis"],
-      Soccer: ["soccer", "soccer", "soccer"],
-      RockClimbing: ["rock climbing", "climb", "climb"],
+      Run: ["run", "run", "running-shoe"],
+      TrailRun: ["trail run", "trail run", "sport-shoe"],
+      VirtualRun: ["virtual run", "run", "treadmill-alt"],
+      Ride: ["ride", "bike ride", "bicycle"],
+      VirtualRide: ["virtual ride", "bike ride", "bike-rider"],
+      MountainBikeRide: ["mountain bike ride", "bike ride", "bicycle-alt"],
+      GravelRide: ["gravel ride", "bike ride", "bicycle-alt"],
+      Swim: ["swim", "swim", "pool-ladder"],
+      Walk: ["walk", "walk", "shoe"],
+      Hike: ["hike", "hike", "hiking-boot"],
+      WeightTraining: ["weight training", "lift", "dumbbell"],
+      Workout: ["workout", "workout", "activity"],
+      Yoga: ["yoga", "yoga", "yoga-mat"],
+      Tennis: ["tennis", "tennis", "tennis-racket"],
+      Soccer: ["soccer", "soccer", "pitch"],
+      RockClimbing: ["rock climbing", "climb", "stone"],
       Crossfit: ["crossfit", "crossfit", "kettlebell"],
-      Golf: ["golf", "golf", "golf"],
+      Golf: ["golf", "golf", "golf-flag"],
     };
     for (const [type, [label, noun, icon]] of Object.entries(expected)) {
       expect([sportTypeLabel(type), sportNoun(type), sportTypeIcon(type)]).toEqual([label, noun, icon]);
@@ -148,7 +148,7 @@ describe("fit sport + sub_sport → sport type", () => {
     ["training", "yoga", "Yoga", "mind"],
     ["training", "pilates", "Pilates", "mind"],
     ["training", "flexibilityTraining", "Mobility", "mind"],
-    ["training", "breathing", "Meditation", "mind"],
+    ["training", "breathing", "Breathwork", "mind"],
     ["fitnessEquipment", "treadmill", "TreadmillRun", "run"],
     ["fitnessEquipment", "indoorRowing", "VirtualRow", "water"],
     ["fitnessEquipment", "elliptical", "Elliptical", "cardio"],
@@ -164,7 +164,7 @@ describe("fit sport + sub_sport → sport type", () => {
     ["snowboarding", "generic", "Snowboard", "snow"],
     ["snowshoeing", "generic", "Snowshoe", "hike"],
     ["hiking", "generic", "Hike", "hike"],
-    ["mountaineering", "generic", "Hike", "hike"],
+    ["mountaineering", "generic", "Mountaineering", "hike"],
     ["walking", "casualWalking", "Walk", "walk"],
     ["rowing", "generic", "Rowing", "water"],
     ["rowing", "indoorRowing", "VirtualRow", "water"],
@@ -180,7 +180,7 @@ describe("fit sport + sub_sport → sport type", () => {
     ["inlineSkating", "generic", "InlineSkate", "skate"],
     ["iceSkating", "generic", "IceSkate", "skate"],
     ["multisport", "triathlon", "Multisport", "multisport"],
-    ["driving", "generic", "Other", "other"],
+    ["driving", "generic", "Driving", "other"],
   ])("%s / %s → %s (%s)", (sport, sub, type, family) => {
     expect(fitSportType(sport, sub)).toBe(type);
     expect(sportFamily(type)).toBe(family);

@@ -98,4 +98,4 @@ export const HOME = {
 };
 
 // sport → icon file in /public/icons/activities
-export const SPORT_ICON: Record<string, string> = { walk: "walk", lift: "weight", ride: "ride", hike: "hike", run: "run" };
+export const SPORT_ICON: Record<string, string> = { walk: "shoe", lift: "dumbbell", ride: "bicycle", hike: "hiking-boot", run: "running-shoe" };

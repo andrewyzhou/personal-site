@@ -25,3 +25,13 @@ full license texts live next to the vendored copies.
 - license: Unlicense (public domain dedication)
 - license text: `packages/lift-core/vendor/free-exercise-db/LICENSE.md`
 
+
+## Hugeicons (activity icons)
+
+- used in: `public/icons/activities/*.svg`, generated from `src/lib/activity-icons.ts`
+  by `scripts/icons/build.mts`
+- source: https://hugeicons.com, npm `@hugeicons/core-free-icons@4.4.0` (free set)
+- license: MIT, copyright (c) Hugeicons
+- license text: `public/icons/activities/LICENSE.md`
+- changes: drawn at stroke width 2; `dumbbell.svg` has a straight bar.
+  `hiking-boot.svg` is original.

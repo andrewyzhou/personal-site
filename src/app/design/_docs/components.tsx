@@ -29,7 +29,7 @@ import { HIKE, LIFT, SPORT_ICON, TRAINING } from "./specimens";
 
 type Page = (brand: Brand) => ReactNode;
 
-const sport = (s: string) => <Icon src={`/icons/activities/${SPORT_ICON[s] ?? "workout"}.svg`} />;
+const sport = (s: string) => <Icon src={`/icons/activities/${SPORT_ICON[s] ?? "activity"}.svg`} />;
 
 export const COMPONENTS: Record<string, Page> = {
   button: (brand) => (
@@ -292,7 +292,7 @@ export const COMPONENTS: Record<string, Page> = {
   icon: (brand) => (
     <Stack gap="12">
       <Block title="icon">
-        <Example brand={brand} code={`<Icon src="/icons/activities/run.svg" />`}>
+        <Example brand={brand} code={`<Icon src="/icons/activities/running-shoe.svg" />`}>
           {["run", "ride", "hike", "weight"].map((n) => (
             <Icon key={n} src={`/icons/activities/${n}.svg`} size="1.5rem" />
           ))}

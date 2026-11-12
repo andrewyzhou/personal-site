@@ -18,7 +18,8 @@
     "lift:import-csv": "tsx --env-file=.env.local scripts/lift-import-workout-csv.ts",
     "build:design": "node scripts/design-build.mjs",
     "test:design": "playwright test -c tests/design/playwright.config.ts",
-    "tokens": "tsx scripts/gen-tokens.ts"
+    "tokens": "tsx scripts/gen-tokens.ts",
+    "icons:build": "tsx scripts/icons/build.mts"
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.208.0",
@@ -55,6 +56,7 @@
     "@emnapi/core": "^1.11.1",
     "@emnapi/runtime": "^1.11.1",
     "@eslint/eslintrc": "^3",
+    "@hugeicons/core-free-icons": "4.4.0",
     "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",

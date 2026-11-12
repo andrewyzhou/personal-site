@@ -50,7 +50,7 @@ type Props = {
 };
 
 function SportIcon({ sport }: { sport: string }) {
-  return <Icon src={`/icons/activities/${SPORT_ICON[sport] ?? "workout"}.svg`} />;
+  return <Icon src={`/icons/activities/${SPORT_ICON[sport] ?? "activity"}.svg`} />;
 }
 
 export default async function BrandPreview({ params, searchParams }: Props) {
