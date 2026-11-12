@@ -5,7 +5,7 @@ import { getContentType, readEntry, moveEntry } from "@/lib/admin/content-store"
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// POST: publish (wip → live) or unpublish (live → wip) as one atomic commit
+// POST: publish (draft → a file in the repo) or unpublish (the file → a draft)
 export async function POST(request: Request, { params }: { params: Promise<{ type: string; slug: string }> }) {
   const denied = await requireAdmin(request);
   if (denied) return denied;

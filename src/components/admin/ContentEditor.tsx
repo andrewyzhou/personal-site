@@ -54,6 +54,8 @@ export default function ContentEditor(props: EditorProps) {
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [outage, setOutage] = useState(false);
   const [commit, setCommit] = useState<{ sha: string; url: string } | null>(null);
+  // a draft save has no commit to follow; it gets a plain confirmation instead
+  const [draftSaved, setDraftSaved] = useState(false);
   const [preview, setPreview] = useState(false);
 
   const { restorable, clearDraft, dismissRestore } = useLocalDraft(
@@ -109,7 +111,8 @@ export default function ContentEditor(props: EditorProps) {
       }
 
       setBaseSha(payload.data.sha ?? null);
-      setCommit({ sha: payload.data.commitSha, url: payload.data.commitUrl });
+      setCommit(payload.data.commitSha ? { sha: payload.data.commitSha, url: payload.data.commitUrl } : null);
+      setDraftSaved(!payload.data.commitSha);
       clearDraft();
       setMessage(null);
       if (props.isNew) {
@@ -163,6 +166,8 @@ export default function ContentEditor(props: EditorProps) {
         return;
       }
       setStatus(direction === "publish" ? "published" : "wip");
+      setBaseSha(payload.data.sha ?? baseSha);
+      setDraftSaved(false);
       setCommit({ sha: payload.data.commitSha, url: payload.data.commitUrl });
       router.refresh();
     } finally {
@@ -259,13 +264,20 @@ export default function ContentEditor(props: EditorProps) {
           </Button>
         )}
         {commit && <DeployStatus commitSha={commit.sha} commitUrl={commit.url} />}
+        {draftSaved && !commit && (
+          <Text size="sm" tone="muted">
+            draft saved
+          </Text>
+        )}
         {!props.isNew && props.viewPath && status === "published" && (
           <Link href={props.viewPath} variant="standalone" tone="muted">
             view on site
           </Link>
         )}
         <Text size="xs" tone="subtle">
-          saving commits this file to github; the site redeploys in about a minute.
+          {props.hasWip && status !== "published"
+            ? "drafts are private. publishing adds the file to the site's repo; the site redeploys in about a minute."
+            : "saving commits this file to github; the site redeploys in about a minute."}
         </Text>
         {!props.isNew && !props.singleton && (
           <div className="adm-danger-zone">

@@ -1,6 +1,8 @@
-// content operations for the cms: list/read/create/update/move/delete against
-// the github repo, with redis as a best-effort cache. git is the system of
-// record; no operation deletes-before-write; updates and deletes are sha-guarded.
+// content operations for the cms: list/read/create/update/move/delete.
+// published entries live in the github repo (git is their system of record,
+// redis a best-effort cache). drafts live in the database and are never in
+// the repo: publishing writes the file, unpublishing takes it back out. no
+// operation deletes before it has written; updates and deletes are sha-guarded.
 
 import { Redis } from "@upstash/redis";
 import {
@@ -8,11 +10,12 @@ import {
   getBlob,
   getFile,
   getTree,
-  moveFile,
   putFile,
   GitHubNotFoundError,
   type WriteResult,
 } from "./github-content";
+import { GitHubExistsError } from "./github-content";
+import { deleteDraft, draftPath, draftSha, getDraft, insertDraft, isDraftPath, listDrafts, updateDraft } from "./draft-store";
 import { getContentType, SLUG_RE, type ContentTypeDef } from "./content-registry";
 import { log } from "@/lib/log";
 
@@ -60,9 +63,15 @@ export async function dropListCache(typeId: string): Promise<void> {
 
 const extFor = (t: ContentTypeDef) => (t.kind === "mdx" ? "mdx" : "yaml");
 
-export function pathFor(t: ContentTypeDef, slug: string, wip: boolean): string {
+// the file of a published entry. drafts have no file (see draft-store).
+export function pathFor(t: ContentTypeDef, slug: string): string {
   if (t.singleton) return t.dir;
-  return `${t.dir}${wip ? "/wip" : ""}/${slug}.${extFor(t)}`;
+  return `${t.dir}/${slug}.${extFor(t)}`;
+}
+
+async function draftItems(t: ContentTypeDef): Promise<ContentListItem[]> {
+  if (!t.hasWip) return [];
+  return (await listDrafts(t.id)).map((d) => ({ slug: d.slug, status: "wip" as const, path: draftPath(t.id, d.slug), sha: d.sha, frontmatter: d.frontmatter }));
 }
 
 export async function listEntries(
@@ -77,29 +86,26 @@ export async function listEntries(
     const cached = await cacheGet<ContentListItem[]>(cacheKey);
     if (cached) {
       log.warn("admin:content", `github list failed for ${t.id}, serving cached`, error);
-      return { items: cached, stale: true };
+      return { items: [...cached, ...(await draftItems(t))], stale: true };
     }
     throw error;
   }
 
   const dirPrefix = `${t.dir}/`;
-  const wipPrefix = `${t.dir}/wip/`;
   const suffix = t.kind === "mdx" ? ".mdx" : ".yaml";
   const altSuffix = t.kind === "yaml" ? ".yml" : null;
 
   const entries = tree.filter((e) => {
     if (e.type !== "blob" || !e.path.startsWith(dirPrefix)) return false;
-    const isWip = e.path.startsWith(wipPrefix);
-    const rest = e.path.slice(isWip ? wipPrefix.length : dirPrefix.length);
-    if (rest.includes("/")) return false; // deeper nesting excluded
+    const rest = e.path.slice(dirPrefix.length);
+    if (rest.includes("/")) return false; // direct children only
     if (rest.toLowerCase() === "readme.md") return false;
     return rest.endsWith(suffix) || (altSuffix !== null && rest.endsWith(altSuffix));
   });
 
   const items: ContentListItem[] = [];
   for (const e of entries) {
-    const isWip = e.path.startsWith(wipPrefix);
-    const filename = e.path.slice(isWip ? wipPrefix.length : dirPrefix.length);
+    const filename = e.path.slice(dirPrefix.length);
     const slug = filename.replace(/\.(mdx|ya?ml)$/, "");
 
     let frontmatter = await cacheGet<Record<string, unknown>>(`cms:fm:${e.sha}`);
@@ -114,11 +120,11 @@ export async function listEntries(
       }
     }
 
-    items.push({ slug, status: isWip ? "wip" : "published", path: e.path, sha: e.sha, frontmatter });
+    items.push({ slug, status: "published", path: e.path, sha: e.sha, frontmatter });
   }
 
   await cacheSet(cacheKey, items, LIST_TTL_S);
-  return { items, stale: false };
+  return { items: [...items, ...(await draftItems(t))], stale: false };
 }
 
 export interface ContentEntry {
@@ -138,30 +144,21 @@ export async function readEntry(t: ContentTypeDef, slug: string): Promise<Conten
     return { slug: t.id, status: "published", path: file.path, sha: file.sha, frontmatter, body, raw: file.content };
   }
 
-  // published first, then wip
-  for (const wip of [false, true]) {
-    if (wip && !t.hasWip) break;
+  // published first (yaml collections may use .yml), then the draft
+  const path = pathFor(t, slug);
+  for (const candidate of t.kind === "yaml" ? [path, path.replace(/\.yaml$/, ".yml")] : [path]) {
     try {
-      const path = pathFor(t, slug, wip);
-      const file = await getFile(REPO, path);
+      const file = await getFile(REPO, candidate);
       const { frontmatter, body } = t.parse(file.content);
-      return { slug, status: wip ? "wip" : "published", path: file.path, sha: file.sha, frontmatter, body, raw: file.content };
+      return { slug, status: "published", path: file.path, sha: file.sha, frontmatter, body, raw: file.content };
     } catch (error) {
       if (!(error instanceof GitHubNotFoundError)) throw error;
     }
   }
-  // yaml collections may use .yml
-  if (t.kind === "yaml") {
-    for (const wip of [false, true]) {
-      if (wip && !t.hasWip) break;
-      try {
-        const path = pathFor(t, slug, wip).replace(/\.yaml$/, ".yml");
-        const file = await getFile(REPO, path);
-        const { frontmatter, body } = t.parse(file.content);
-        return { slug, status: wip ? "wip" : "published", path: file.path, sha: file.sha, frontmatter, body, raw: file.content };
-      } catch (error) {
-        if (!(error instanceof GitHubNotFoundError)) throw error;
-      }
+  if (t.hasWip) {
+    const draft = await getDraft(t.id, slug);
+    if (draft) {
+      return { slug, status: "wip", path: draftPath(t.id, slug), sha: draft.sha, frontmatter: draft.frontmatter, body: draft.body, raw: t.serialize(draft.frontmatter, draft.body) };
     }
   }
   throw new GitHubNotFoundError(`${t.id}/${slug}`);
@@ -172,6 +169,9 @@ export function validateSlug(t: ContentTypeDef, slug: string): string | null {
   return SLUG_RE.test(slug) ? null : "slug must be lowercase ascii: a-z, 0-9, dashes, underscores";
 }
 
+// a write that never touched the repo has no commit
+const NO_COMMIT = { commitSha: "", commitUrl: "" };
+
 export async function createEntry(
   t: ContentTypeDef,
   slug: string,
@@ -179,8 +179,14 @@ export async function createEntry(
   body: string,
   wip: boolean
 ): Promise<WriteResult & { path: string }> {
-  const path = pathFor(t, slug, wip && t.hasWip);
   const content = t.serialize(frontmatter, body);
+  if (wip && t.hasWip) {
+    const sha = draftSha(content);
+    if (!(await insertDraft({ type: t.id, slug, frontmatter, body, sha }))) throw new GitHubExistsError(`draft ${t.id}/${slug}`);
+    log.info("admin:content", `created draft ${t.id}/${slug}`);
+    return { blobSha: sha, ...NO_COMMIT, path: draftPath(t.id, slug) };
+  }
+  const path = pathFor(t, slug);
   const result = await putFile(REPO, {
     path,
     content,
@@ -200,6 +206,13 @@ export async function updateEntry(
   baseSha: string
 ): Promise<WriteResult> {
   const content = t.serialize(frontmatter, body);
+  if (isDraftPath(entryPath)) {
+    const sha = draftSha(content);
+    // same refusal as a stale file: the caller offers reload or overwrite
+    if (!(await updateDraft({ type: t.id, slug: slugLabel, frontmatter, body, sha }, baseSha))) throw new GitHubExistsError(`draft ${t.id}/${slugLabel} changed`);
+    log.info("admin:content", `updated draft ${t.id}/${slugLabel}`);
+    return { blobSha: sha, ...NO_COMMIT };
+  }
   const result = await putFile(REPO, {
     path: entryPath,
     content,
@@ -211,23 +224,43 @@ export async function updateEntry(
   return result;
 }
 
+// publish: the draft becomes a file in the repo, then its row is removed.
+// unpublish: the file's content becomes a draft, then the file is deleted.
+// each direction writes the destination first, so a failure half way leaves
+// the entry in both places rather than in neither.
 export async function moveEntry(
   t: ContentTypeDef,
   slug: string,
   direction: "publish" | "unpublish",
-  blobSha: string
-): Promise<{ path: string; commitSha: string; commitUrl: string }> {
-  const fromPath = pathFor(t, slug, direction === "publish");
-  const toPath = pathFor(t, slug, direction === "unpublish");
-  const result = await moveFile(REPO, {
-    fromPath,
-    toPath,
-    blobSha,
-    message: `content: ${direction} ${t.commitNoun} ${slug}`,
+  sha: string
+): Promise<{ path: string; sha: string; commitSha: string; commitUrl: string }> {
+  const filePath = pathFor(t, slug);
+  if (direction === "publish") {
+    const draft = await getDraft(t.id, slug);
+    if (!draft || draft.sha !== sha) throw new GitHubNotFoundError(`draft ${t.id}/${slug}`);
+    const result = await putFile(REPO, {
+      path: filePath,
+      content: t.serialize(draft.frontmatter, draft.body),
+      message: `content: add ${t.commitNoun} ${slug}`,
+    });
+    await deleteDraft(t.id, slug, sha);
+    await dropListCache(t.id);
+    log.info("admin:content", `published ${slug} (${result.commitSha.slice(0, 7)})`);
+    return { path: filePath, sha: result.blobSha, commitSha: result.commitSha, commitUrl: result.commitUrl };
+  }
+
+  const entry = await readEntry(t, slug);
+  if (entry.status !== "published" || entry.sha !== sha) throw new GitHubNotFoundError(`${t.id}/${slug}`);
+  const stored = { type: t.id, slug, frontmatter: entry.frontmatter, body: entry.body, sha: draftSha(t.serialize(entry.frontmatter, entry.body)) };
+  if (!(await insertDraft(stored))) throw new GitHubExistsError(`draft ${t.id}/${slug}`);
+  const result = await deleteFile(REPO, {
+    path: entry.path,
+    message: `content: remove ${t.commitNoun} ${slug}`,
+    sha,
   });
   await dropListCache(t.id);
-  log.info("admin:content", `${direction}ed ${slug} (${result.commitSha.slice(0, 7)})`);
-  return { path: toPath, ...result };
+  log.info("admin:content", `unpublished ${slug} (${result.commitSha.slice(0, 7)})`);
+  return { path: draftPath(t.id, slug), sha: stored.sha, ...result };
 }
 
 export async function deleteEntry(
@@ -236,6 +269,11 @@ export async function deleteEntry(
   slug: string,
   sha: string
 ): Promise<{ commitSha: string; commitUrl: string }> {
+  if (isDraftPath(entryPath)) {
+    if (!(await deleteDraft(t.id, slug, sha))) throw new GitHubNotFoundError(`draft ${t.id}/${slug}`);
+    log.info("admin:content", `deleted draft ${t.id}/${slug}`);
+    return NO_COMMIT;
+  }
   const result = await deleteFile(REPO, {
     path: entryPath,
     message: `content: delete ${t.commitNoun} ${slug}`,
