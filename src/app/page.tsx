@@ -8,16 +8,15 @@ import ActivityCalendar from "@/components/ActivityCalendar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Bio from "@/components/mdx/Bio";
 import ItemContent from "@/components/mdx/ItemContent";
-import { getAllEntries } from "@/lib/library";
-import { getAllPosts } from "@/lib/blog";
-import { getAllPhotosets } from "@/lib/photos";
-import { getItems, type ItemCategory } from "@/lib/items";
-import { getHeroQuotes, getSectionDescriptions, getCoursework } from "@/lib/content";
-import { getSite } from "@/content/site";
+import type { SectionKey } from "@/lib/content";
+import * as content from "@/content";
 import { formatDay } from "@/content/format";
 
-function loadCategory(category: ItemCategory) {
-  return getItems(category).map((m) => ({
+type Listed = { slug: string; title: string; company: string; companyUrl?: string; location?: string; period?: string; year: string };
+
+// folder = where the entry's file lives, which is where its text is loaded from
+function experience(items: (Listed & { group?: "work" | "research" | "teaching" })[], folder?: "projects") {
+  return items.map((m) => ({
     id: m.slug,
     title: m.title,
     company: m.company,
@@ -25,19 +24,19 @@ function loadCategory(category: ItemCategory) {
     location: m.location,
     period: m.period,
     year: m.year,
-    description: <ItemContent category={category} slug={m.slug} />,
+    description: <ItemContent category={folder ?? m.group!} slug={m.slug} />,
   }));
 }
 
 
 export default function Home() {
-  const site = getSite();
-  const workItems = loadCategory("work");
-  const researchItems = loadCategory("research");
-  const teachingItems = loadCategory("teaching");
-  const projectsItems = loadCategory("projects");
+  const site = content.site();
+  const workItems = experience(content.roles("work"));
+  const researchItems = experience(content.roles("research"));
+  const teachingItems = experience(content.roles("teaching"));
+  const projectsItems = experience(content.projects(), "projects");
 
-  const libraryPreview: LibraryPreviewItem[] = getAllEntries().slice(0, 5).map((e) => {
+  const libraryPreview: LibraryPreviewItem[] = content.reading().slice(0, 5).map((e) => {
     const dateLabel = e.dateCompleted
       ? `${site.pages.library.completed} ${formatDay(e.dateCompleted)}`
       : e.dateStarted
@@ -49,14 +48,14 @@ export default function Home() {
       slug: e.slug,
       title: e.title,
       creator: e.creator,
-      type: e.type,
+      type: "book",
       summary: e.summary,
       dateLabel,
       year,
     };
   });
 
-  const blogPreview: BlogPreviewItem[] = getAllPosts().slice(0, 5).map((p) => ({
+  const blogPreview: BlogPreviewItem[] = content.posts().slice(0, 5).map((p) => ({
     slug: p.slug,
     title: p.title,
     summary: p.summary,
@@ -64,7 +63,7 @@ export default function Home() {
     year: (p.date ?? "").slice(0, 4) || "",
   }));
 
-  const photosPreview: PhotosetPreviewItem[] = getAllPhotosets().slice(0, 5).map((s) => ({
+  const photosPreview: PhotosetPreviewItem[] = content.photoSets().slice(0, 5).map((s) => ({
     slug: s.slug,
     title: s.title,
     caption: s.caption,
@@ -76,7 +75,8 @@ export default function Home() {
   return (
     <main className="site-container">
       {/* section 1: hero */}
-      <Hero quotes={getHeroQuotes()} />
+      <Hero quotes={content.quotes().map((q) => `${q.text}
+- ${q.attribution}`)} />
       <div className="section-divider" />
 
       {/* section 2: experience/work/research/teaching/projects/library */}
@@ -84,8 +84,8 @@ export default function Home() {
         libraryPreview={libraryPreview}
         blogPreview={blogPreview}
         photosPreview={photosPreview}
-        sectionDescriptions={getSectionDescriptions()}
-        semesters={getCoursework()}
+        sectionDescriptions={content.blurbs() as Record<SectionKey, string>}
+        semesters={content.coursework()}
         bio={<Bio />}
         workItems={workItems}
         researchItems={researchItems}
