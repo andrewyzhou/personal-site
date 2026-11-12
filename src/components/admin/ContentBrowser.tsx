@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import NextLink from "next/link";
+import { Badge, Button, Card, Chip, Cluster, EmptyState, Input, Link, Select, Skeleton, Stack, Table, Text } from "@/design-system";
 
 const COLLECTIONS = ["blog", "library", "photos", "work", "research", "teaching", "projects"] as const;
 const SINGLETONS = [
-  { id: "bio", label: "bio" },
-  { id: "sections", label: "sections" },
-  { id: "coursework", label: "coursework" },
-  { id: "hero-quotes", label: "hero quotes" },
+  { id: "bio", label: "bio", hint: "the about-me text on the home page" },
+  { id: "sections", label: "sections", hint: "the blurb under each home tab" },
+  { id: "coursework", label: "coursework", hint: "semesters, courses, reviews" },
+  { id: "hero-quotes", label: "hero quotes", hint: "the rotating quotes in the hero" },
 ];
 
 interface Item {
@@ -25,6 +26,10 @@ const VIEW_PATH: Record<string, (slug: string) => string> = {
   photos: (s) => `/photos/${s}`,
 };
 
+const dateOf = (fm: Record<string, unknown>) => String(fm.date ?? fm.dateCompleted ?? fm.dateStarted ?? "");
+
+// the content list: one collection at a time, searchable, with the site-wide
+// singletons (bio, sections, …) in their own card
 export default function ContentBrowser() {
   const [type, setType] = useState<string>("blog");
   const [items, setItems] = useState<Item[] | null>(null);
@@ -75,96 +80,108 @@ export default function ContentBrowser() {
       });
     }
     return out.slice().sort((a, b) => {
-      if (sort === "az") {
-        return String(a.frontmatter.title ?? a.slug).localeCompare(String(b.frontmatter.title ?? b.slug));
-      }
-      const da = String(a.frontmatter.date ?? a.frontmatter.dateCompleted ?? a.frontmatter.dateStarted ?? "");
-      const db = String(b.frontmatter.date ?? b.frontmatter.dateCompleted ?? b.frontmatter.dateStarted ?? "");
-      return db.localeCompare(da);
+      if (sort === "az") return String(a.frontmatter.title ?? a.slug).localeCompare(String(b.frontmatter.title ?? b.slug));
+      return dateOf(b.frontmatter).localeCompare(dateOf(a.frontmatter));
     });
   }, [items, search, sort]);
 
   return (
-    <div className="admin-cms flex flex-col" style={{ gap: "14px" }}>
-      <div className="flex flex-wrap" style={{ gap: "6px" }}>
-        {COLLECTIONS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setType(t)}
-            className={`font-sans text-sm ${type === t ? "text-off-white link-highlight-active" : "text-gray link-highlight"}`}
-            style={{ padding: "2px 6px" }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center" style={{ gap: "8px" }}>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="search…"
-          style={{ flex: 1 }}
-        />
-        <button
-          onClick={() => setSort(sort === "newest" ? "az" : "newest")}
-          className="font-sans text-gray text-sm link-highlight"
-          style={{ flexShrink: 0 }}
-        >
-          {sort === "newest" ? "newest" : "a–z"}
-        </button>
-        <Link href={`/admin/content/${type}/new`} className="font-sans text-off-white text-sm link-highlight" style={{ flexShrink: 0 }}>
-          + new
-        </Link>
-      </div>
-
-      {stale && <p className="font-sans text-gray text-xs italic">github unreachable — showing cached list</p>}
-      {error && <p className="font-sans text-gray text-sm italic">{error}</p>}
-
-      {items === null ? (
-        <div className="card-bg animate-pulse rounded-lg" style={{ height: 120 }} />
-      ) : (
-        <div className="flex flex-col" style={{ gap: "6px" }}>
-          {filtered.map((item) => {
-            const fm = item.frontmatter;
-            const date = String(fm.date ?? fm.dateCompleted ?? fm.dateStarted ?? "");
-            const view = VIEW_PATH[type]?.(item.slug);
-            return (
-              <div key={item.path} className="card-bg-hover rounded-lg flex items-center" style={{ padding: "8px 12px", gap: "8px" }}>
-                <Link href={`/admin/content/${type}/${item.slug}`} style={{ flex: 1, minWidth: 0 }}>
-                  <span className="font-sans text-off-white text-sm block truncate">
-                    {String(fm.title ?? item.slug)}
-                    {item.status === "wip" && (
-                      <span className="text-gray link-highlight rounded" style={{ fontSize: "0.7rem", padding: "1px 5px", marginLeft: "8px" }}>
-                        wip
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-sans text-gray text-xs">{date || item.slug}</span>
-                </Link>
-                {view && item.status === "published" && (
-                  <Link href={view} className="font-sans text-gray text-xs link-highlight" style={{ flexShrink: 0 }}>
-                    view →
-                  </Link>
-                )}
-              </div>
-            );
-          })}
-          {filtered.length === 0 && <p className="font-sans text-gray text-sm italic">nothing here yet</p>}
+    <Stack gap="6">
+      <Card
+        title={
+          <Cluster gap="2">
+            {COLLECTIONS.map((t) => (
+              <Chip key={t} selected={type === t} onClick={() => setType(t)}>
+                {t}
+              </Chip>
+            ))}
+          </Cluster>
+        }
+        actions={
+          <Button href={`/admin/content/${type}/new`} variant="primary" size="sm">
+            {`new ${type === "photos" ? "photoset" : type === "library" ? "entry" : type === "blog" ? "post" : "item"}`}
+          </Button>
+        }
+        padded={false}
+      >
+        <div className="adm-toolbar">
+          <Input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`search ${type}`} aria-label="search" />
+          <Select value={sort} onChange={(e) => setSort(e.target.value as "newest" | "az")} aria-label="sort">
+            <option value="newest">newest first</option>
+            <option value="az">a–z</option>
+          </Select>
         </div>
-      )}
+        {stale ? (
+          <div className="adm-note">
+            <Text size="xs" tone="muted">
+              github is unreachable — showing the last list we had
+            </Text>
+          </div>
+        ) : null}
+        {items === null ? (
+          <div className="adm-pad">
+            <Stack gap="2">
+              <Skeleton height="1.25rem" />
+              <Skeleton height="1.25rem" />
+              <Skeleton height="1.25rem" width="60%" />
+            </Stack>
+          </div>
+        ) : error ? (
+          <div className="adm-pad">
+            <EmptyState title="couldn't load this list" body={error} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="adm-pad">
+            <EmptyState title={search ? "no matches" : "nothing here yet"} />
+          </div>
+        ) : (
+          <div className="adm-table-wrap">
+            <Table
+              rowKey={(i) => i.path}
+              rows={filtered}
+              columns={[
+                {
+                  key: "title",
+                  header: "title",
+                  cell: (i) => (
+                    <NextLink href={`/admin/content/${type}/${i.slug}`} className="adm-row-link">
+                      <span>{String(i.frontmatter.title ?? i.slug)}</span>
+                      {i.status === "wip" ? <Badge tone="accent">draft</Badge> : null}
+                    </NextLink>
+                  ),
+                },
+                { key: "date", header: "date", align: "right", cell: (i) => dateOf(i.frontmatter) || "—" },
+                {
+                  key: "view",
+                  header: "",
+                  align: "right",
+                  cell: (i) => {
+                    const view = VIEW_PATH[type]?.(i.slug);
+                    return view && i.status === "published" ? (
+                      <Link href={view} variant="standalone" tone="muted">
+                        view
+                      </Link>
+                    ) : null;
+                  },
+                },
+              ]}
+            />
+          </div>
+        )}
+      </Card>
 
-      <div style={{ marginTop: "0.5rem" }}>
-        <p className="font-sans text-gray text-xs" style={{ marginBottom: "4px" }}>site</p>
-        <div className="flex flex-wrap" style={{ gap: "10px" }}>
-          {SINGLETONS.map((sg) => (
-            <Link key={sg.id} href={`/admin/content/${sg.id}/${sg.id}`} className="font-sans text-gray text-sm link-highlight">
-              {sg.label}
-            </Link>
+      <Card title="site text" padded={false}>
+        <ul className="adm-list">
+          {SINGLETONS.map((s) => (
+            <li key={s.id}>
+              <NextLink href={`/admin/content/${s.id}/${s.id}`} className="adm-list-row">
+                <span className="adm-list-label">{s.label}</span>
+                <span className="adm-list-hint">{s.hint}</span>
+              </NextLink>
+            </li>
           ))}
-        </div>
-      </div>
-    </div>
+        </ul>
+      </Card>
+    </Stack>
   );
 }

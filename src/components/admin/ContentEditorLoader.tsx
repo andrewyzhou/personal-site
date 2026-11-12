@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EmptyState, Skeleton, Stack } from "@/design-system";
 import ContentEditor from "./ContentEditor";
 
 // fetches an existing entry through the session-authed api, then mounts the
@@ -76,9 +77,15 @@ export default function ContentEditorLoader({ typeId, slug }: { typeId: string; 
     };
   }, [typeId, slug, isNew, meta]);
 
-  if (!meta) return <p className="font-sans text-gray text-sm italic">unknown content type</p>;
-  if (state.phase === "loading") return <div className="card-bg animate-pulse rounded-lg" style={{ height: 220 }} />;
-  if (state.phase === "error") return <p className="font-sans text-gray text-sm italic">{state.message}</p>;
+  if (!meta) return <EmptyState title="unknown content type" />;
+  if (state.phase === "loading")
+    return (
+      <Stack gap="3">
+        <Skeleton height="2.5rem" />
+        <Skeleton height="20rem" />
+      </Stack>
+    );
+  if (state.phase === "error") return <EmptyState title="couldn't open this entry" body={state.message} />;
 
   const isBlocksFormat = typeId === "photos" && state.frontmatter.format === "blocks";
 

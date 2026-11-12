@@ -75,6 +75,10 @@
   --ds-bg-inset: oklch(95.5% 0 0);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0 0);
   --ds-fg-default: oklch(28% 0 0);
   --ds-fg-muted: oklch(44% 0 0);
@@ -113,6 +117,10 @@
   --ds-bg-inset: oklch(95.5% 0.004 255);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0.004 255);
   --ds-fg-default: oklch(28% 0.004 255);
   --ds-fg-muted: oklch(44% 0.004 255);
@@ -151,6 +159,10 @@
   --ds-bg-inset: oklch(95.5% 0.004 75);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0.004 75);
   --ds-fg-default: oklch(28% 0.004 75);
   --ds-fg-muted: oklch(44% 0.004 75);
@@ -189,6 +201,10 @@
   --ds-bg-inset: oklch(95.5% 0.003 160);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0.003 160);
   --ds-fg-default: oklch(28% 0.003 160);
   --ds-fg-muted: oklch(44% 0.003 160);
@@ -227,6 +243,10 @@
   --ds-bg-inset: oklch(14.8% 0 0);
   --ds-bg-hover: oklch(94.9% 0 0 / 0.06);
   --ds-bg-active: oklch(94.9% 0 0 / 0.11);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(94.9% 0 0 / 0.06);
   --ds-fg: oklch(94.9% 0 0);
   --ds-fg-default: oklch(84.5% 0 0);
   --ds-fg-muted: oklch(72% 0 0);
@@ -265,6 +285,10 @@
   --ds-bg-inset: oklch(14.8% 0.004 255);
   --ds-bg-hover: oklch(94.9% 0 0 / 0.06);
   --ds-bg-active: oklch(94.9% 0 0 / 0.11);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(94.9% 0 0 / 0.06);
   --ds-fg: oklch(94.9% 0.004 255);
   --ds-fg-default: oklch(84.5% 0.004 255);
   --ds-fg-muted: oklch(72% 0.004 255);
@@ -303,6 +327,10 @@
   --ds-bg-inset: oklch(14.8% 0.004 75);
   --ds-bg-hover: oklch(94.9% 0 0 / 0.06);
   --ds-bg-active: oklch(94.9% 0 0 / 0.11);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(94.9% 0 0 / 0.06);
   --ds-fg: oklch(94.9% 0.004 75);
   --ds-fg-default: oklch(84.5% 0.004 75);
   --ds-fg-muted: oklch(72% 0.004 75);
@@ -341,6 +369,10 @@
   --ds-bg-inset: oklch(14.8% 0.003 160);
   --ds-bg-hover: oklch(94.9% 0 0 / 0.06);
   --ds-bg-active: oklch(94.9% 0 0 / 0.11);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(94.9% 0 0 / 0.06);
   --ds-fg: oklch(94.9% 0.003 160);
   --ds-fg-default: oklch(84.5% 0.003 160);
   --ds-fg-muted: oklch(72% 0.003 160);
@@ -379,6 +411,10 @@
   --ds-bg-inset: oklch(95.5% 0 0);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0 0);
   --ds-fg-default: oklch(28% 0 0);
   --ds-fg-muted: oklch(44% 0 0);
@@ -417,6 +453,10 @@
   --ds-bg-inset: oklch(95.5% 0.004 255);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0.004 255);
   --ds-fg-default: oklch(28% 0.004 255);
   --ds-fg-muted: oklch(44% 0.004 255);
@@ -455,6 +495,10 @@
   --ds-bg-inset: oklch(95.5% 0.004 75);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0.004 75);
   --ds-fg-default: oklch(28% 0.004 75);
   --ds-fg-muted: oklch(44% 0.004 75);
@@ -493,6 +537,10 @@
   --ds-bg-inset: oklch(95.5% 0.003 160);
   --ds-bg-hover: oklch(17.3% 0 0 / 0.05);
   --ds-bg-active: oklch(17.3% 0 0 / 0.09);
+  --ds-highlight: var(--ds-accent-subtle);
+  --ds-highlight-hover: color-mix(in oklch, var(--ds-accent) 26%, transparent);
+  --ds-highlight-active: color-mix(in oklch, var(--ds-accent) 32%, transparent);
+  --ds-panel: oklch(17.3% 0 0 / 0.05);
   --ds-fg: oklch(17.3% 0.003 160);
   --ds-fg-default: oklch(28% 0.003 160);
   --ds-fg-muted: oklch(44% 0.003 160);
@@ -606,6 +654,29 @@
   --ds-leading-3xl: 3.1625rem;
   --ds-text-display: 4.6rem;
   --ds-leading-display: 4.6rem;
+}
+
+.ds[data-brand="admin"] {
+  --ds-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ds-font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ds-heading-weight: 600;
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 12px;
+  --ds-control-h: 2rem;
+  --ds-control-h-sm: 1.625rem;
+  --ds-row-pad: 0.5rem;
+  --ds-dur-fast: 96ms;
+  --ds-dur-base: 144ms;
+  --ds-dur-slow: 224ms;
+  --ds-text-2xl: 1.575rem;
+  --ds-leading-2xl: 1.9125rem;
+  --ds-text-3xl: 2.25rem;
+  --ds-leading-3xl: 2.475rem;
+  --ds-text-display: 3.6rem;
+  --ds-leading-display: 3.6rem;
+  --ds-text-base: 0.875rem;
+  --ds-leading-base: 1.3125rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

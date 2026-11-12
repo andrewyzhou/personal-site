@@ -35,6 +35,12 @@ export const COLOR: Record<string, Pair> = {
   "bg-inset": { light: g(95.5), dark: g(14.8) },
   "bg-hover": { light: "oklch(17.3% 0 0 / 0.05)", dark: "oklch(94.9% 0 0 / 0.06)" },
   "bg-active": { light: "oklch(17.3% 0 0 / 0.09)", dark: "oklch(94.9% 0 0 / 0.11)" },
+  // the soft box behind inline links and selected chips, and card panels.
+  // defaults follow the accent.
+  highlight: { light: "var(--ds-accent-subtle)", dark: "var(--ds-accent-subtle)" },
+  "highlight-hover": { light: "color-mix(in oklch, var(--ds-accent) 26%, transparent)", dark: "color-mix(in oklch, var(--ds-accent) 26%, transparent)" },
+  "highlight-active": { light: "color-mix(in oklch, var(--ds-accent) 32%, transparent)", dark: "color-mix(in oklch, var(--ds-accent) 32%, transparent)" },
+  panel: { light: "oklch(17.3% 0 0 / 0.05)", dark: "oklch(94.9% 0 0 / 0.06)" },
   // foreground
   fg: { light: g(17.3), dark: g(94.9) },
   "fg-default": { light: g(28), dark: g(84.5) },

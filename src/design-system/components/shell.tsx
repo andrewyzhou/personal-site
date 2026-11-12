@@ -13,6 +13,8 @@ export interface NavItem {
   href: string;
   // other url prefixes that belong to this item (training also owns /activities)
   match?: string[];
+  // current only on its own url, not on pages under it (a dashboard at /admin)
+  exact?: boolean;
 }
 
 export interface ShellModel {
@@ -36,12 +38,18 @@ export function AppShell({
   model,
   brand,
   variant: variantProp,
+  hideFooter,
+  actions,
   accent,
   theme,
   className,
   children,
 }: {
   model: ShellModel;
+  // the page draws its own footer
+  hideFooter?: boolean;
+  // extra controls beside the theme toggle (a tool's "new" menu, sign out)
+  actions?: ReactNode;
   // a brand sets the shell variant, accent and component switches at once
   brand?: Brand;
   variant?: "topbar" | "pill" | "rail";
@@ -61,6 +69,7 @@ export function AppShell({
         </NextLink>
         <ShellNav items={model.nav} layout="bar" />
         <div className="ds-topbar-end">
+          {actions}
           <ThemeToggle label={model.labels.theme} />
           <details className="ds-menu">
             <summary className="ds-btn" data-variant="ghost" data-icon-only="" aria-label={model.labels.menu} title={model.labels.menu}>
@@ -77,9 +86,11 @@ export function AppShell({
   const body = (
     <>
       <main className="ds-shell-main">{children}</main>
-      <footer className="ds-footer">
-        <Container>{model.footer}</Container>
-      </footer>
+      {hideFooter ? null : (
+        <footer className="ds-footer">
+          <Container>{model.footer}</Container>
+        </footer>
+      )}
     </>
   );
   return (

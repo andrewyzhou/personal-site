@@ -161,6 +161,60 @@ export const PATTERNS: Record<string, Page> = {
     </Stack>
   ),
 
+  admin: () => (
+    <Stack gap="12">
+      <Block
+        title="what it is"
+        intro="the admin is the editing tool, not a page visitors see. it has its own entry in the system (brand: admin) and never follows the public site's theme, so switching themes can't break a form."
+      >
+        <Prose>
+          <ul>
+            <li>system ui font, neutral grays, blue only for actions, focus and links.</li>
+            <li>compact controls; 14px body text; tables and cards instead of loose lists.</li>
+            <li>links are underlined text. no highlight boxes, no hover washes on text.</li>
+            <li>works as a phone app: the sidebar becomes a menu bar below 1024px.</li>
+          </ul>
+        </Prose>
+      </Block>
+      <Block title="frame" intro="the app shell's rail variant.">
+        {anatomy([
+          ["sidebar", "mark (admin) · dashboard · content · activities · comments · listening · privacy"],
+          ["sidebar foot", "+ new menu · sign out · theme"],
+          ["phones", "the same items in a top bar: mark, + new, theme, menu"],
+          ["main", "up to 1120px wide, 32px padding"],
+        ])}
+      </Block>
+      <Block title="page anatomy" intro="every admin page uses AdminPage (src/components/admin/AdminPage).">
+        {anatomy([
+          ["breadcrumb", "content / blog / hello-world (only below a section)"],
+          ["title + actions", "2xl title; the page's main action on the right as a small primary button"],
+          ["description", "one optional muted line"],
+          ["body", "cards, 24px apart"],
+        ])}
+      </Block>
+      <Block title="editor" intro="content entries (posts, notes, work items, bio, site text).">
+        {anatomy([
+          ["main column", "the text: write / preview switch, toolbar that scrolls on phones, links in blue"],
+          ["side column (320px, sticky)", "publish card: status, save (primary), publish or move to drafts, deploy status, delete last"],
+          ["", "details card: url name for new entries, then the entry's fields"],
+          ["phones", "publish card first, then details, then the text"],
+          ["notices", "one-line callouts above the editor: unsaved local changes, conflicts, outages"],
+        ])}
+      </Block>
+      <Block title="rules">
+        <Prose>
+          <ul>
+            <li>one primary action per page header and per card.</li>
+            <li>every save says where it goes: a commit to github, then a redeploy.</li>
+            <li>destructive buttons are danger-styled, last, and confirm first.</li>
+            <li>empty and error states use EmptyState; nothing is ever a bare italic line.</li>
+            <li>new admin pages are built from design-system components; the old utility classes are only bridged until each page is rebuilt.</li>
+          </ul>
+        </Prose>
+      </Block>
+    </Stack>
+  ),
+
   "empty-and-error": (brand) => (
     <Stack gap="12">
       <Block title="empty hub">

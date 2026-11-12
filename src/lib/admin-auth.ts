@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "./auth";
+import { isLocalPreview } from "./local-preview";
 
 // admin gate for mutation endpoints: a signed-in allowlisted google session
 // (the admin ui path) or the shared-secret header (scripts / curl fallback).
@@ -48,5 +49,7 @@ export function unauthorizedResponse(): NextResponse {
 
 // helper for admin routes: returns a 401 response to short-circuit with, or null
 export async function requireAdmin(request: Request): Promise<NextResponse | null> {
+  // local design preview: reads only, never writes (see lib/local-preview)
+  if (isLocalPreview() && (request.method === "GET" || request.method === "HEAD")) return null;
   return (await isAdminRequest(request)) ? null : unauthorizedResponse();
 }

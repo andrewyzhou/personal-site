@@ -41,7 +41,8 @@ export const SECTIONS: DocSection[] = [
       { slug: "table", title: "table", summary: "aligned numbers: splits, sets, laps." },
       { slug: "badge", title: "badge & legend", summary: "small status marks and color keys." },
       { slug: "empty-state", title: "empty state", summary: "what a section says when there's nothing in it." },
-      { slug: "forms", title: "forms", summary: "field, input, textarea." },
+      { slug: "forms", title: "forms", summary: "field, input, textarea, select, checkbox." },
+      { slug: "card", title: "card", summary: "a bordered surface for one record, form or group of settings." },
       { slug: "icon", title: "icon", summary: "monochrome svg in the current text color." },
       { slug: "map-frame", title: "map frame", summary: "the chrome around a map: frame, controls, credit, caption." },
       { slug: "page-header", title: "page header", summary: "breadcrumbs, title, meta line, actions." },
@@ -59,6 +60,7 @@ export const SECTIONS: DocSection[] = [
       { slug: "lift-session", title: "lift session", summary: "a weight training session: totals, then every set." },
       { slug: "article", title: "article", summary: "a post or a note: one readable column." },
       { slug: "empty-and-error", title: "empty & error", summary: "empty sections, missing pages, failed loads." },
+      { slug: "admin", title: "admin", summary: "the editing tool: sidebar frame, page anatomy, the editor, and its rules." },
     ],
   },
   {

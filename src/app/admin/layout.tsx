@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import "@/design-system/ds.css";
+import { AppShell, Button, Card, Container, Stack, Text, getBrand } from "@/design-system";
 import { auth, signIn, signOut, isGoogleAuthConfigured } from "@/lib/auth";
+import { LOCAL_PREVIEW_EMAIL, isLocalPreview } from "@/lib/local-preview";
 import NewEntryMenu from "@/components/admin/NewEntryMenu";
 import "./admin.css";
 
@@ -15,117 +17,102 @@ export const metadata: Metadata = {
   },
 };
 
+const brand = getBrand("admin")!;
+
+// the admin's own frame: a left sidebar on wide screens, a menu bar on
+// phones, in the admin design (src/design-system/brands, docs at /design/admin).
+// it never follows the public site's theme.
+const MODEL = {
+  mark: { label: "admin", href: "/admin", logo: "/images/az-logo.svg" },
+  nav: [
+    { label: "dashboard", href: "/admin", exact: true },
+    { label: "content", href: "/admin/content", match: ["/admin/essays", "/admin/leetcode"] },
+    { label: "activities", href: "/admin/calendar", match: ["/admin/activities", "/admin/upload"] },
+    { label: "listening", href: "/admin/listening" },
+    { label: "privacy", href: "/admin/privacy" },
+  ],
+  footer: "",
+  labels: { menu: "menu", theme: "switch to {theme} mode" },
+};
+
 // the layout is the auth gate for every /admin page. defense in depth: every
 // mutation route still verifies the session/secret itself.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
+  const session = isLocalPreview() ? { user: { email: LOCAL_PREVIEW_EMAIL, isAdmin: true } } : await auth();
   const user = session?.user as { email?: string | null; isAdmin?: boolean } | undefined;
 
-  if (!user) {
+  if (!user || !user.isAdmin) {
     return (
-      <AdminShell>
-        <div className="card-bg rounded-lg" style={{ padding: "24px", textAlign: "center" }}>
-          <h1 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: "1rem" }}>
-            admin
-          </h1>
-          {isGoogleAuthConfigured() ? (
+      <div className="ds adm-gate" {...{ "data-brand": brand.id, "data-accent": brand.accent, "data-chip": brand.components.chip, "data-link": brand.components.inlineLink, "data-stats": brand.components.stats }}>
+        <Container width="prose">
+          <Card title={!user ? "sign in to admin" : "not authorized"}>
+            {!user ? (
+              isGoogleAuthConfigured() ? (
+                <form
+                  action={async () => {
+                    "use server";
+                    await signIn("google", { redirectTo: "/admin" });
+                  }}
+                >
+                  <Button type="submit" variant="primary">
+                    sign in with google
+                  </Button>
+                </form>
+              ) : (
+                <Text tone="muted" size="sm">
+                  google sign-in is not configured — set AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET
+                </Text>
+              )
+            ) : (
+              <Stack gap="4">
+                <Text tone="muted" size="sm">{`signed in as ${user.email}`}</Text>
+                <form
+                  action={async () => {
+                    "use server";
+                    await signOut({ redirectTo: "/admin" });
+                  }}
+                >
+                  <Button type="submit">sign out</Button>
+                </form>
+              </Stack>
+            )}
+          </Card>
+        </Container>
+      </div>
+    );
+  }
+
+  return (
+    <AppShell
+      model={MODEL}
+      brand={brand}
+      hideFooter
+      className="adm"
+      actions={
+        <>
+          <NewEntryMenu />
+          {isLocalPreview() ? (
+            <span className="adm-preview-tag">
+              <Text size="xs" tone="subtle">
+                {LOCAL_PREVIEW_EMAIL}
+              </Text>
+            </span>
+          ) : (
             <form
               action={async () => {
                 "use server";
-                await signIn("google", { redirectTo: "/admin" });
+                await signOut({ redirectTo: "/admin" });
               }}
             >
-              <button
-                type="submit"
-                className="font-sans text-off-white text-lg link-highlight rounded-lg"
-                style={{ padding: "12px 20px", width: "100%" }}
-              >
-                sign in with google
-              </button>
+              <Button type="submit" variant="ghost" size="sm">
+                sign out
+              </Button>
             </form>
-          ) : (
-            <p className="font-sans text-gray text-sm italic">
-              google sign-in is not configured — set AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET
-            </p>
           )}
-        </div>
-      </AdminShell>
-    );
-  }
-
-  if (!user.isAdmin) {
-    return (
-      <AdminShell>
-        <div className="card-bg rounded-lg" style={{ padding: "24px", textAlign: "center" }}>
-          <h1 className="font-sans font-bold text-off-white text-3xl" style={{ marginBottom: "0.5rem" }}>
-            not authorized
-          </h1>
-          <p className="font-sans text-gray text-sm" style={{ marginBottom: "1rem" }}>
-            signed in as {user.email}
-          </p>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/admin" });
-            }}
-          >
-            <button type="submit" className="font-sans text-gray text-sm link-highlight">
-              sign out
-            </button>
-          </form>
-        </div>
-      </AdminShell>
-    );
-  }
-
-  return (
-    <AdminShell>
-      <div className="flex items-center justify-between" style={{ marginBottom: "0.75rem" }}>
-        <h1 className="font-sans font-bold text-off-white text-3xl">
-          <Link href="/admin">admin</Link>
-        </h1>
-        <div className="flex items-center" style={{ gap: "10px" }}>
-          <NewEntryMenu />
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/admin" });
-            }}
-          >
-            <button type="submit" className="font-sans text-gray text-sm link-highlight">
-              sign out
-            </button>
-          </form>
-        </div>
-      </div>
-      <nav className="flex items-center" style={{ gap: "12px", marginBottom: "1.5rem" }}>
-        <Link href="/admin/content" className="font-sans text-gray text-sm link-highlight">
-          content
-        </Link>
-        <Link href="/admin/calendar" className="font-sans text-gray text-sm link-highlight">
-          calendar
-        </Link>
-        <Link href="/admin/upload" className="font-sans text-gray text-sm link-highlight">
-          upload
-        </Link>
-        <Link href="/admin/privacy" className="font-sans text-gray text-sm link-highlight">
-          privacy
-        </Link>
-        <Link href="/admin/listening" className="font-sans text-gray text-sm link-highlight">
-          listening
-        </Link>
-      </nav>
-      {children}
-    </AdminShell>
-  );
-}
-
-function AdminShell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="site-container">
-      <section className="py-16" style={{ maxWidth: "480px", marginLeft: "auto", marginRight: "auto" }}>
-        {children}
-      </section>
-    </main>
+        </>
+      }
+    >
+      <div className="adm-main">{children}</div>
+    </AppShell>
   );
 }

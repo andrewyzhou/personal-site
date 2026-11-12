@@ -3,6 +3,8 @@ import {
   Badge,
   Breadcrumbs,
   Button,
+  Card,
+  Checkbox,
   Chip,
   Cluster,
   EmptyState,
@@ -15,6 +17,7 @@ import {
   ListRow,
   MapFrame,
   PageHeader,
+  Select,
   Stack,
   Stat,
   StatGrid,
@@ -272,6 +275,13 @@ export const COMPONENTS: Record<string, Page> = {
           <Field id={`f-comment-${brand.id}`} label="comment" error="say something first">
             <Textarea id={`f-comment-${brand.id}`} invalid placeholder="leave a comment…" />
           </Field>
+          <Field id={`f-sort-${brand.id}`} label="sort">
+            <Select id={`f-sort-${brand.id}`} defaultValue="newest">
+              <option value="newest">newest first</option>
+              <option value="az">a–z</option>
+            </Select>
+          </Field>
+          <Checkbox label="pinned (sorts first everywhere)" />
           <Cluster gap="2">
             <Button variant="primary">post</Button>
           </Cluster>
@@ -283,6 +293,43 @@ export const COMPONENTS: Record<string, Page> = {
             <li>every input has a visible label; placeholders are examples, never labels.</li>
             <li>errors say what to do, under the field, in danger red.</li>
             <li>on phones inputs are 16px so the browser doesn&apos;t zoom.</li>
+          </ul>
+        </Prose>
+      </Block>
+    </Stack>
+  ),
+
+  card: (brand) => (
+    <Stack gap="12">
+      <Block title="card" intro="a bordered surface for one thing: a record, a form, a group of settings. a header row names it and holds its actions; the body is padded unless it holds a full-bleed table or list.">
+        <Example brand={brand} stack code={`<Card title="storage" actions={<Button size="sm">refresh</Button>}>
+  <Text size="sm">28 mb used of the 10 gb free tier</Text>
+</Card>`}>
+          <Card title="storage" actions={<Button size="sm">refresh</Button>}>
+            <Text size="sm">28 mb used of the 10 gb free tier</Text>
+          </Card>
+          <Card title="recent" padded={false}>
+            <Table
+              rowKey={(r) => r.n}
+              rows={[
+                { n: "bike to oh", d: "2026-11-05" },
+                { n: "stroll", d: "2026-11-03" },
+              ]}
+              columns={[
+                { key: "n", header: "activity", cell: (r) => r.n },
+                { key: "d", header: "date", align: "right", cell: (r) => r.d },
+              ]}
+            />
+          </Card>
+        </Example>
+      </Block>
+      <Block title="usage">
+        <Prose>
+          <ul>
+            <li>one primary button per card at most; it goes in the header or at the top of the body.</li>
+            <li>destructive actions sit last, separated by a divider.</li>
+            <li>cards don&apos;t nest. group inside a card with dividers, not more cards.</li>
+            <li>the public site uses cards rarely (lists and type do the work); the admin uses them for every section.</li>
           </ul>
         </Prose>
       </Block>

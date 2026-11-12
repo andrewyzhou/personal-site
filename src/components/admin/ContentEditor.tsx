@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { Badge, Button, Card, Cluster, Field, Input, Link, Skeleton, Stack, Text } from "@/design-system";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import FrontmatterForm from "./FrontmatterForm";
@@ -10,7 +10,7 @@ import { useLocalDraft } from "./useLocalDraft";
 
 const MdxEditor = dynamic(() => import("./MdxEditorInner"), {
   ssr: false,
-  loading: () => <div className="card-bg animate-pulse rounded-lg" style={{ height: 220 }} />,
+  loading: () => <Skeleton height="20rem" />,
 });
 const MdxPreview = dynamic(() => import("./MdxPreview"), { ssr: false });
 
@@ -188,149 +188,207 @@ export default function ContentEditor(props: EditorProps) {
     }
   }
 
+  const saveLabel = saving ? "saving…" : outage ? "retry save" : status === "wip" ? "save draft" : "save";
+
   if (props.rawFallback) {
     return (
-      <div className="admin-cms flex flex-col" style={{ gap: "12px" }}>
-        <p className="font-sans text-gray text-sm italic">
-          this essay uses the block format — editing raw yaml (the block editor lives in the photo-essay flow)
-        </p>
-        <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={24} style={{ fontFamily: "ui-monospace, monospace" }} />
-        {message && <p className="font-sans text-gray text-sm italic">{message}</p>}
-        <div className="flex items-center" style={{ gap: "12px" }}>
-          <button onClick={saveRaw} disabled={saving} className="card-bg rounded-lg font-sans text-off-white text-lg" style={{ padding: "10px 20px" }}>
-            {saving ? "saving…" : "save"}
-          </button>
-          {commit && <DeployStatus commitSha={commit.sha} commitUrl={commit.url} />}
-        </div>
+      <div className="adm-editor">
+        <Callout>this essay uses the block format, so it&apos;s edited as raw yaml here. the block editor lives in the photo-essay flow.</Callout>
+        <Card
+          title="yaml"
+          actions={
+            <>
+              {commit && <DeployStatus commitSha={commit.sha} commitUrl={commit.url} />}
+              <Button variant="primary" size="sm" onClick={saveRaw} disabled={saving}>
+                {saving ? "saving…" : "save"}
+              </Button>
+            </>
+          }
+          padded={false}
+        >
+          <textarea className="adm-code" value={raw} onChange={(e) => setRaw(e.target.value)} rows={24} spellCheck={false} />
+        </Card>
+        {message && <Callout tone="danger">{message}</Callout>}
       </div>
     );
   }
 
-  return (
-    <div className="admin-cms flex flex-col" style={{ gap: "16px" }}>
-      {restorable && (
-        <div className="card-bg rounded-lg flex items-center justify-between" style={{ padding: "10px 14px", gap: "8px" }}>
-          <span className="font-sans text-gray text-sm">
-            restore local draft from {new Date(restorable.savedAt).toLocaleString().toLowerCase()}?
-          </span>
-          <span className="flex" style={{ gap: "12px" }}>
-            <button
-              onClick={() => {
-                setFrontmatter(restorable.frontmatter);
-                setBody(restorable.body);
-                dismissRestore();
+  const details = (
+    <Card title="details">
+      <Stack gap="4">
+        {props.isNew && !props.singleton && (
+          <Field id="slug" label="url name" hint="used in the address; locked after the first save">
+            <Input
+              id="slug"
+              value={derivedSlug}
+              onChange={(e) => {
+                setSlugTouched(true);
+                setSlug(kebab(e.target.value));
               }}
-              className="font-sans text-off-white text-sm link-highlight"
-            >
-              restore
-            </button>
-            <button onClick={() => { clearDraft(); }} className="font-sans text-gray text-sm link-highlight">
-              discard
-            </button>
-          </span>
-        </div>
+              className="ds-input adm-mono"
+            />
+          </Field>
+        )}
+        <FrontmatterForm typeId={props.typeId} value={frontmatter} onChange={setFrontmatter} uploadPrefix={uploadPrefix} />
+      </Stack>
+    </Card>
+  );
+
+  const publish = (
+    <Card title="publish">
+      <Stack gap="3">
+        {props.hasWip && !props.isNew ? (
+          <Cluster gap="2">
+            <Text size="sm" tone="muted">
+              status
+            </Text>
+            <Badge tone={status === "published" ? "accent" : "neutral"}>{status === "published" ? "published" : "draft"}</Badge>
+          </Cluster>
+        ) : null}
+        <Button variant="primary" onClick={save} disabled={saving || (props.isNew && !effectiveSlug)}>
+          {saveLabel}
+        </Button>
+        {!props.isNew && props.hasWip && status === "wip" && (
+          <Button onClick={() => move("publish")} disabled={saving}>
+            publish
+          </Button>
+        )}
+        {!props.isNew && props.hasWip && status === "published" && (
+          <Button variant="ghost" onClick={() => move("unpublish")} disabled={saving}>
+            move back to drafts
+          </Button>
+        )}
+        {commit && <DeployStatus commitSha={commit.sha} commitUrl={commit.url} />}
+        {!props.isNew && props.viewPath && status === "published" && (
+          <Link href={props.viewPath} variant="standalone" tone="muted">
+            view on site
+          </Link>
+        )}
+        <Text size="xs" tone="subtle">
+          saving commits this file to github; the site redeploys in about a minute.
+        </Text>
+        {!props.isNew && !props.singleton && (
+          <div className="adm-danger-zone">
+            <Button variant="danger" size="sm" onClick={remove} disabled={saving}>
+              delete entry
+            </Button>
+          </div>
+        )}
+      </Stack>
+    </Card>
+  );
+
+  return (
+    <div className="adm-editor">
+      {restorable && (
+        <Callout
+          actions={
+            <>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setFrontmatter(restorable.frontmatter);
+                  setBody(restorable.body);
+                  dismissRestore();
+                }}
+              >
+                restore
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => clearDraft()}>
+                discard
+              </Button>
+            </>
+          }
+        >
+          {`you have unsaved changes on this device from ${new Date(restorable.savedAt).toLocaleString().toLowerCase()}.`}
+        </Callout>
       )}
 
       {conflict && (
-        <div className="card-bg rounded-lg" style={{ padding: "10px 14px" }}>
-          <p className="font-sans text-gray text-sm" style={{ marginBottom: "6px" }}>
-            this file changed on github since you opened it.
-          </p>
-          <span className="flex" style={{ gap: "12px" }}>
-            <button
-              onClick={() => {
-                setFrontmatter(conflict.remoteFrontmatter);
-                setBody(conflict.remoteBody);
-                setBaseSha(conflict.remoteSha);
-                setConflict(null);
-              }}
-              className="font-sans text-off-white text-sm link-highlight"
-            >
-              reload remote
-            </button>
-            <button
-              onClick={() => {
-                setBaseSha(conflict.remoteSha);
-                setConflict(null);
-                save();
-              }}
-              className="font-sans text-gray text-sm link-highlight"
-            >
-              overwrite
-            </button>
-          </span>
-        </div>
-      )}
-
-      {outage && (
-        <p className="font-sans text-gray text-sm italic">github unreachable — your draft is saved on this device.</p>
-      )}
-
-      {props.isNew && !props.singleton && (
-        <div className="flex flex-col" style={{ gap: "4px" }}>
-          <label className="font-sans">slug (url name — locked after first save)</label>
-          <input
-            type="text"
-            value={derivedSlug}
-            onChange={(e) => {
-              setSlugTouched(true);
-              setSlug(kebab(e.target.value));
-            }}
-            style={{ fontFamily: "ui-monospace, monospace" }}
-          />
-        </div>
-      )}
-
-      <FrontmatterForm typeId={props.typeId} value={frontmatter} onChange={setFrontmatter} uploadPrefix={uploadPrefix} />
-
-      {props.kind === "mdx" && (
-        <div className="flex flex-col" style={{ gap: "8px" }}>
-          <div className="flex items-center justify-between">
-            <label className="font-sans">body</label>
-            <button
-              onClick={() => setPreview((p) => !p)}
-              className={`font-sans text-sm ${preview ? "text-off-white link-highlight-active" : "text-gray link-highlight"}`}
-            >
-              preview
-            </button>
-          </div>
-          {preview ? <MdxPreview markdown={body} /> : <MdxEditor markdown={body} onChange={setBody} uploadPrefix={uploadPrefix} />}
-        </div>
-      )}
-
-      {message && <p className="font-sans text-gray text-sm italic">⚠ {message}</p>}
-
-      <div className="flex items-center flex-wrap" style={{ gap: "12px" }}>
-        <button
-          onClick={outage ? save : save}
-          disabled={saving || (props.isNew && !effectiveSlug)}
-          className="card-bg rounded-lg font-sans text-off-white text-lg"
-          style={{ padding: "10px 20px" }}
+        <Callout
+          tone="danger"
+          actions={
+            <>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setFrontmatter(conflict.remoteFrontmatter);
+                  setBody(conflict.remoteBody);
+                  setBaseSha(conflict.remoteSha);
+                  setConflict(null);
+                }}
+              >
+                load their version
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() => {
+                  setBaseSha(conflict.remoteSha);
+                  setConflict(null);
+                  save();
+                }}
+              >
+                overwrite with mine
+              </Button>
+            </>
+          }
         >
-          {saving ? "saving…" : outage ? "retry" : status === "wip" ? "save draft" : "save"}
-        </button>
-        {!props.isNew && props.hasWip && status === "wip" && (
-          <button onClick={() => move("publish")} disabled={saving} className="font-sans text-off-white text-sm link-highlight">
-            publish
-          </button>
-        )}
-        {!props.isNew && props.hasWip && status === "published" && (
-          <button onClick={() => move("unpublish")} disabled={saving} className="font-sans text-gray text-sm link-highlight">
-            unpublish
-          </button>
-        )}
-        {!props.isNew && props.viewPath && status === "published" && (
-          <Link href={props.viewPath} className="font-sans text-gray text-sm link-highlight">
-            view on site →
-          </Link>
-        )}
-        {commit && <DeployStatus commitSha={commit.sha} commitUrl={commit.url} />}
-        {!props.isNew && !props.singleton && (
-          <button onClick={remove} disabled={saving} className="font-sans text-gray text-sm link-highlight" style={{ marginLeft: "auto" }}>
-            delete
-          </button>
-        )}
-      </div>
+          this file changed on github since you opened it.
+        </Callout>
+      )}
+
+      {outage && <Callout tone="danger">github is unreachable. your changes are kept on this device; try saving again.</Callout>}
+      {message && <Callout tone="danger">{message}</Callout>}
+
+      {props.kind === "mdx" ? (
+        <div className="adm-editor-grid">
+          <div className="adm-editor-main">
+            <Card
+              title="text"
+              actions={
+                <div className="adm-segmented" role="tablist" aria-label="view">
+                  <button type="button" role="tab" aria-selected={!preview} onClick={() => setPreview(false)}>
+                    write
+                  </button>
+                  <button type="button" role="tab" aria-selected={preview} onClick={() => setPreview(true)}>
+                    preview
+                  </button>
+                </div>
+              }
+              padded={false}
+            >
+              {preview ? (
+                <div className="adm-pad">
+                  <MdxPreview markdown={body} />
+                </div>
+              ) : (
+                <MdxEditor markdown={body} onChange={setBody} uploadPrefix={uploadPrefix} />
+              )}
+            </Card>
+          </div>
+          <aside className="adm-editor-side">
+            {publish}
+            {/* the bio is text only: no fields to show */}
+            {props.singleton ? null : details}
+          </aside>
+        </div>
+      ) : (
+        <div className="adm-editor-grid">
+          <div className="adm-editor-main">{details}</div>
+          <aside className="adm-editor-side">{publish}</aside>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// a one-line notice above the editor, with optional actions
+function Callout({ tone, actions, children }: { tone?: "danger"; actions?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="adm-callout" data-tone={tone} role={tone === "danger" ? "alert" : "status"}>
+      <span>{children}</span>
+      {actions ? <span className="adm-callout-actions">{actions}</span> : null}
     </div>
   );
 }

@@ -612,3 +612,43 @@ textarea.ds-input { min-height: 5.5rem; resize: vertical; }
    sections always stack, so "below" is the true wording at every width. */
 .ds-prose .hidden.md\:inline { display: none !important; }
 .ds-prose .md\:hidden { display: inline !important; }
+
+/* ---------------------------------------------------------- token bridge */
+/* widgets built for the first site (currently, the calendar, the github
+   graph, comments, metrics…) color themselves through v1's --theme-* and
+   --contrib-* variables. inside the system those names point at brand
+   tokens, so every legacy widget takes the brand's palette, accent and
+   radius in both themes without being rewritten. v1 pages never sit inside
+   .ds, so they are untouched. */
+.ds {
+  --theme-bg: var(--ds-bg);
+  --theme-text: var(--ds-fg-default);
+  --theme-text-primary: var(--ds-fg);
+  --theme-text-muted: var(--ds-fg-muted);
+  --theme-divider: var(--ds-divider);
+  --theme-highlight-bg: var(--ds-highlight);
+  --theme-highlight-bg-hover: var(--ds-highlight-hover);
+  --theme-highlight-bg-active: var(--ds-highlight-active);
+  --theme-card-bg: var(--ds-panel);
+  --theme-card-bg-hover: var(--ds-bg-hover);
+  --theme-scrollbar-track: var(--ds-bg);
+  --theme-scrollbar-thumb: var(--ds-border-strong);
+  --theme-scrollbar-thumb-hover: var(--ds-fg-muted);
+  --ui-highlight-radius: var(--ds-radius-sm);
+  /* contribution graph: empty → full in the accent */
+  --contrib-0: var(--ds-bg-hover);
+  --contrib-1: color-mix(in oklch, var(--ds-accent) 30%, var(--ds-bg));
+  --contrib-2: color-mix(in oklch, var(--ds-accent) 55%, var(--ds-bg));
+  --contrib-3: color-mix(in oklch, var(--ds-accent) 80%, var(--ds-bg));
+  --contrib-4: var(--ds-accent);
+}
+
+/* ------------------------------------------------------- card, select, check */
+.ds-card { background: var(--ds-bg-raised); border: 1px solid var(--ds-border); border-radius: var(--ds-radius-lg); min-width: 0; }
+.ds-card-header { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-space-3); padding: var(--ds-space-3) var(--ds-space-4); border-bottom: 1px solid var(--ds-divider); min-height: 2.75rem; }
+.ds-card-title { margin: 0; font-size: var(--ds-text-sm); font-weight: var(--ds-weight-semibold); color: var(--ds-fg); }
+.ds-card-actions { display: flex; align-items: center; gap: var(--ds-space-2); }
+.ds-card-body { padding: var(--ds-space-4); }
+.ds-select { appearance: none; padding-right: 2rem; background-image: linear-gradient(45deg, transparent 50%, var(--ds-fg-muted) 50%), linear-gradient(135deg, var(--ds-fg-muted) 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+.ds-check { display: inline-flex; align-items: center; gap: var(--ds-space-2); font-size: var(--ds-text-sm); color: var(--ds-fg-default); cursor: pointer; }
+.ds-check input { width: 1rem; height: 1rem; accent-color: var(--ds-accent); margin: 0; }

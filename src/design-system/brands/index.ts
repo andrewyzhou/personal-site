@@ -65,7 +65,27 @@ export const D: Brand = {
   components: { chip: "outline", inlineLink: "underline", stats: "divided" },
 };
 
-export const BRANDS: Record<string, Brand> = { b: B, a: A, c: C, d: D };
+// admin: the editing tool, not a public theme. a standard dashboard look that
+// never changes with the site's theme: system ui font, neutral grays, a blue
+// accent for actions and focus, compact controls, underlined links (no
+// highlight boxes), hairline-bordered surfaces and a left sidebar.
+const SYSTEM_UI = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+export const ADMIN: Brand = {
+  id: "admin",
+  name: "admin",
+  tagline: "the editing tool",
+  description:
+    "the admin dashboard and editors: a plain, dense tool ui that stays the same whatever the public theme is. system font, neutral grays, blue for actions and focus, compact controls, a left sidebar on wide screens and a menu bar on phones.",
+  accent: "blue",
+  type: { display: SYSTEM_UI, body: SYSTEM_UI, headingWeight: 600, displayScale: 0.9, pageTitle: "2xl", bodyText: { size: 14, leading: 1.5 } },
+  shape: "soft",
+  density: "compact",
+  motion: 0.8,
+  shell: "rail",
+  components: { chip: "outline", inlineLink: "underline", stats: "divided" },
+};
+
+export const BRANDS: Record<string, Brand> = { b: B, a: A, c: C, d: D, admin: ADMIN };
 export const DEFAULT_BRAND = "b";
 
 export function getBrand(id: string | undefined): Brand | null {

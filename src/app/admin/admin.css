@@ -1,81 +1,311 @@
-/* cms-only styles, scoped under .admin-cms — additive, never touches public
-   component styles. maps mdxeditor's theme variables onto the site theme. */
+/* admin: the frame and the parts of the admin design that are specific to the
+   tool. colors, type, spacing and controls all come from the design system's
+   "admin" entry (src/design-system/brands, docs at /design/admin). nothing
+   here is a raw color. */
 
-.admin-cms input,
-.admin-cms textarea,
-.admin-cms select {
-  background-color: var(--theme-card-bg);
-  border: 1px solid var(--theme-highlight-bg);
-  border-radius: 8px;
-  color: var(--theme-text-primary);
-  padding: 8px 12px;
+/* ------------------------------------------------------------------ frame */
+
+.adm-main {
   width: 100%;
-  font-family: var(--font-sans);
-  font-size: 0.875rem;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--ds-space-6) var(--ds-space-4) var(--ds-space-16);
+}
+@media (min-width: 768px) {
+  .adm-main { padding: var(--ds-space-8) var(--ds-space-8) var(--ds-space-16); }
+}
+.ds.adm { font-size: var(--ds-text-base); line-height: var(--ds-leading-base); }
+
+/* sign-in gate: a centered card */
+.adm-gate { min-height: 100vh; display: grid; place-items: center; padding: var(--ds-space-6) var(--ds-space-4); background: var(--ds-bg); }
+.adm-gate .ds-card { width: min(28rem, 100%); }
+
+.adm-preview-tag { display: none; }
+@media (min-width: 1024px) { .adm-preview-tag { display: inline; } }
+
+/* "+ new" menu: opens below on phones, upward from the sidebar's foot */
+.adm-new { position: relative; }
+.adm-new > summary { list-style: none; cursor: pointer; }
+.adm-new > summary::-webkit-details-marker { display: none; }
+.adm-new-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--ds-space-2));
+  z-index: 40;
+  width: 15rem;
+  max-height: 70vh;
+  overflow: auto;
+  padding: var(--ds-space-2);
+  background: var(--ds-bg-raised);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+.adm-new-group { display: flex; flex-direction: column; }
+.adm-new-label { padding: var(--ds-space-1) var(--ds-space-2); font-size: var(--ds-text-xs); color: var(--ds-fg-subtle); }
+.adm-new-item { padding: var(--ds-space-1) var(--ds-space-2); border-radius: var(--ds-radius-md); color: var(--ds-fg-default); font-size: var(--ds-text-sm); text-decoration: none; }
+.adm-new-item:hover { background: var(--ds-bg-hover); color: var(--ds-fg); }
+@media (min-width: 1024px) {
+  .ds-shell[data-variant="rail"] .adm-new-panel { top: auto; bottom: calc(100% + var(--ds-space-2)); left: 0; right: auto; }
+  .ds-shell[data-variant="rail"] .ds-topbar-end { flex-wrap: wrap; gap: var(--ds-space-2); }
 }
 
-.admin-cms input:focus,
-.admin-cms textarea:focus,
-.admin-cms select:focus {
-  outline: 1px solid var(--theme-text-muted);
-}
+/* ------------------------------------------------------------ page parts */
 
-.admin-cms label {
-  color: var(--theme-text-muted);
-  font-size: 0.75rem;
+.adm .ds-page-header { margin-bottom: var(--ds-space-6); }
+.adm-page-actions { display: flex; align-items: center; gap: var(--ds-space-2); flex: none; }
+
+/* dashboard shortcut tiles */
+.adm-shortcut {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-4);
+  background: var(--ds-bg-raised);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  text-decoration: none;
+  transition: border-color var(--ds-dur-fast) var(--ds-ease-standard), background var(--ds-dur-fast) var(--ds-ease-standard);
+}
+.adm-shortcut:hover { border-color: var(--ds-border-strong); background: var(--ds-bg-hover); }
+.adm-shortcut-label { color: var(--ds-fg); font-weight: var(--ds-weight-semibold); font-size: var(--ds-text-sm); }
+.adm-shortcut-hint { color: var(--ds-fg-muted); font-size: var(--ds-text-xs); }
+
+/* tables inside cards: full bleed, rows with comfortable height */
+.adm-table-wrap { overflow-x: auto; }
+.adm-table-wrap .ds-table th,
+.adm-table-wrap .ds-table td { padding: var(--ds-space-2) var(--ds-space-4); }
+.adm-table-wrap .ds-table th { padding-top: var(--ds-space-3); background: var(--ds-bg-subtle); }
+.adm-table-wrap .ds-table tr:hover td { background: var(--ds-bg-hover); }
+.adm-row-link { display: inline-flex; align-items: center; gap: var(--ds-space-2); color: var(--ds-fg); text-decoration: none; font-weight: var(--ds-weight-medium); }
+.adm-row-link:hover span:first-of-type { text-decoration: underline; text-underline-offset: 3px; }
+.adm-icon { flex: none; }
+
+/* list of links inside a card */
+.adm-list { list-style: none; margin: 0; padding: 0; }
+.adm-list li + li { border-top: 1px solid var(--ds-divider); }
+.adm-list-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ds-space-4); padding: var(--ds-space-3) var(--ds-space-4); text-decoration: none; }
+.adm-list-row:hover { background: var(--ds-bg-hover); }
+.adm-list-label { color: var(--ds-fg); font-weight: var(--ds-weight-medium); font-size: var(--ds-text-sm); }
+.adm-list-hint { color: var(--ds-fg-muted); font-size: var(--ds-text-xs); text-align: right; }
+
+/* filter row under a card header */
+.adm-toolbar { display: flex; gap: var(--ds-space-2); padding: var(--ds-space-3) var(--ds-space-4); border-bottom: 1px solid var(--ds-divider); }
+.adm-toolbar > .ds-input:first-child { flex: 1; min-width: 0; }
+.adm-toolbar > .ds-select { flex: none; width: auto; }
+.adm-pad { padding: var(--ds-space-4); }
+.adm-note { padding: var(--ds-space-2) var(--ds-space-4); background: var(--ds-bg-subtle); border-bottom: 1px solid var(--ds-divider); }
+.adm .ds-card-header .ds-cluster { row-gap: var(--ds-space-2); }
+.adm .ds-card-header { flex-wrap: wrap; }
+
+/* editor: text in the main column, publish + details in a side column that
+   stays in view (stacked, publish first, below 1024px) */
+.adm-editor { display: flex; flex-direction: column; gap: var(--ds-space-4); }
+.adm-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ds-space-4); align-items: start; }
+.adm-editor-side { display: flex; flex-direction: column; gap: var(--ds-space-4); min-width: 0; }
+@media (min-width: 1024px) {
+  .adm-editor-grid { grid-template-columns: minmax(0, 1fr) 20rem; gap: var(--ds-space-6); }
+  .adm-editor-side { position: sticky; top: var(--ds-space-6); }
+}
+@media (max-width: 1023px) {
+  .adm-editor-grid > .adm-editor-side { order: -1; }
+}
+.adm-editor-main .mdxeditor { border: 0; border-radius: 0 0 var(--ds-radius-lg) var(--ds-radius-lg); }
+.adm-editor-main .mdxeditor-toolbar { border-radius: 0; }
+.adm-danger-zone { padding-top: var(--ds-space-3); border-top: 1px solid var(--ds-divider); }
+.adm-mono, .adm-code { font-family: var(--ds-font-mono); }
+.adm-code {
   display: block;
+  width: 100%;
+  min-height: 24rem;
+  border: 0;
+  border-radius: 0 0 var(--ds-radius-lg) var(--ds-radius-lg);
+  padding: var(--ds-space-4);
+  background: var(--ds-bg-raised);
+  color: var(--ds-fg);
+  font-size: var(--ds-text-sm);
+  resize: vertical;
+}
+.adm-code:focus { outline: none; box-shadow: inset 0 0 0 2px var(--ds-accent-subtle); }
+.adm .ds-card .ds-field-label { font-size: var(--ds-text-xs); }
+
+/* write / preview switch */
+.adm-segmented { display: inline-flex; padding: 2px; gap: 2px; background: var(--ds-bg-active); border-radius: var(--ds-radius-md); }
+.adm-segmented button {
+  font: inherit;
+  font-size: var(--ds-text-xs);
+  border: 0;
+  background: transparent;
+  color: var(--ds-fg-muted);
+  padding: 2px var(--ds-space-3);
+  border-radius: calc(var(--ds-radius-md) - 2px);
+  cursor: pointer;
+}
+.adm-segmented button[aria-selected="true"] { background: var(--ds-bg-raised); color: var(--ds-fg); box-shadow: 0 1px 2px oklch(0% 0 0 / 0.12); }
+
+/* notices */
+.adm-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border: 1px solid var(--ds-border);
+  border-left: 3px solid var(--ds-accent);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-bg-raised);
+  font-size: var(--ds-text-sm);
+  color: var(--ds-fg-default);
+}
+.adm-callout[data-tone="danger"] { border-left-color: var(--ds-danger); }
+.adm-callout-actions { display: inline-flex; gap: var(--ds-space-2); }
+
+/* usage meter */
+.adm-meter { height: 6px; border-radius: var(--ds-radius-full); background: var(--ds-bg-active); overflow: hidden; }
+.adm-meter > span { display: block; height: 100%; background: var(--ds-accent); }
+
+/* -------------------------------------------- pages not rebuilt yet (bridge)
+   admin pages still written with the first site's utility classes render in
+   the admin design: system font, tool-sized text, bordered cards, plain
+   underlined links instead of highlight boxes. each page drops these classes
+   as it's rebuilt on design-system components. */
+.adm {
+  --font-sans: var(--ds-font-sans);
+}
+.adm .text-3xl { font-size: var(--ds-text-2xl); line-height: var(--ds-leading-2xl); }
+.adm .text-2xl { font-size: var(--ds-text-xl); line-height: var(--ds-leading-xl); }
+.adm .text-xl { font-size: var(--ds-text-lg); line-height: var(--ds-leading-lg); }
+.adm .text-lg { font-size: var(--ds-text-base); line-height: var(--ds-leading-base); }
+.adm .text-base { font-size: var(--ds-text-base); line-height: var(--ds-leading-base); }
+.adm .text-sm { font-size: var(--ds-text-sm); line-height: var(--ds-leading-sm); }
+.adm .text-xs { font-size: var(--ds-text-xs); line-height: var(--ds-leading-xs); }
+.adm .card-bg { background: var(--ds-bg-raised); border: 1px solid var(--ds-border); }
+.adm .card-bg-hover:hover { background: var(--ds-bg-hover); }
+.adm .link-highlight,
+.adm .link-highlight-active {
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0;
+  color: var(--ds-accent-fg);
+  text-decoration: none;
+}
+.adm .link-highlight:hover { background: transparent; color: var(--ds-accent-fg); text-decoration: underline; text-underline-offset: 3px; }
+.adm .link-highlight-active { color: var(--ds-fg); font-weight: var(--ds-weight-semibold); text-decoration: underline; text-underline-offset: 3px; }
+.adm button.link-highlight,
+.adm button.link-highlight-active { padding-inline: 0; }
+
+/* bare form controls inside admin pages look like design-system inputs */
+.adm input:not(.ds-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+.adm textarea:not(.ds-input),
+.adm select:not(.ds-input) {
+  font: inherit;
+  font-size: var(--ds-text-sm);
+  color: var(--ds-fg);
+  background: var(--ds-bg-raised);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-1) var(--ds-space-3);
+  min-height: var(--ds-control-h);
+  max-width: 100%;
+}
+.adm textarea { padding-block: var(--ds-space-2); }
+.adm input:focus,
+.adm textarea:focus,
+.adm select:focus { outline: none; border-color: var(--ds-accent); box-shadow: 0 0 0 3px var(--ds-accent-subtle); }
+.adm input[type="checkbox"],
+.adm input[type="radio"] { accent-color: var(--ds-accent); }
+.adm label { color: var(--ds-fg-default); font-size: var(--ds-text-sm); }
+.adm .field-error { color: var(--ds-danger); font-size: var(--ds-text-xs); }
+
+/* ------------------------------------------------------------- mdx editor */
+
+.adm .mdxeditor {
+  --baseBg: var(--ds-bg-raised);
+  --baseBgSubtle: var(--ds-bg-subtle);
+  --baseBgHover: var(--ds-bg-hover);
+  --baseBgActive: var(--ds-bg-active);
+  --baseLine: var(--ds-divider);
+  --baseBorder: var(--ds-border);
+  --baseBorderHover: var(--ds-border-strong);
+  --baseSolid: var(--ds-fg-muted);
+  --baseText: var(--ds-fg-default);
+  --baseTextContrast: var(--ds-fg);
+  --basePageBg: var(--ds-bg-raised);
+  --accentBg: var(--ds-accent-subtle);
+  --accentBgActive: var(--ds-accent-subtle);
+  --accentBorder: var(--ds-accent);
+  --accentSolid: var(--ds-accent);
+  --accentText: var(--ds-accent-fg);
+  --accentTextContrast: var(--ds-fg);
+  --admonitionTipBg: var(--ds-bg-subtle);
+  font-family: var(--ds-font-sans);
+  background: var(--ds-bg-raised);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  color: var(--ds-fg-default);
+}
+/* toolbar: one row that scrolls sideways on narrow screens instead of
+   wrapping buttons over each other */
+.adm .mdxeditor-toolbar {
+  background: var(--ds-bg-subtle);
+  border-bottom: 1px solid var(--ds-divider);
+  border-radius: var(--ds-radius-lg) var(--ds-radius-lg) 0 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-1) var(--ds-space-2);
+}
+.adm .mdxeditor-toolbar > * { flex: none; }
+.adm .mdxeditor-toolbar button,
+.adm .mdxeditor-toolbar [role="combobox"] { color: var(--ds-fg-default); }
+.adm .mdxeditor-toolbar [data-toolbar-item][data-state="on"],
+.adm .mdxeditor-toolbar button[data-state="on"] { background: var(--ds-bg-active); color: var(--ds-fg); }
+/* the rich / diff / source switch at the end of the toolbar */
+.adm .mdxeditor-toolbar [role="radiogroup"],
+.adm .mdxeditor-toolbar [class*="toggleGroupRoot"] { background: transparent; margin-left: auto; }
+.adm .mdxeditor-toolbar [role="radio"] { color: var(--ds-fg-muted); background: transparent; }
+.adm .mdxeditor-toolbar [role="radio"][data-state="on"] { color: var(--ds-fg); background: var(--ds-bg-active); }
+.adm .mdxeditor [contenteditable="true"] {
+  min-height: 320px;
+  padding: var(--ds-space-4);
+  color: var(--ds-fg-default);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-base);
+  line-height: 1.65;
+}
+/* the rich / diff / source switch: the library pins it to the right edge,
+   where it covers other buttons once the toolbar scrolls; let it scroll too */
+.adm .mdxeditor-toolbar [class*="_diffSourceToggleWrapper_"] { position: static; margin-left: auto; }
+.adm .mdxeditor [contenteditable="true"] p { margin: 0 0 0.85em; }
+.adm .mdxeditor [contenteditable="true"] p:last-child { margin-bottom: 0; }
+.adm .mdxeditor [contenteditable="true"] h2,
+.adm .mdxeditor [contenteditable="true"] h3 { color: var(--ds-fg); font-weight: var(--ds-weight-semibold); margin: 1.2em 0 0.5em; }
+.adm .mdxeditor [contenteditable="true"] ul,
+.adm .mdxeditor [contenteditable="true"] ol { padding-left: 1.4em; margin: 0 0 0.85em; }
+
+/* links while editing: blue and underlined, like any editor */
+.adm .mdxeditor [contenteditable="true"] a {
+  color: var(--ds-accent-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.adm .mdxeditor-popup-container > * {
+  background: var(--ds-bg-raised);
+  color: var(--ds-fg-default);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-popover);
 }
 
-.admin-cms .field-error {
-  color: var(--theme-text-muted);
-  font-size: 0.75rem;
-  font-style: italic;
-}
-
-/* mdxeditor theme mapping */
-.admin-cms .mdxeditor {
-  --baseBg: var(--theme-bg);
-  --baseBgActive: var(--theme-card-bg);
-  --baseText: var(--theme-text);
-  --baseTextContrast: var(--theme-text-primary);
-  --baseBorder: var(--theme-divider);
-  --baseBorderHover: var(--theme-text-muted);
-  --basePageBg: var(--theme-bg);
-  --accentBg: var(--theme-card-bg);
-  --accentBgActive: var(--theme-highlight-bg-active);
-  --accentText: var(--theme-text-primary);
-  --accentBorder: var(--theme-divider);
-  --admonitionTipBg: var(--theme-card-bg);
-  font-family: var(--font-sans);
-  background-color: var(--theme-card-bg);
-  border: 1px solid var(--theme-highlight-bg);
-  border-radius: 8px;
-  color: var(--theme-text);
-}
-
-.admin-cms .mdxeditor-toolbar {
-  background-color: var(--theme-card-bg);
-  border-bottom: 1px solid var(--theme-divider);
-  border-radius: 8px 8px 0 0;
-  text-transform: lowercase;
-}
-
-.admin-cms .mdxeditor [contenteditable="true"] {
-  min-height: 220px;
-  color: var(--theme-text);
-  font-family: var(--font-sans);
-}
-
-.admin-cms .mdxeditor-popup-container > * {
-  background-color: var(--theme-bg);
-  color: var(--theme-text);
-  border: 1px solid var(--theme-divider);
-}
-
-/* preview pane mirrors the public article constraints */
-.admin-cms .mdx-preview {
+/* preview pane mirrors the public article width */
+.adm .mdx-preview {
   max-width: 720px;
-  border: 1px dashed var(--theme-divider);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
+  border: 1px dashed var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  padding: var(--ds-space-4) var(--ds-space-5);
 }

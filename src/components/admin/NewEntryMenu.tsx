@@ -1,65 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-const ENTRIES = [
-  { label: "blog post", href: "/admin/content/blog/new" },
-  { label: "library entry", href: "/admin/content/library/new" },
-  { label: "photo essay", href: "/admin/essays/new" },
-  { label: "classic photoset", href: "/admin/content/photos/new" },
-  { label: "activity", href: "/admin/upload" },
-  { label: "leetcode solution", href: "/admin/leetcode/new" },
-  { label: "work item", href: "/admin/content/work/new" },
-  { label: "research item", href: "/admin/content/research/new" },
-  { label: "teaching item", href: "/admin/content/teaching/new" },
-  { label: "project item", href: "/admin/content/projects/new" },
+const GROUPS: { label: string; entries: { label: string; href: string }[] }[] = [
+  {
+    label: "writing",
+    entries: [
+      { label: "blog post", href: "/admin/content/blog/new" },
+      { label: "library entry", href: "/admin/content/library/new" },
+    ],
+  },
+  {
+    label: "photos",
+    entries: [
+      { label: "photo essay", href: "/admin/essays/new" },
+      { label: "classic photoset", href: "/admin/content/photos/new" },
+    ],
+  },
+  {
+    label: "work",
+    entries: [
+      { label: "work item", href: "/admin/content/work/new" },
+      { label: "research item", href: "/admin/content/research/new" },
+      { label: "teaching item", href: "/admin/content/teaching/new" },
+      { label: "project item", href: "/admin/content/projects/new" },
+    ],
+  },
+  {
+    label: "other",
+    entries: [
+      { label: "activity", href: "/admin/upload" },
+      { label: "leetcode solution", href: "/admin/leetcode/new" },
+    ],
+  },
 ];
 
+// "+ new" in the admin frame: a native disclosure, closed again on navigation
 export default function NewEntryMenu() {
-  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDetailsElement>(null);
+  const pathname = usePathname();
+  useEffect(() => {
+    ref.current?.removeAttribute("open");
+  }, [pathname]);
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={`font-sans text-lg ${open ? "text-off-white link-highlight-active" : "text-gray link-highlight"}`}
-        style={{ padding: "2px 10px" }}
-        aria-label="new entry"
-      >
-        +
-      </button>
-      {open && (
-        <>
-          <div style={{ position: "fixed", inset: 0, zIndex: 30 }} onClick={() => setOpen(false)} />
-          <div
-            className="card-bg rounded-lg flex flex-col"
-            style={{
-              position: "absolute",
-              right: 0,
-              top: "2.2rem",
-              zIndex: 31,
-              padding: "8px",
-              gap: "2px",
-              minWidth: "180px",
-              backgroundColor: "var(--theme-bg)",
-              border: "1px solid var(--theme-divider)",
-            }}
-          >
-            {ENTRIES.map((e) => (
-              <Link
-                key={e.href}
-                href={e.href}
-                onClick={() => setOpen(false)}
-                className="font-sans text-gray text-sm link-highlight rounded"
-                style={{ padding: "6px 8px" }}
-              >
+    <details ref={ref} className="adm-new">
+      <summary className="ds-btn" data-variant="primary" data-size="sm">
+        + new
+      </summary>
+      <div className="adm-new-panel" role="menu">
+        {GROUPS.map((g) => (
+          <div key={g.label} className="adm-new-group">
+            <span className="adm-new-label">{g.label}</span>
+            {g.entries.map((e) => (
+              <Link key={e.href} href={e.href} className="adm-new-item" role="menuitem">
                 {e.label}
               </Link>
             ))}
           </div>
-        </>
-      )}
-    </div>
+        ))}
+      </div>
+    </details>
   );
 }

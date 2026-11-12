@@ -61,3 +61,31 @@ export function Divider() {
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
 }
+
+// a bordered surface: one record, one form, one group of settings. optional
+// header row (title + actions) and a padded body.
+export function Card({
+  title,
+  actions,
+  children,
+  className,
+  padded = true,
+}: {
+  title?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  padded?: boolean;
+}) {
+  return (
+    <section className={cx("ds-card", className)}>
+      {title || actions ? (
+        <header className="ds-card-header">
+          {title ? <h2 className="ds-card-title">{title}</h2> : <span />}
+          {actions ? <div className="ds-card-actions">{actions}</div> : null}
+        </header>
+      ) : null}
+      <div className={padded ? "ds-card-body" : undefined}>{children}</div>
+    </section>
+  );
+}

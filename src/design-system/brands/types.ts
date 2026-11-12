@@ -24,6 +24,8 @@ export interface Brand {
     displayScale: number;
     // the size a page title uses
     pageTitle: "2xl" | "3xl";
+    // running text size in px and line-height (default 15 / 1.6)
+    bodyText?: { size: number; leading: number };
   };
 
   // corner radius family

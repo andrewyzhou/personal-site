@@ -83,8 +83,10 @@ describe("brands", () => {
     expect(BRANDS[b.id]).toBe(b);
     expect(["neutral", "blue", "amber", "green"]).toContain(b.accent);
     expect(css).toContain(`.ds[data-brand="${b.id}"]`);
-    // a brand may only use faces the root layout actually loads
+    // a brand may only use faces the root layout actually loads, or the
+    // device's own ui font (nothing to download)
     for (const stack of [b.type.display, b.type.body]) {
+      if (stack.startsWith("ui-sans-serif, system-ui")) continue;
       const v = stack.match(/var\((--font-[a-z-]+)\)/)?.[1];
       expect(v && loadedFonts.includes(v), `${b.id}: ${stack}`).toBe(true);
     }

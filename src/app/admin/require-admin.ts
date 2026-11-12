@@ -1,4 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
+import { isLocalPreview } from "@/lib/local-preview";
 
 // per-page auth for admin server components that load data. the layout's gate
 // isn't enough on its own: a soft navigation (or a hand-made rsc request)
@@ -6,6 +7,7 @@ import { getSessionUser } from "@/lib/auth";
 // render a page alongside its layout. pages bail out with nothing (no throw,
 // so the layout's sign-in screen still renders on a full load).
 export async function isAdminViewer(): Promise<boolean> {
+  if (isLocalPreview()) return true;
   try {
     const user = await getSessionUser();
     return user?.isAdmin === true;

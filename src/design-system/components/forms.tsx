@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 // label + control + hint/error. the caller passes the control's id so this
 // stays a server component (no hooks).
@@ -40,4 +40,21 @@ export function Input({ invalid, ...rest }: InputHTMLAttributes<HTMLInputElement
 
 export function Textarea({ invalid, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }) {
   return <textarea className="ds-input" aria-invalid={invalid || undefined} {...rest} />;
+}
+
+export function Select({ invalid, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
+  return (
+    <select className="ds-input ds-select" aria-invalid={invalid || undefined} {...rest}>
+      {children}
+    </select>
+  );
+}
+
+export function Checkbox({ label, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: ReactNode }) {
+  return (
+    <label className="ds-check">
+      <input type="checkbox" {...rest} />
+      <span>{label}</span>
+    </label>
+  );
 }

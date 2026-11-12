@@ -74,6 +74,10 @@ function brandVars(b: Brand): Record<string, string | number> {
     v[`text-${k}`] = `${round((size * b.type.displayScale) / 16)}rem`;
     v[`leading-${k}`] = `${round((lh * b.type.displayScale) / 16)}rem`;
   }
+  if (b.type.bodyText) {
+    v["text-base"] = `${round(b.type.bodyText.size / 16)}rem`;
+    v["leading-base"] = `${round((b.type.bodyText.size * b.type.bodyText.leading) / 16)}rem`;
+  }
   return v;
 }
 

@@ -1,15 +1,10 @@
-import Link from "next/link";
 import ContentBrowser from "@/components/admin/ContentBrowser";
+import AdminPage from "@/components/admin/AdminPage";
 
 export default function AdminContentPage() {
   return (
-    <div>
-      <p style={{ marginBottom: "1rem" }}>
-        <Link href="/admin" className="font-sans text-gray text-sm link-highlight">
-          ← dashboard
-        </Link>
-      </p>
+    <AdminPage title="content" description="every edit saves as a commit to the site's repo, then the site redeploys">
       <ContentBrowser />
-    </div>
+    </AdminPage>
   );
 }
