@@ -114,6 +114,13 @@ export const QUOTES = list(object({ text: text(), attribution: text() }));
 // the line under each home tab; a key may be left empty
 export const BLURBS = record(anyText());
 
+// list fields a file may leave out: a missing one reads as empty
+export const DEFAULTS = {
+  post: { tags: [] as string[] },
+  reading: { tags: [] as string[] },
+  screen: { tags: [] as string[], watches: [] as Watch[] },
+};
+
 // ----------------------------------------------------------------- sections
 
 // the three sections of the site and the kinds each one holds. a theme may

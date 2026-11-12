@@ -1,10 +1,12 @@
 "use client";
 
+import { TYPE_NAMES } from "./type-names";
 import { useEffect, useMemo, useState } from "react";
 import NextLink from "next/link";
 import { Badge, Button, Card, Chip, Cluster, EmptyState, Input, Link, Select, Skeleton, Stack, Table, Text } from "@/design-system";
 
-const COLLECTIONS = ["blog", "library", "photos", "work", "research", "teaching", "projects"] as const;
+const COLLECTIONS = ["blog", "library", "screen", "photos", "work", "research", "teaching", "projects"] as const;
+
 const SINGLETONS = [
   { id: "bio", label: "bio", hint: "the about-me text on the home page" },
   { id: "sections", label: "sections", hint: "the blurb under each home tab" },
@@ -23,6 +25,7 @@ interface Item {
 const VIEW_PATH: Record<string, (slug: string) => string> = {
   blog: (s) => `/writing/${s}`,
   library: (s) => `/library/reading/${s}`,
+  screen: (s) => `/library/tv-movies/${s}`,
   photos: (s) => `/library/photos/${s}`,
 };
 
@@ -92,14 +95,14 @@ export default function ContentBrowser() {
           <Cluster gap="2">
             {COLLECTIONS.map((t) => (
               <Chip key={t} selected={type === t} onClick={() => setType(t)}>
-                {t}
+                {TYPE_NAMES[t] ?? t}
               </Chip>
             ))}
           </Cluster>
         }
         actions={
           <Button href={`/admin/content/${type}/new`} variant="primary" size="sm">
-            {`new ${type === "photos" ? "photoset" : type === "library" ? "entry" : type === "blog" ? "post" : "item"}`}
+            {`new ${type === "photos" ? "photoset" : type === "library" || type === "screen" ? "entry" : type === "blog" ? "post" : "item"}`}
           </Button>
         }
         padded={false}

@@ -9,7 +9,13 @@ const GROUPS: { label: string; entries: { label: string; href: string }[] }[] = 
     label: "writing",
     entries: [
       { label: "blog post", href: "/admin/content/blog/new" },
-      { label: "library entry", href: "/admin/content/library/new" },
+    ],
+  },
+  {
+    label: "library",
+    entries: [
+      { label: "reading note", href: "/admin/content/library/new" },
+      { label: "tv or movie", href: "/admin/content/screen/new" },
     ],
   },
   {

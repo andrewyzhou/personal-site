@@ -3,9 +3,11 @@
 // photos.ts, items.ts, content.ts).
 
 import { parseMdx, parseYamlFile, serializeMdx, serializeYamlFile } from "./frontmatter";
+import { DEFAULTS, SCREEN } from "@/content/kinds";
+import { problems } from "@/content/schema";
 
 export type ContentTypeId =
-  | "blog" | "library" | "photos"
+  | "blog" | "library" | "screen" | "photos"
   | "work" | "research" | "teaching" | "projects"
   | "bio" | "sections" | "coursework" | "hero-quotes";
 
@@ -59,7 +61,7 @@ function experienceType(id: ContentTypeId): ContentTypeDef {
     dir: `content/${id}`,
     hasWip: false,
     commitNoun: `${id} item`,
-    keyOrder: ["order", "title", "company", "companyUrl", "location", "period", "year"],
+    keyOrder: ["order", "title", "company", "companyUrl", "location", "period", "year", "alsoIn"],
     validate: (fm) => {
       const errors: string[] = [];
       if (typeof fm.order !== "number") errors.push("order must be a number");
@@ -99,7 +101,7 @@ export const CONTENT_TYPES: Record<ContentTypeId, ContentTypeDef> = {
     dir: "content/library",
     hasWip: true,
     commitNoun: "library entry",
-    keyOrder: ["title", "creator", "type", "sourceUrl", "cover", "dateStarted", "dateCompleted", "rating", "tags", "summary"],
+    keyOrder: ["title", "creator", "type", "sourceUrl", "cover", "dateStarted", "dateCompleted", "rating", "tags", "summary", "inWriting"],
     validate: (fm) => {
       const errors: string[] = [];
       if (!str(fm.title)) errors.push("title is required");
@@ -113,6 +115,17 @@ export const CONTENT_TYPES: Record<ContentTypeId, ContentTypeDef> = {
       if (!str(fm.summary)) errors.push("summary is required");
       return errors;
     },
+  }),
+
+  screen: mdxType({
+    id: "screen",
+    label: "tv or movie",
+    singleton: false,
+    dir: "content/screen",
+    hasWip: true,
+    commitNoun: "tv or movie entry",
+    keyOrder: ["title", "format", "year", "cover", "sourceUrl", "watches", "tags", "summary", "inWriting"],
+    validate: (fm) => problems(SCREEN, { ...DEFAULTS.screen, ...fm }),
   }),
 
   photos: yamlType({

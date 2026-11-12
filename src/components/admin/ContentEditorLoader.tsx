@@ -16,6 +16,7 @@ interface TypeMeta {
 const TYPE_META: Record<string, TypeMeta> = {
   blog: { kind: "mdx", singleton: false, hasWip: true },
   library: { kind: "mdx", singleton: false, hasWip: true },
+  screen: { kind: "mdx", singleton: false, hasWip: true },
   photos: { kind: "yaml", singleton: false, hasWip: true },
   work: { kind: "mdx", singleton: false, hasWip: false },
   research: { kind: "mdx", singleton: false, hasWip: false },
@@ -30,6 +31,7 @@ const TYPE_META: Record<string, TypeMeta> = {
 const VIEW_PATH: Record<string, (slug: string) => string> = {
   blog: (s) => `/writing/${s}`,
   library: (s) => `/library/reading/${s}`,
+  screen: (s) => `/library/tv-movies/${s}`,
   photos: (s) => `/library/photos/${s}`,
 };
 

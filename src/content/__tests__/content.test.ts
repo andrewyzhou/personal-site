@@ -157,3 +157,18 @@ describe("writing and shelves", () => {
     expect(content.reading().map((r) => `${r.slug}:${r.status}`)).toEqual(["now:in-progress", "done:completed"]);
   });
 });
+
+describe("lists a file leaves out", () => {
+  it("read as empty instead of failing", async () => {
+    const content = await load(
+      tree({
+        ...BIO,
+        "blog/bare.mdx": "---\ntitle: t\ndate: 2026-05-31\nsummary: s\n---\n\nbody\n",
+        "screen/bare.mdx": "---\ntitle: m\nformat: show\n---\n\n",
+      }),
+    );
+    expect(content.check()).toEqual([]);
+    expect(content.posts()[0].tags).toEqual([]);
+    expect(content.screen()[0]).toMatchObject({ tags: [], watches: [], rewatches: 0 });
+  });
+});

@@ -192,3 +192,31 @@ describe("kinds without drafts", () => {
     expect(drafts.size).toBe(0);
   });
 });
+
+describe("tv and movies", () => {
+  const screen = getContentType("screen")!;
+  const fm = { title: "a movie", format: "movie", year: 1999, watches: [{ date: "2026-04-18", rating: 4.5, review: "good" }], tags: ["x"], inWriting: true };
+
+  it("checks an entry with the site's own definition", () => {
+    expect(screen.validate(fm, "")).toEqual([]);
+    expect(screen.validate({ title: "a show", format: "show" }, "")).toEqual([]);
+    expect(screen.validate({ ...fm, watches: [{ date: "2026-04-18", rating: 4.3 }] }, "")).toEqual(["watches[1].rating: must be 0.5 to 5 in half stars"]);
+    expect(screen.validate({ ...fm, format: "book" }, "")).toEqual(["format: must be one of movie, show"]);
+  });
+
+  it("writes a file that reads back the same", () => {
+    const text = screen.serialize(fm, "notes");
+    expect(text).toContain("watches:\n  - date: 2026-04-18\n    rating: 4.5\n    review: good\n");
+    const back = screen.parse(text);
+    expect(back.frontmatter).toEqual(fm);
+    expect(back.body.trim()).toBe("notes");
+  });
+
+  it("is drafted privately and published to its own folder", async () => {
+    const created = await createEntry(screen, "a-movie", fm, "notes", true);
+    expect(created.path).toBe("draft:screen/a-movie");
+    const moved = await moveEntry(screen, "a-movie", "publish", created.blobSha);
+    expect(moved.path).toBe("content/screen/a-movie.mdx");
+    expect(commits).toEqual(["content: add tv or movie entry a-movie"]);
+  });
+});

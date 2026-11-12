@@ -51,8 +51,38 @@ export default function FrontmatterForm({ typeId, value, onChange, uploadPrefix 
           <NumberField label="rating (0–5, optional)" value={n(value.rating)} onChange={(v) => set("rating", v === "" ? undefined : v)} step={0.5} min={0} max={5} />
           <TagInput label="tags" value={arr(value.tags)} onChange={(v) => set("tags", v)} />
           <TextareaField label="summary" value={s(value.summary)} onChange={(v) => set("summary", v)} />
+          <CheckboxField label="also list in writing" checked={value.inWriting === true} onChange={(v) => set("inWriting", v || undefined)} />
         </div>
       );
+
+    case "screen": {
+      const watches = (Array.isArray(value.watches) ? value.watches : []) as { date?: string; rating?: number; review?: string }[];
+      return (
+        <div className="flex flex-col" style={{ gap: "12px" }}>
+          <TextField label="title" value={s(value.title)} onChange={(v) => set("title", v)} />
+          <SelectField label="format" value={s(value.format) || "movie"} onChange={(v) => set("format", v)} options={["movie", "show"].map((t) => ({ value: t, label: t }))} />
+          <NumberField label="year (optional)" value={n(value.year)} onChange={(v) => set("year", v === "" ? undefined : v)} min={1880} max={2100} />
+          <CoverField label="poster (optional)" value={s(value.cover)} onChange={(v) => set("cover", v)} uploadPrefix={uploadPrefix} />
+          <TextField label="link (optional)" value={s(value.sourceUrl)} onChange={(v) => set("sourceUrl", v)} />
+          <RepeaterField
+            label="viewings (one per watch; a rewatch is a new one)"
+            items={watches}
+            onChange={(w) => set("watches", w)}
+            makeNew={() => ({ date: new Date().toISOString().slice(0, 10) })}
+            render={(w, update) => (
+              <div className="flex flex-col" style={{ gap: "8px", flex: 1 }}>
+                <DateField label="date" value={s(w.date)} onChange={(v) => update({ ...w, date: v })} />
+                <NumberField label="rating (0.5–5, half stars, optional)" value={n(w.rating)} onChange={(v) => update({ ...w, rating: v === "" ? undefined : v })} step={0.5} min={0.5} max={5} />
+                <TextareaField label="review (optional)" value={s(w.review)} onChange={(v) => update({ ...w, review: v })} rows={3} />
+              </div>
+            )}
+          />
+          <TagInput label="tags" value={arr(value.tags)} onChange={(v) => set("tags", v)} />
+          <TextareaField label="one line on what it is (optional)" value={s(value.summary)} onChange={(v) => set("summary", v)} rows={2} />
+          <CheckboxField label="also list in writing" checked={value.inWriting === true} onChange={(v) => set("inWriting", v || undefined)} />
+        </div>
+      );
+    }
 
     case "photos":
       return (

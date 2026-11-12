@@ -13,6 +13,7 @@ import { getSite } from "./site";
 import {
   BLURBS,
   COURSEWORK,
+  DEFAULTS,
   PHOTO_SET,
   POST,
   PROJECT,
@@ -73,7 +74,7 @@ interface Loaded<T> {
   found: Problem[];
 }
 
-function loadCollection<S extends Shape>(dir: string, shape: S): Loaded<Infer<S>> {
+function loadCollection<S extends Shape>(dir: string, shape: S, defaults: Record<string, unknown> = {}): Loaded<Infer<S>> {
   const full = contentPath(dir);
   const entries: Entry<Infer<S>>[] = [];
   const found: Problem[] = [];
@@ -83,7 +84,9 @@ function loadCollection<S extends Shape>(dir: string, shape: S): Loaded<Infer<S>
     if (!d.isFile() || !d.name.endsWith(".mdx")) continue;
     const file = `${dir}/${d.name}`;
     const slug = d.name.replace(/\.mdx$/, "");
-    const { frontmatter, body } = parseMdx(fs.readFileSync(path.join(full, d.name), "utf8"));
+    const parsed = parseMdx(fs.readFileSync(path.join(full, d.name), "utf8"));
+    const frontmatter = { ...defaults, ...parsed.frontmatter };
+    const body = parsed.body;
     const errors = SLUG_RE.test(slug) ? problems(shape, frontmatter) : ["file name must be lowercase letters, digits, - or _"];
     if (errors.length > 0) found.push({ file, problems: errors });
     else entries.push({ ...(frontmatter as Infer<S>), slug, body });
@@ -111,7 +114,7 @@ const byOrder = <T extends { order: number; slug: string }>(a: T, b: T) => a.ord
 
 // newest first, pinned posts ahead of the rest
 export function posts(): Post[] {
-  return strict(loadCollection("blog", POST)).entries.sort(
+  return strict(loadCollection("blog", POST, DEFAULTS.post)).entries.sort(
     (a, b) => Number(b.pinned ?? false) - Number(a.pinned ?? false) || b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug),
   );
 }
@@ -154,7 +157,7 @@ export function projects(): Project[] {
 
 // in progress first (latest started first), then finished (latest first)
 export function reading(): Reading[] {
-  const withStatus = strict(loadCollection("library", READING)).entries.map((e) => ({ ...e, status: e.dateCompleted ? ("completed" as const) : ("in-progress" as const) }));
+  const withStatus = strict(loadCollection("library", READING, DEFAULTS.reading)).entries.map((e) => ({ ...e, status: e.dateCompleted ? ("completed" as const) : ("in-progress" as const) }));
   return withStatus.sort((a, b) => {
     if (a.status !== b.status) return a.status === "in-progress" ? -1 : 1;
     return (b.dateCompleted ?? b.dateStarted ?? "").localeCompare(a.dateCompleted ?? a.dateStarted ?? "") || a.slug.localeCompare(b.slug);
@@ -163,7 +166,7 @@ export function reading(): Reading[] {
 
 // latest watched first; not yet watched last
 export function screen(): Screen[] {
-  return strict(loadCollection("screen", SCREEN))
+  return strict(loadCollection("screen", SCREEN, DEFAULTS.screen))
     .entries.map((e) => {
       const watches = [...e.watches].sort((a, b) => b.date.localeCompare(a.date));
       return { ...e, watches, latest: watches[0], rewatches: Math.max(0, watches.length - 1) };
@@ -267,11 +270,11 @@ export const sections = () => SECTIONS;
 // asserts this is empty, so a bad file fails before it can reach a build.
 export function check(): Problem[] {
   const found: Problem[] = [];
-  found.push(...loadCollection("blog", POST).found);
+  found.push(...loadCollection("blog", POST, DEFAULTS.post).found);
   found.push(...loadRoles().found);
   found.push(...loadCollection("projects", PROJECT).found);
-  found.push(...loadCollection("library", READING).found);
-  found.push(...loadCollection("screen", SCREEN).found);
+  found.push(...loadCollection("library", READING, DEFAULTS.reading).found);
+  found.push(...loadCollection("screen", SCREEN, DEFAULTS.screen).found);
   found.push(...photoSetProblems());
   found.push(...loadYamlFile("coursework.yaml", COURSEWORK, []).found);
   found.push(...loadYamlFile("hero-quotes.yaml", QUOTES, []).found);
