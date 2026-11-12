@@ -35,8 +35,9 @@ interface LiteralBook {
   previousFetchedAt?: number | null;
 }
 
-// showHeading=false lets a page put this under its own section title
-export default function Currently({ showHeading = true }: { showHeading?: boolean } = {}) {
+// showHeading=false lets a page put this under its own section title.
+// typing=false writes the sentence out at once instead of typing it.
+export default function Currently({ showHeading = true, typing = true }: { showHeading?: boolean; typing?: boolean } = {}) {
   const { currently: copy } = useSite();
   const [spotify, setSpotify] = useState<SpotifyTrack | null>(null);
   const [workout, setWorkout] = useState<LatestActivity | null>(null);
@@ -65,7 +66,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
   const [isTypingActive, setIsTypingActive] = useState(false);
 
   const INITIAL_TEXT = "i'm currently reading ";
-  const TYPING_SPEED = 45; // ms per character
+  const typingSpeed = useRef(typing ? 45 : 0); // ms per character
   const LINE_TRANSITION_DELAY = 2000; // 2 seconds between lines
   const PRE_TYPE_DELAY = 1000; // 1 second before starting to type
 
@@ -93,7 +94,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
       if (charIndex < INITIAL_TEXT.length) {
         setDisplayedText(INITIAL_TEXT.slice(0, charIndex + 1));
         charIndex++;
-        setTimeout(typeInitial, TYPING_SPEED);
+        setTimeout(typeInitial, typingSpeed.current);
       } else {
         setIsTypingActive(false);
       }
@@ -111,7 +112,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
         const char = remainingText[charIndex];
         charIndex++;
         setDisplayedText(prev => prev + char);
-        setTimeout(typeNext, TYPING_SPEED);
+        setTimeout(typeNext, typingSpeed.current);
       } else {
         setIsTypingActive(false);
         setIsTypingComplete(true);
@@ -410,7 +411,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
       if (deleteIndex > 0) {
         deleteIndex--;
         setDisplay(oldStr.slice(0, deleteIndex));
-        setTimeout(deleteChar, TYPING_SPEED);
+        setTimeout(deleteChar, typingSpeed.current);
       } else {
         // pause after deleting before typing new text
         setIsTypingActive(false);
@@ -421,7 +422,7 @@ export default function Currently({ showHeading = true }: { showHeading?: boolea
             if (typeIndex < newStr.length) {
               typeIndex++;
               setDisplay(newStr.slice(0, typeIndex));
-              setTimeout(typeChar, TYPING_SPEED);
+              setTimeout(typeChar, typingSpeed.current);
             } else {
               setIsTypingActive(false);
               onComplete();

@@ -56,6 +56,9 @@ export interface LabelledContent {
 
 export interface SectionPagesContent {
   empty: string;
+  seeAll: string;
+  latest: string;
+  recent: string;
   entries: { one: string; other: string };
   updated: string;
   groups: Record<"work" | "research" | "teaching", string>;

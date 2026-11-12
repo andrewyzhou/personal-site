@@ -68,7 +68,7 @@ const REQUIRED_STRINGS = [
   ),
   ...["work", "writing", "library"].map((k) => `sections.${k}.label`),
   ...["reading", "screen", "photos", "projects", "coursework"].map((k) => `shelves.${k}.label`),
-  ...["empty", "entries.one", "entries.other", "updated", "groups.work", "groups.research", "groups.teaching", "kinds.post", "kinds.reading", "kinds.screen", "formats.movie", "formats.show", "watched", "rewatched", "toWatch", "inProgress", "started", "finished", "source", "newer", "older"].map(
+  ...["empty", "seeAll", "latest", "recent", "entries.one", "entries.other", "updated", "groups.work", "groups.research", "groups.teaching", "kinds.post", "kinds.reading", "kinds.screen", "formats.movie", "formats.show", "watched", "rewatched", "toWatch", "inProgress", "started", "finished", "source", "newer", "older"].map(
     (k) => `sectionPages.${k}`,
   ),
   ...["heading", "pastYear", "earlier", "later", "all", "nothing", "kinds.writing", "kinds.library", "kinds.workouts", "kinds.code", "contributions.one", "contributions.other", "loading"].map((k) => `figure.${k}`),

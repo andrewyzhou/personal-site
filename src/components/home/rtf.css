@@ -1,0 +1,63 @@
+/* the plain-document home: paper, ink, one serif face. everything inside
+   takes its colour from the same variables the shared parts already read,
+   so "currently" and the figure follow without knowing about this layout. */
+.rtf {
+  --theme-bg: oklch(99% 0 0);
+  --theme-text-primary: oklch(15% 0 0);
+  --theme-text: oklch(22% 0 0);
+  --theme-text-muted: oklch(45% 0 0);
+  --theme-divider: oklch(86% 0 0);
+  min-height: 100vh;
+  background: var(--theme-bg);
+  color: var(--theme-text);
+  font-family: var(--font-garamond), "EB Garamond", Garamond, Georgia, serif;
+  font-size: 1.25rem;
+  line-height: 1.45;
+  padding: 3.5rem 1.25rem 3rem;
+}
+.theme-dark .rtf {
+  --theme-bg: oklch(15% 0 0);
+  --theme-text-primary: oklch(95% 0 0);
+  --theme-text: oklch(88% 0 0);
+  --theme-text-muted: oklch(68% 0 0);
+  --theme-divider: oklch(30% 0 0);
+}
+
+.rtf-col { max-width: 34rem; margin: 0 auto; }
+.rtf-wide { max-width: 76.25rem; margin: 2.5rem auto; }
+.rtf section { margin-top: 1.75rem; }
+.rtf p + p, .rtf section p + p { margin-top: 0.85rem; }
+
+.rtf-head { display: flex; gap: 1rem; align-items: flex-start; }
+.rtf-photo { width: 3.5rem; height: auto; flex-shrink: 0; }
+.rtf-head p + p { margin-top: 0; }
+.rtf-nav { display: flex; gap: 1rem; margin-top: 0.35rem; }
+.rtf-muted { color: var(--theme-text-muted); }
+.rtf-list { list-style: none; }
+.rtf-list li + li { margin-top: 0.2rem; }
+.rtf-foot { margin-top: 3rem; font-size: 0.85em; }
+
+/* only three kinds of emphasis: bold, italic, underline */
+.rtf a, .rtf .link-highlight, .rtf .link-highlight-active {
+  color: inherit;
+  background: none;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+.rtf a:hover, .rtf .link-highlight:hover { color: var(--theme-text-primary); text-decoration-thickness: 2px; background: none; }
+.rtf .link-highlight-active { font-weight: 700; }
+
+/* the shared parts arrive with the first site's type utilities; here they
+   set in the document's face and size */
+.rtf .font-sans { font-family: inherit; }
+.rtf h3, .rtf h3.font-sans { font-size: 1em; line-height: inherit; font-weight: 700; letter-spacing: 0; margin-bottom: 0.25rem; }
+.rtf .text-lg { font-size: 1em; line-height: inherit; }
+.rtf .text-sm, .rtf .text-xs { font-size: 0.8em; }
+.rtf-wide h3, .rtf-wide h3.font-sans { font-size: 1.25rem; }
+
+/* the figure's controls are words here, so they need air between them */
+.rtf-wide button { margin-right: 0.6rem; }

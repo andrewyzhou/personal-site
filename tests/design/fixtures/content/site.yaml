@@ -278,6 +278,9 @@ shelves:
   coursework: { label: coursework, intro: "" }
 sectionPages:
   empty: nothing here yet.
+  seeAll: see all
+  latest: latest
+  recent: recently added
   entries: { one: "{n} entry", other: "{n} entries" }
   updated: updated
   groups: { work: work, research: research, teaching: teaching }
