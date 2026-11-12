@@ -1,9 +1,9 @@
 "use client";
 
-import { useTheme } from "@/context/ThemeContext";
+import { nextPreference, useTheme } from "@/context/ThemeContext";
 
 export default function ThemeToggle() {
-  const { theme, cycleTheme } = useTheme();
+  const { preference, cycleTheme } = useTheme();
   return (
     <button
       type="button"
@@ -12,7 +12,7 @@ export default function ThemeToggle() {
       style={{ padding: "6px 12px" }}
       data-testid="theme-toggle"
     >
-      {theme === "dark" ? "light mode" : "dark mode"}
+      {`${nextPreference(preference)} mode`}
     </button>
   );
 }

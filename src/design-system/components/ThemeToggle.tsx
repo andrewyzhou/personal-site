@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@/context/ThemeContext";
+import { nextPreference, useTheme } from "@/context/ThemeContext";
 import { IconButton } from "./actions";
 
 const Sun = () => (
@@ -15,9 +15,16 @@ const Moon = () => (
   </svg>
 );
 
+const System = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+    <circle cx="8" cy="8" r="5.5" />
+    <path d="M8 2.5a5.5 5.5 0 0 0 0 11Z" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 // label is a template with {theme}, e.g. "switch to {theme} mode"
 export function ThemeToggle({ label }: { label: string }) {
-  const { theme, cycleTheme } = useTheme();
-  const next = theme === "dark" ? "light" : "dark";
-  return <IconButton label={label.replace("{theme}", next)} icon={theme === "dark" ? <Moon /> : <Sun />} onClick={cycleTheme} />;
+  const { preference, cycleTheme } = useTheme();
+  const icon = preference === "dark" ? <Moon /> : preference === "system" ? <System /> : <Sun />;
+  return <IconButton label={label.replace("{theme}", nextPreference(preference))} icon={icon} onClick={cycleTheme} />;
 }

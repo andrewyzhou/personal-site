@@ -22,6 +22,7 @@ for (const route of V1_ROUTES) {
       test(`v1 ${route.name} ${vp.name} ${theme}`, async ({ page }) => {
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+        await page.addInitScript((t) => window.localStorage.setItem("theme", t), theme);
         await stage(page);
         await page.goto(route.path);
         await settle(page, { theme });

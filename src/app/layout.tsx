@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Funnel_Sans } from "next/font/google";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { ThemeProvider, THEME_BOOT_SCRIPT } from "@/context/ThemeContext";
 import { Analytics } from "@vercel/analytics/next";
 import CursorHalo from "@/components/CursorHalo";
 import { getSite } from "@/content/site";
@@ -39,7 +39,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${funnelSans.variable} ${ebGaramond.variable} theme-dark`}>
+    <html lang="en" className={`${funnelSans.variable} ${ebGaramond.variable} theme-light`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="antialiased">
         <SiteProvider site={site}>
           <ThemeProvider>

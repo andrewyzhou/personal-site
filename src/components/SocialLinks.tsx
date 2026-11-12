@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useTheme } from "@/context/ThemeContext";
+import { nextPreference, useTheme } from "@/context/ThemeContext";
 import { useSite } from "@/content/SiteProvider";
 import { fill } from "@/content/site-types";
 
 export default function SocialLinks() {
-  const { theme, cycleTheme } = useTheme();
+  const { preference, cycleTheme } = useTheme();
   const site = useSite();
 
   return (
@@ -40,11 +40,11 @@ export default function SocialLinks() {
       })}
       <button
         onClick={cycleTheme}
-        title={fill(site.theme.switchTo, { theme: theme === "dark" ? "light" : "dark" })}
+        title={fill(site.theme.switchTo, { theme: nextPreference(preference) })}
       >
         <Image
-          src={theme === "dark" ? "/icons/moon.svg" : "/icons/sun.svg"}
-          alt={fill(site.theme.current, { theme })}
+          src={preference === "dark" ? "/icons/moon.svg" : preference === "system" ? "/icons/system.svg" : "/icons/sun.svg"}
+          alt={fill(site.theme.current, { theme: preference })}
           width={24}
           height={24}
           className="opacity-60 hover:opacity-100 transition-opacity"
