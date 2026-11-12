@@ -111,7 +111,7 @@ describe("collections", () => {
 
 describe("writing and shelves", () => {
   const reading = (day: string, extra = "") => `---\ntitle: r\ncreator: c\ndateCompleted: ${day}\ntags: []\nsummary: s\n${extra}---\n\nnote\n`;
-  const screen = (day: string, extra = "") => `---\ntitle: m\nformat: movie\ndateWatched: ${day}\ntags: []\n${extra}---\n\nnote\n`;
+  const screen = (day: string, extra = "") => `---\ntitle: m\nformat: movie\nwatches:\n  - date: ${day}\n    rating: 4.5\ntags: []\n${extra}---\n\nnote\n`;
 
   it("writing lists posts plus only the notes that opted in, newest first", async () => {
     const content = await load(
@@ -133,6 +133,23 @@ describe("writing and shelves", () => {
     expect(by.screen).toEqual({ id: "screen", count: 1, updated: "2026-02-01" });
     expect(by.projects.count).toBe(1);
     expect(by.photos.count).toBe(0);
+  });
+
+  it("keeps every viewing of a rewatched movie, newest first", async () => {
+    const twice = "---\ntitle: m\nformat: movie\nwatches:\n  - date: 2024-01-01\n    rating: 3\n    review: fine\n  - date: 2026-02-01\n    rating: 4.5\n    review: better the second time\ntags: []\n---\n\n";
+    const content = await load(tree({ ...BIO, "screen/twice.mdx": twice, "screen/later.mdx": "---\ntitle: l\nformat: show\nwatches: []\ntags: []\n---\n\n" }));
+    const [first, second] = content.screen();
+    expect(first.slug).toBe("twice");
+    expect(first.watches.map((w) => w.date)).toEqual(["2026-02-01", "2024-01-01"]);
+    expect(first.latest).toEqual({ date: "2026-02-01", rating: 4.5, review: "better the second time" });
+    expect(first.rewatches).toBe(1);
+    expect(second.latest).toBeUndefined();
+  });
+
+  it("only accepts ratings in half stars", async () => {
+    const bad = "---\ntitle: m\nformat: movie\nwatches:\n  - date: 2026-02-01\n    rating: 4.3\ntags: []\n---\n\n";
+    const content = await load(tree({ ...BIO, "screen/bad.mdx": bad }));
+    expect(content.check()).toEqual([{ file: "screen/bad.mdx", problems: ["watches[1].rating: must be 0.5 to 5 in half stars"] }]);
   });
 
   it("orders reading with what is in progress first", async () => {

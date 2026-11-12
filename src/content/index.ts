@@ -30,6 +30,7 @@ import {
   type RoleGroup,
   type ScreenFields,
   type ShelfId,
+  type Watch,
 } from "./kinds";
 import { problems, problemsOf, type Field, type Infer, type Shape } from "./schema";
 
@@ -46,7 +47,8 @@ export type Post = Entry<PostFields>;
 export type Role = Entry<RoleFields> & { group: RoleGroup };
 export type Project = Entry<ProjectFields>;
 export type Reading = Entry<ReadingFields> & { status: "in-progress" | "completed" };
-export type Screen = Entry<ScreenFields>;
+// `watches` newest first; `latest` is the most recent one, `rewatches` how many came after the first
+export type Screen = Entry<ScreenFields> & { latest?: Watch; rewatches: number };
 export interface Quote {
   text: string;
   attribution: string;
@@ -159,9 +161,14 @@ export function reading(): Reading[] {
   });
 }
 
-// latest watched first; undated entries last
+// latest watched first; not yet watched last
 export function screen(): Screen[] {
-  return strict(loadCollection("screen", SCREEN)).entries.sort((a, b) => (b.dateWatched ?? "").localeCompare(a.dateWatched ?? "") || a.slug.localeCompare(b.slug));
+  return strict(loadCollection("screen", SCREEN))
+    .entries.map((e) => {
+      const watches = [...e.watches].sort((a, b) => b.date.localeCompare(a.date));
+      return { ...e, watches, latest: watches[0], rewatches: Math.max(0, watches.length - 1) };
+    })
+    .sort((a, b) => (b.latest?.date ?? "").localeCompare(a.latest?.date ?? "") || a.slug.localeCompare(b.slug));
 }
 
 function photoSetProblems(): Problem[] {
@@ -203,7 +210,7 @@ export function shelves(): Shelf[] {
   const p = photoSets();
   const counts: Record<ShelfId, Shelf> = {
     reading: { id: "reading", count: r.length, updated: latest(r.map((e) => e.dateCompleted ?? e.dateStarted)) },
-    screen: { id: "screen", count: s.length, updated: latest(s.map((e) => e.dateWatched)) },
+    screen: { id: "screen", count: s.length, updated: latest(s.map((e) => e.latest?.date)) },
     photos: { id: "photos", count: p.length, updated: latest(p.map((e) => e.date)) },
     projects: { id: "projects", count: projects().length },
     coursework: { id: "coursework", count: coursework().reduce((n, sem) => n + sem.courses.length, 0) },
@@ -248,7 +255,7 @@ export function writing(): WritingItem[] {
     const day = entry.dateCompleted ?? entry.dateStarted;
     if (entry.inWriting && day) items.push({ kind: "reading", date: day, entry });
   }
-  for (const entry of screen()) if (entry.inWriting && entry.dateWatched) items.push({ kind: "screen", date: entry.dateWatched, entry });
+  for (const entry of screen()) if (entry.inWriting && entry.latest) items.push({ kind: "screen", date: entry.latest.date, entry });
   return items.sort((a, b) => b.date.localeCompare(a.date) || a.entry.slug.localeCompare(b.entry.slug));
 }
 

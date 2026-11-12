@@ -57,6 +57,12 @@ export const number = (range?: { min?: number; max?: number }) =>
     else if (range?.max !== undefined && v > range.max) e.push(`${at}: must be at most ${range.max}`);
   });
 
+// a rating out of five, in half stars
+export const stars = () =>
+  field<number>((v, at, e) => {
+    if (typeof v !== "number" || v < 0.5 || v > 5 || (v * 2) % 1 !== 0) e.push(`${at}: must be 0.5 to 5 in half stars`);
+  });
+
 export const bool = () =>
   field<boolean>((v, at, e) => {
     if (typeof v !== "boolean") e.push(`${at}: must be true or false`);

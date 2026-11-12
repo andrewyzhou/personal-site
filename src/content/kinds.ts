@@ -2,7 +2,7 @@
 // the tests all take their types and their checks from here. no fs: safe to
 // import from client components.
 
-import { anyText, bool, date, list, number, object, oneOf, optional, record, text, type Infer } from "./schema";
+import { anyText, bool, date, list, number, object, oneOf, optional, record, stars, text, type Infer } from "./schema";
 
 // ------------------------------------------------------------------ writing
 
@@ -58,7 +58,7 @@ export const READING = {
   cover: optional(text()),
   dateStarted: optional(date()),
   dateCompleted: optional(date()),
-  rating: optional(number({ min: 0, max: 5 })),
+  rating: optional(stars()),
   tags: list(text()),
   summary: text(),
   // also list this note in the writing section
@@ -66,7 +66,11 @@ export const READING = {
 };
 export type ReadingFields = Infer<typeof READING>;
 
-// notes on a movie or a show
+// notes on a movie or a show. every time it is watched is its own entry in
+// `watches`, with that viewing's rating and review, so a rewatch adds to the
+// record instead of replacing it. no watches yet = on the list to watch.
+export const WATCH = { date: date(), rating: optional(stars()), review: optional(anyText()) };
+export type Watch = Infer<typeof WATCH>;
 export const SCREEN_FORMATS = ["movie", "show"] as const;
 export const SCREEN = {
   title: text(),
@@ -75,8 +79,7 @@ export const SCREEN = {
   // poster image, local path or https
   cover: optional(text()),
   sourceUrl: optional(text()),
-  dateWatched: optional(date()),
-  rating: optional(number({ min: 0, max: 5 })),
+  watches: list(object(WATCH)),
   tags: list(text()),
   summary: optional(anyText()),
   inWriting: optional(bool()),
