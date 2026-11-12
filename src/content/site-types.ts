@@ -72,7 +72,20 @@ export interface SectionPagesContent {
   older: string;
 }
 
+export interface FigureContent {
+  heading: string;
+  pastYear: string;
+  earlier: string;
+  later: string;
+  all: string;
+  nothing: string;
+  kinds: Record<"writing" | "library" | "workouts" | "code", string>;
+  contributions: { one: string; other: string };
+  loading: string;
+}
+
 export interface SiteContent {
+  figure: FigureContent;
   sections: Record<"work" | "writing" | "library", LabelledContent>;
   shelves: Record<"reading" | "screen" | "photos" | "projects" | "coursework", LabelledContent>;
   sectionPages: SectionPagesContent;

@@ -291,3 +291,15 @@ sectionPages:
   source: original source
   newer: newer
   older: older
+
+# the activity figure: one cell per day
+figure:
+  heading: activity
+  pastYear: past year
+  earlier: earlier
+  later: later
+  all: all
+  nothing: nothing recorded
+  kinds: { writing: writing, library: library, workouts: workouts, code: code }
+  contributions: { one: "{n} contribution", other: "{n} contributions" }
+  loading: loading

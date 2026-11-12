@@ -13,11 +13,12 @@ export interface GitHubContributions {
   totalContributions: number;
 }
 
-export async function getContributions(username: string): Promise<GitHubContributions> {
+// the last year of contributions, or one calendar year when `year` is given
+export async function getContributions(username: string, year?: number): Promise<GitHubContributions> {
   const query = `
-    query($username: String!) {
+    query($username: String!, $from: DateTime, $to: DateTime) {
       user(login: $username) {
-        contributionsCollection {
+        contributionsCollection(from: $from, to: $to) {
           contributionCalendar {
             totalContributions
             weeks {
@@ -41,7 +42,7 @@ export async function getContributions(username: string): Promise<GitHubContribu
     },
     body: JSON.stringify({
       query,
-      variables: { username },
+      variables: year ? { username, from: `${year}-01-01T00:00:00Z`, to: `${year}-12-31T23:59:59Z` } : { username },
     }),
     next: { revalidate: 300 }, // cache for 5 minutes
     signal: AbortSignal.timeout(10000),
