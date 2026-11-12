@@ -25,11 +25,10 @@ slug rules (enforced by the loader): lowercase ascii, start with a letter/digit,
 then letters/digits/hyphens/underscores. no spaces or dots. a bad filename is
 skipped with a `[blog] skipping …` warning at build time.
 
-## drafts (wip)
+## drafts
 
-work on a post in `content/blog/wip/my-post.mdx` — it's committed/pushed to
-GitHub but **not** published. move it up to `content/blog/` to publish on the
-next build. see `wip/README.md` for the full convention.
+drafts are written in the admin and stay private until they are published.
+nothing unpublished belongs in this folder.
 
 ## photos
 

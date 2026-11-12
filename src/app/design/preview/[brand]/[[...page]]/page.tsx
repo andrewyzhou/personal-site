@@ -181,7 +181,7 @@ export default async function BrandPreview({ params, searchParams }: Props) {
         </Stack>
       </Page>
     );
-  } else if (key === "writing/hello-world") {
+  } else if (key === "writing/sample-post") {
     body = (
       <Page width="prose">
         <PageHeader

@@ -12,7 +12,7 @@ describe("hub site routing", () => {
   });
 
   it("rewrites only urls that have a b page", () => {
-    for (const p of ["/", "/work", "/writing", "/training", "/photos", "/blog/hello-world", "/library/foundation", "/activities/496"]) expect(hasBPage(p), p).toBe(true);
+    for (const p of ["/", "/work", "/writing", "/training", "/photos", "/blog/sample-post", "/library/sample-book", "/activities/496"]) expect(hasBPage(p), p).toBe(true);
     for (const p of ["/activities/records", "/lifts", "/lifts/abc", "/photos/trip", "/admin", "/blog", "/activities/abc", "/work/x"]) expect(hasBPage(p), p).toBe(false);
   });
 

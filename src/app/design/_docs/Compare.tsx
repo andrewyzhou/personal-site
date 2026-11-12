@@ -67,7 +67,7 @@ const PAGES = [
   { id: "/training/496", label: "lift session" },
   { id: "/training", label: "training" },
   { id: "", label: "home" },
-  { id: "/writing/hello-world", label: "article" },
+  { id: "/writing/sample-post", label: "article" },
 ];
 
 // every brand on the same page

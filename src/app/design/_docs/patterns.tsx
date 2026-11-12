@@ -156,7 +156,7 @@ export const PATTERNS: Record<string, Page> = {
         ])}
       </Block>
       <Block title="live">
-        <PatternPreview brand={brand.id} path="/writing/hello-world" />
+        <PatternPreview brand={brand.id} path="/writing/sample-post" />
       </Block>
     </Stack>
   ),
@@ -186,7 +186,7 @@ export const PATTERNS: Record<string, Page> = {
       </Block>
       <Block title="page anatomy" intro="every admin page uses AdminPage (src/components/admin/AdminPage).">
         {anatomy([
-          ["breadcrumb", "content / blog / hello-world (only below a section)"],
+          ["breadcrumb", "content / blog / sample-post (only below a section)"],
           ["title + actions", "2xl title; the page's main action on the right as a small primary button"],
           ["description", "one optional muted line"],
           ["body", "cards, 24px apart"],

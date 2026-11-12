@@ -15,8 +15,8 @@ appears on the site, it comes from one of the sources below.
 | hero quotes | `hero-quotes.yaml` | cms singleton | `getHeroQuotes()` |
 | coursework | `coursework.yaml` | cms singleton | `getCoursework()`; types in `src/lib/coursework.ts` |
 | work / research / teaching / projects | `<category>/*.mdx` | cms | `getItems()` (`src/lib/items.ts`) |
-| blog posts | `blog/*.mdx` (drafts in `blog/wip/`) | cms | `src/lib/blog.ts` |
-| library entries | `library/*.mdx` (drafts in `library/wip/`) | cms | `src/lib/library.ts` |
+| blog posts | `blog/*.mdx` (drafts stay in the admin) | cms | `src/lib/blog.ts` |
+| library entries | `library/*.mdx` (drafts stay in the admin) | cms | `src/lib/library.ts` |
 | photo sets and essays | `photos/*.yaml` + images in `public/photos/` or r2 | cms / admin | `src/lib/photos.ts` |
 | activities, activity photos | postgres `activities`, `activity_photos` | sync + admin | `src/lib/public-activity.ts`, `/api/activities*` |
 | lift workouts | postgres `lift_*` tables | share-text ingest, telegram bot, csv import | `src/lib/lift/public.ts` |

@@ -1,6 +1,6 @@
 // specimen content for the design docs. real public values copied from the
-// live site (activities 464, 496 and the recent list, the library drafts, the
-// hello-world post), frozen so the docs render without a database. the docs
+// live site (activities 464, 496 and the recent list), plus sample writing,
+// frozen so the docs render without a database. the docs
 // demo the system; they are not a design, so they don't go through the
 // content layer. hub labels and intros come from content/site.yaml.
 
@@ -69,19 +69,19 @@ export const TRAINING_SUMMARY = [
 ];
 
 export const WRITING = [
-  { kind: "post", slug: "hello-world", title: "hello, world", date: "may 31, 2026", summary: "sample text." },
-  { kind: "note", slug: "foundation", title: "foundation", date: "isaac asimov · book", summary: "sample text." },
-  { kind: "note", slug: "make-it-stick", title: "make it stick", date: "brown, roediger & mcdaniel · book", summary: "sample text." },
-  { kind: "note", slug: "psychology-of-money", title: "the psychology of money", date: "morgan housel · book", summary: "sample text." },
+  { kind: "post", slug: "sample-post", title: "a sample post", date: "may 31, 2026", summary: "one or two sentences that say what the post is about." },
+  { kind: "note", slug: "sample-book", title: "a sample book", date: "an author · book", summary: "one line on what the book argues and why it was worth reading." },
+  { kind: "note", slug: "another-book", title: "another book", date: "two authors · book", summary: "a second note, to show how a list of them reads." },
+  { kind: "note", slug: "third-book", title: "a third book", date: "an author · book", summary: "a third, shorter one." },
 ];
 
 export const ARTICLE = {
-  title: "hello, world",
+  title: "a sample post",
   date: "may 31, 2026",
-  tags: ["meta"],
+  tags: ["sample"],
   body: [
-    "sample text.",
-    "sample text.",
+    "this is the first paragraph of a sample post. it runs for a few lines so the measure, the line height and the space between paragraphs can be judged at reading length rather than from a single sentence.",
+    "a second paragraph follows, a little shorter than the first, with a link-length phrase and enough words to wrap at least twice on a phone.",
   ],
 };
 
