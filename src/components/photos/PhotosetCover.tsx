@@ -16,7 +16,7 @@ interface Props {
 export default function PhotosetCover({ slug, title, cover, sizes, fill = false }: Props) {
   return (
     <Link
-      href={`/photos/${slug}`}
+      href={`/library/photos/${slug}`}
       aria-label={title}
       className="photoset-cover-link relative block overflow-hidden rounded"
       style={fill ? { width: "100%", height: "100%" } : undefined}

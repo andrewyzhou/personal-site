@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Hero from "@/components/Hero";
 import Experience, { LibraryPreviewItem, BlogPreviewItem, PhotosetPreviewItem } from "@/components/Experience";
 import GitHubActivity from "@/components/GitHubActivity";
@@ -134,9 +133,6 @@ export default function Home() {
             </ErrorBoundary>
           </div>
         </div>
-        <p className="font-sans text-gray text-sm text-center activity-stack:text-right" style={{ marginTop: '1.5rem' }}>
-          <Link href="/lifts" className="link-highlight">lifts &rarr;</Link>
-        </p>
       </section>
       <div className="section-divider" />
 

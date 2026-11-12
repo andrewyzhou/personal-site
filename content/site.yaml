@@ -263,3 +263,31 @@ hubPages:
     liftsOverview: lifts overview
     empty: no sessions of this kind yet.
     more: older sessions are on the calendar on the home page.
+
+# the three sections and the library's shelves. intros are optional.
+sections:
+  work: { label: work, intro: "" }
+  writing: { label: writing, intro: "" }
+  library: { label: library, intro: "" }
+shelves:
+  reading: { label: reading, intro: "" }
+  screen: { label: "tv, movies", intro: "" }
+  photos: { label: photos, intro: "" }
+  projects: { label: projects, intro: "" }
+  coursework: { label: coursework, intro: "" }
+sectionPages:
+  empty: nothing here yet.
+  entries: { one: "{n} entry", other: "{n} entries" }
+  updated: updated
+  groups: { work: work, research: research, teaching: teaching }
+  kinds: { post: post, reading: reading, screen: "tv, movies" }
+  formats: { movie: movie, show: show }
+  watched: watched
+  rewatched: "watched {n} times"
+  toWatch: not watched yet
+  inProgress: in progress
+  started: started
+  finished: finished
+  source: original source
+  newer: newer
+  older: older

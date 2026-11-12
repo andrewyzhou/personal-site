@@ -84,7 +84,7 @@ export default function Experience({
       <div className="flex flex-col gap-2">
         <p>{e.summary}</p>
         <Link
-          href={`/library/${e.slug}`}
+          href={`/library/reading/${e.slug}`}
           className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
           {`${copy.open.library} →`}
@@ -102,7 +102,7 @@ export default function Experience({
       <div className="flex flex-col gap-2">
         <p>{e.summary}</p>
         <Link
-          href={`/blog/${e.slug}`}
+          href={`/writing/${e.slug}`}
           className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
           {`${copy.open.blog} →`}
@@ -121,7 +121,7 @@ export default function Experience({
         <p>{e.caption}</p>
         <p className="font-sans text-gray text-sm italic">{e.count}{` ${plural(e.count, copy.photoCount)}`}</p>
         <Link
-          href={`/photos/${e.slug}`}
+          href={`/library/photos/${e.slug}`}
           className="font-sans text-gray hover:text-off-white transition-colors inline-block w-fit"
         >
           {`${copy.open.photos} →`}
@@ -468,7 +468,7 @@ export default function Experience({
         {activeCategory === "library" && (
           <div style={{ marginTop: '1.5rem' }}>
             <Link
-              href="/library"
+              href="/library/reading"
               className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
               {`${copy.seeAll.library} →`}
@@ -478,7 +478,7 @@ export default function Experience({
         {activeCategory === "blog" && (
           <div style={{ marginTop: '1.5rem' }}>
             <Link
-              href="/blog"
+              href="/writing"
               className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
               {`${copy.seeAll.blog} →`}
@@ -488,7 +488,7 @@ export default function Experience({
         {activeCategory === "photos" && (
           <div style={{ marginTop: '1.5rem' }}>
             <Link
-              href="/photos"
+              href="/library/photos"
               className="font-sans text-gray hover:text-off-white transition-colors text-lg"
             >
               {`${copy.seeAll.photos} →`}

@@ -1,11 +1,17 @@
 // every page the v1 lock renders, from fixture content
 export const V1_ROUTES = [
   { name: "home", path: "/" },
-  { name: "blog", path: "/blog" },
-  { name: "blog-post", path: "/blog/sample-post" },
+  { name: "work", path: "/work" },
+  { name: "writing", path: "/writing" },
+  { name: "post", path: "/writing/sample-post" },
   { name: "library", path: "/library" },
-  { name: "library-entry", path: "/library/sample-book" },
-  { name: "photos", path: "/photos" },
+  { name: "reading", path: "/library/reading" },
+  { name: "reading-entry", path: "/library/reading/sample-book" },
+  { name: "tv-movies", path: "/library/tv-movies" },
+  { name: "tv-movies-entry", path: "/library/tv-movies/sample-movie" },
+  { name: "photos", path: "/library/photos" },
+  { name: "projects", path: "/library/projects" },
+  { name: "coursework", path: "/library/coursework" },
   { name: "not-found", path: "/this-page-does-not-exist" },
 ] as const;
 

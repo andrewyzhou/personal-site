@@ -48,7 +48,34 @@ export interface HubPagesContent {
   };
 }
 
+export interface LabelledContent {
+  label: string;
+  // optional line under the title; may be empty
+  intro: string;
+}
+
+export interface SectionPagesContent {
+  empty: string;
+  entries: { one: string; other: string };
+  updated: string;
+  groups: Record<"work" | "research" | "teaching", string>;
+  kinds: Record<"post" | "reading" | "screen", string>;
+  formats: Record<"movie" | "show", string>;
+  watched: string;
+  rewatched: string;
+  toWatch: string;
+  inProgress: string;
+  started: string;
+  finished: string;
+  source: string;
+  newer: string;
+  older: string;
+}
+
 export interface SiteContent {
+  sections: Record<"work" | "writing" | "library", LabelledContent>;
+  shelves: Record<"reading" | "screen" | "photos" | "projects" | "coursework", LabelledContent>;
+  sectionPages: SectionPagesContent;
   hubs: HubContent[];
   shell: { menu: string; theme: string };
   hubPages: HubPagesContent;

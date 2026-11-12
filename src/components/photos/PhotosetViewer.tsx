@@ -87,13 +87,13 @@ export default function PhotosetViewer({
         goPrev();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        if (nextSlug) router.push(`/photos/${nextSlug}`);
+        if (nextSlug) router.push(`/library/photos/${nextSlug}`);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        if (prevSlug) router.push(`/photos/${prevSlug}`);
+        if (prevSlug) router.push(`/library/photos/${prevSlug}`);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        router.push("/photos");
+        router.push("/library/photos");
       } else if (e.key === " ") {
         e.preventDefault();
         setPaused((p) => !p);
@@ -182,20 +182,20 @@ export default function PhotosetViewer({
 
       {/* controls row */}
       <div className="w-full flex justify-between items-center flex-wrap gap-3" style={{ maxWidth: "900px", marginTop: "1.5rem" }}>
-        <Link href="/photos" className="font-sans text-gray text-base link-highlight">
+        <Link href="/library/photos" className="font-sans text-gray text-base link-highlight">
           ← back to photos
         </Link>
 
         <div className="flex gap-3">
           <button
-            onClick={() => prevSlug && router.push(`/photos/${prevSlug}`)}
+            onClick={() => prevSlug && router.push(`/library/photos/${prevSlug}`)}
             disabled={!prevSlug}
             className={`font-sans text-base ${prevSlug ? "text-off-white link-highlight" : "text-gray opacity-40 cursor-not-allowed"}`}
           >
             ↑ previous set
           </button>
           <button
-            onClick={() => nextSlug && router.push(`/photos/${nextSlug}`)}
+            onClick={() => nextSlug && router.push(`/library/photos/${nextSlug}`)}
             disabled={!nextSlug}
             className={`font-sans text-base ${nextSlug ? "text-off-white link-highlight" : "text-gray opacity-40 cursor-not-allowed"}`}
           >

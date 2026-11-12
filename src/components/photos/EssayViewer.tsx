@@ -90,14 +90,14 @@ export default function EssayViewer({ slug, title, date, caption, blocks, prevSl
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") goTo(index + 1);
       else if (e.key === "ArrowLeft") goTo(index - 1);
-      else if (e.key === "ArrowUp" && prevSlug) router.push(`/photos/${prevSlug}`);
-      else if (e.key === "ArrowDown" && nextSlug) router.push(`/photos/${nextSlug}`);
+      else if (e.key === "ArrowUp" && prevSlug) router.push(`/library/photos/${prevSlug}`);
+      else if (e.key === "ArrowDown" && nextSlug) router.push(`/library/photos/${nextSlug}`);
       else if (e.key === " ") {
         e.preventDefault();
         setPaused((p) => !p);
       } else if (e.key === "i" && step.type === "image" && hasSidebarContent(step.image)) {
         setShowInfo((s) => !s);
-      } else if (e.key === "Escape") router.push("/photos");
+      } else if (e.key === "Escape") router.push("/library/photos");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -189,7 +189,7 @@ export default function EssayViewer({ slug, title, date, caption, blocks, prevSl
 
       {/* controls row */}
       <div className="flex items-center justify-between" style={{ marginTop: "1.5rem" }}>
-        <Link href="/photos" className="font-sans text-base text-off-white link-highlight">
+        <Link href="/library/photos" className="font-sans text-base text-off-white link-highlight">
           ← back to photos
         </Link>
         <div className="flex items-center" style={{ gap: "12px" }}>
@@ -202,12 +202,12 @@ export default function EssayViewer({ slug, title, date, caption, blocks, prevSl
             </button>
           )}
           {prevSlug && (
-            <Link href={`/photos/${prevSlug}`} className="font-sans text-base text-off-white link-highlight">
+            <Link href={`/library/photos/${prevSlug}`} className="font-sans text-base text-off-white link-highlight">
               ↑ previous set
             </Link>
           )}
           {nextSlug && (
-            <Link href={`/photos/${nextSlug}`} className="font-sans text-base text-off-white link-highlight">
+            <Link href={`/library/photos/${nextSlug}`} className="font-sans text-base text-off-white link-highlight">
               ↓ next set
             </Link>
           )}

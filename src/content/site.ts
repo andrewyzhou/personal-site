@@ -66,6 +66,11 @@ const REQUIRED_STRINGS = [
   ...["all", "runs", "rides", "hikes", "walks", "lifts", "other", "thisWeek", "sessions", "distanceYear", "total", "records", "liftsOverview", "empty", "more"].map(
     (k) => `hubPages.training.${k}`,
   ),
+  ...["work", "writing", "library"].map((k) => `sections.${k}.label`),
+  ...["reading", "screen", "photos", "projects", "coursework"].map((k) => `shelves.${k}.label`),
+  ...["empty", "entries.one", "entries.other", "updated", "groups.work", "groups.research", "groups.teaching", "kinds.post", "kinds.reading", "kinds.screen", "formats.movie", "formats.show", "watched", "rewatched", "toWatch", "inProgress", "started", "finished", "source", "newer", "older"].map(
+    (k) => `sectionPages.${k}`,
+  ),
   "pages.blog.title",
   "pages.blog.metaDescription",
   "pages.blog.intro",

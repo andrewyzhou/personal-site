@@ -23,16 +23,6 @@ export default async function DocsLayout({ params, children }: { params: Promise
           <span>design</span>
         </a>
         <div className="docs-top-end">
-          {/* the live site in the hub design (admins only until it's the default). plain
-              <a> on purpose: switching needs a full load so the proxy can set the cookie */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/?design=b" className="ds-link" data-variant="nav" style={{ fontSize: "var(--ds-text-sm)" }}>
-            view site in B
-          </a>
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a href="/?design=v1" className="ds-link" data-variant="nav" style={{ fontSize: "var(--ds-text-sm)" }}>
-            back to v1
-          </a>
           <BrandSwitch brands={Object.values(BRANDS).map((b) => ({ id: b.id, name: b.name }))} current={brand.id} />
           <ThemeToggle label="switch to {theme} mode" />
         </div>

@@ -21,9 +21,9 @@ interface Item {
 }
 
 const VIEW_PATH: Record<string, (slug: string) => string> = {
-  blog: (s) => `/blog/${s}`,
-  library: (s) => `/library/${s}`,
-  photos: (s) => `/photos/${s}`,
+  blog: (s) => `/writing/${s}`,
+  library: (s) => `/library/reading/${s}`,
+  photos: (s) => `/library/photos/${s}`,
 };
 
 const dateOf = (fm: Record<string, unknown>) => String(fm.date ?? fm.dateCompleted ?? fm.dateStarted ?? "");

@@ -28,9 +28,9 @@ const TYPE_META: Record<string, TypeMeta> = {
 };
 
 const VIEW_PATH: Record<string, (slug: string) => string> = {
-  blog: (s) => `/blog/${s}`,
-  library: (s) => `/library/${s}`,
-  photos: (s) => `/photos/${s}`,
+  blog: (s) => `/writing/${s}`,
+  library: (s) => `/library/reading/${s}`,
+  photos: (s) => `/library/photos/${s}`,
 };
 
 export default function ContentEditorLoader({ typeId, slug }: { typeId: string; slug: string | null }) {

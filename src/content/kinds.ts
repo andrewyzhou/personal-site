@@ -128,3 +128,21 @@ export type SectionId = (typeof SECTIONS)[number]["id"];
 // the shelves of the library, in display order
 export const SHELVES = ["reading", "screen", "photos", "projects", "coursework"] as const;
 export type ShelfId = (typeof SHELVES)[number];
+
+// each shelf's name in a url: /library/<path>
+export const SHELF_PATHS: Record<ShelfId, string> = {
+  reading: "reading",
+  screen: "tv-movies",
+  photos: "photos",
+  projects: "projects",
+  coursework: "coursework",
+};
+export const shelfFromPath = (p: string): ShelfId | null => SHELVES.find((id) => SHELF_PATHS[id] === p) ?? null;
+
+// where each thing lives on the site
+export const urls = {
+  section: (id: SectionId) => `/${id}`,
+  post: (slug: string) => `/writing/${slug}`,
+  shelf: (id: ShelfId) => `/library/${SHELF_PATHS[id]}`,
+  item: (id: ShelfId, slug: string) => `/library/${SHELF_PATHS[id]}/${slug}`,
+};
